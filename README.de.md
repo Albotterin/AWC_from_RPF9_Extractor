@@ -238,7 +238,9 @@ Englisch zurück). Pull Requests mit Übersetzungen sind willkommen.
   echten Dateinamen**, nur Offsets und Stream-IDs.
 * **Gruppen sind eine Layout-Heuristik** (siehe oben), keine echten Ordner; Namen musst du selbst vergeben.
 * Entwickelt und getestet mit den AWC-Dateien **eines** RPF9-Archivs; andere Spiele/Versionen können abweichen.
-* Dauern in der Liste sind Schätzungen (mit `~`); die genaue Länge steht nach Extraktion/Wiedergabe fest.
+* Dauern in der Liste (mit `~`) stammen aus der Sample-Zahl im Stream-Header. Im Beispielarchiv stimmten sie bei 2236
+  von 2240 Streams auf 1 % genau mit den Längen aus der Audio-Konfiguration des Spiels überein; die genaue Länge steht
+  nach Extraktion/Wiedergabe fest.
 * Beim Spulen startet `ffplay` an der neuen Stelle neu (kurze Lücke ist normal).
 
 ## Fehlerbehebung

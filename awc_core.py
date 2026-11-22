@@ -142,6 +142,7 @@ class AwcStream:
         self.sample_rate = sample_rate
         self.codec = codec
         self.opus_channels = 2
+        self.header_samples = 0     # interleaved sample count from the stream format chunk (0x48)
         self.est_seconds = 0.0
 
     @property
@@ -204,8 +205,9 @@ class AwcFile:
             self.data_off = chunks[0x55][0]
             self.data_size = min(chunks[0x55][1], self.size - self.data_off)
             for c in range(nch):
-                sid, _samples, _headroom, sps, codec = struct.unpack_from("<IIhHB", fmt, 12 + 16 * c)
+                sid, samples, _headroom, sps, codec = struct.unpack_from("<IIhHB", fmt, 12 + 16 * c)
                 self.streams.append(AwcStream(c, sid, sps, codec))
+                self.streams[-1].header_samples = samples
             self.n_blocks = (self.data_size + self.block_size - 1) // self.block_size
             self.truncated = self.data_size < chunks[0x55][1]
             self._estimate(f)
@@ -235,6 +237,8 @@ class AwcFile:
                 if 0 < n and pos + 3 <= len(blk):
                     st.opus_channels = 2 if (blk[pos + 2] & 4) else 1
             st.est_seconds = totals[c] / float(st.sample_rate * st.opus_channels)
+            if st.header_samples > 0:   # the format chunk holds the exact length (matches the game's config)
+                st.est_seconds = st.header_samples / float(st.sample_rate * st.opus_channels)
             pos += ents[c] * 0x800
 
     # -- extraction -------------------------------------------------------------
@@ -396,7 +400,7 @@ def scan_container_cached(path, progress=None, cancel=None, use_cache=True):
         try:
             with open(cf, "r", encoding="utf-8") as fh:
                 c = json.load(fh)
-            if c.get("size") == st.st_size and c.get("mtime") == int(st.st_mtime) and c.get("v") == 2:
+            if c.get("size") == st.st_size and c.get("mtime") == int(st.st_mtime) and c.get("v") == 3:
                 for it in c["items"]:
                     it["path"] = path          # the archive may have been moved/renamed since the scan
                 add_groups(c["items"])
@@ -407,7 +411,7 @@ def scan_container_cached(path, progress=None, cancel=None, use_cache=True):
     add_groups(items)
     try:
         with open(cf, "w", encoding="utf-8") as fh:
-            json.dump({"v": 2, "path": path, "size": st.st_size, "mtime": int(st.st_mtime),
+            json.dump({"v": 3, "path": path, "size": st.st_size, "mtime": int(st.st_mtime),
                        "total": total, "items": items}, fh)
     except OSError:
         pass

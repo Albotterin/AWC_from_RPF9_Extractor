@@ -57,7 +57,7 @@ def first_adat(data):
 
 
 def read_config_strings(path):
-    """(set of printable strings, set of station slugs) from the config at the start of an archive."""
+    """(printable strings, station slugs) from the config at the start of an archive."""
     with open(path, "rb") as f:
         data = f.read(MAX_SCAN)
     data = data[:first_adat(data)]
@@ -96,7 +96,7 @@ def pretty(slug):
 
 
 def read_names(path, wanted):
-    """Names for the loaded stream IDs and the station list found in one archive.
+    """Names and the station list of one archive for the loaded stream IDs.
 
     Returns (names {stream id: pretty title}, stations [pretty names], n_strings)."""
     strings, stations = read_config_strings(path)
