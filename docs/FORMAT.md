@@ -129,7 +129,21 @@ without re-encoding.
 * Ogg CRC32 (polynomial `0x04C11DB7`, not reflected, init 0) is computed with `zlib.crc32` by bit-reversing the
   input bytes and the result – about 30× faster than a table loop in pure Python.
 
-## 6. Not covered
+## 6. Grouping (a heuristic, not part of the format)
+
+Names and directories live in the unreadable RPF9 table of contents, so `awc_core.add_groups()` clusters the music AWCs
+by their position in the archive:
+
+1. sort the AWCs by offset;
+2. start a new group when `offset - previous_end >= 0x10000` **or** the running AWC number (ordinal among *all* valid
+   `ADAT` headers found, music or not) is not `previous + 1`, i.e. a non-music AWC sits in between.
+
+Observed in the sample archive: the 2,684 music AWCs form one almost gap-free region (2,587 of 2,683 transitions have
+less than 4 KiB of padding); the 28 boundaries inside it are mostly exactly one non-music AWC plus a gap of up to
+~24 MB, giving 29 groups. Whether a group really is one directory (e.g. one radio station) can't be proven without the
+table of contents - it is an inference from the layout.
+
+## 7. Not covered
 
 * Non-music AWCs (chunk `0xFA` "sfx header", Vorbis `0x76`/`0x7F`, MIDI `0x68`, …).
 * Codecs other than `0x0B`: PCM, IMA/MS-ADPCM, XMA2, MPEG, Vorbis, ATRAC9, DSP, other Opus variants.

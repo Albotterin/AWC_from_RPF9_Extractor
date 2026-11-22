@@ -358,6 +358,26 @@ def scan_container(path, progress=None, cancel=None):
     return items, total
 
 
+GROUP_GAP = 0x10000   # byte gap between two music AWCs that starts a new group
+
+
+def add_groups(items):
+    """Cluster the AWCs of one archive into groups by their position in the archive.
+
+    Files of one folder are stored back to back, so a new group starts where there is a larger gap
+    (>= 64 KiB) or where the running AWC number jumps (a non-music AWC sits in between).
+    Sets item["g"] (1-based group number) on every item and returns the number of groups.
+    """
+    prev = None
+    g = 0
+    for it in sorted(items, key=lambda x: x["base"]):
+        if prev is None or it["base"] - (prev["base"] + (prev["length"] or 0)) >= GROUP_GAP                 or it.get("n", 0) - prev.get("n", 0) != 1:
+            g += 1
+        it["g"] = g
+        prev = it
+    return g
+
+
 def _cache_file(path):
     d = os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~"), "AWC-Tool", "cache")
     os.makedirs(d, exist_ok=True)
@@ -372,10 +392,14 @@ def scan_container_cached(path, progress=None, cancel=None, use_cache=True):
             with open(cf, "r", encoding="utf-8") as fh:
                 c = json.load(fh)
             if c.get("size") == st.st_size and c.get("mtime") == int(st.st_mtime) and c.get("v") == 2:
+                for it in c["items"]:
+                    it["path"] = path          # the archive may have been moved/renamed since the scan
+                add_groups(c["items"])
                 return c["items"], c["total"], True
         except (OSError, ValueError, KeyError):
             pass
     items, total = scan_container(path, progress, cancel)
+    add_groups(items)
     try:
         with open(cf, "w", encoding="utf-8") as fh:
             json.dump({"v": 2, "path": path, "size": st.st_size, "mtime": int(st.st_mtime),
@@ -454,6 +478,7 @@ class AwcRef:
         self.n_blocks = item.get("blocks", 0)
         self.key = "%s@%d" % (self.path, self.base)
         self.in_rpf = self.path.lower().endswith(".rpf")
+        self.group = item.get("g", 0)
         self.container = os.path.splitext(os.path.basename(self.path))[0]
         self.streams = []
         for si in item["streams"]:

@@ -16,7 +16,8 @@ import tempfile
 import threading
 import time
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+import json
+from tkinter import filedialog, messagebox, simpledialog, ttk
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import awc_core as core  # noqa: E402
@@ -65,6 +66,29 @@ def fmt_size(n):
         n /= 1024.0
 
 
+def _names_file():
+    return os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~"), "AWC-Tool", "group_names.json")
+
+
+def load_group_names():
+    """{archive path (lower case): {group number as str: custom name}} - set via right click > Rename group."""
+    try:
+        with open(_names_file(), "r", encoding="utf-8") as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def save_group_names(d):
+    try:
+        os.makedirs(os.path.dirname(_names_file()), exist_ok=True)
+        with open(_names_file(), "w", encoding="utf-8") as f:
+            json.dump(d, f, ensure_ascii=False, indent=1)
+    except OSError:
+        pass
+
+
 def safe_name(s):
     return "".join(c if c not in '<>:"/\\|?*' else "_" for c in s)
 
@@ -82,6 +106,7 @@ class App(tk.Tk):
         self.nodes = {}            # iid -> ("container", dict) | ("awc", AwcRef) | ("stream", (AwcRef, AwcStream))
         self.refs = {}             # ref.key -> AwcRef
         self.containers = set()    # paths that are already loaded
+        self.group_names = load_group_names()
         self.cache = {}            # (ref.key, stream_idx) -> (opus_path, seconds)  (playback/extract cache)
         self.busy = False
         self.cancel_flag = False
@@ -148,9 +173,30 @@ class App(tk.Tk):
         self._update_count()
         self._update_ui()
 
+    @staticmethod
+    def _gkey(cpath):
+        return os.path.normcase(os.path.abspath(cpath))
+
+    def _gname(self, cpath, g):
+        return self.group_names.get(self._gkey(cpath), {}).get(str(g), "")
+
+    def _group_text(self, cpath, g):
+        name = self._gname(cpath, g)
+        return tr("grp_label_named", g=g, name=name) if name else tr("grp_label", g=g)
+
+    def _group_dir(self, ref):
+        """Output sub folder of an AWC inside an archive: group_03 or group_03_<custom name>."""
+        if not ref.in_rpf or not ref.group:
+            return ""
+        name = self._gname(ref.path, ref.group)
+        return "group_%02d" % ref.group + ("_" + safe_name(name) if name else "")
+
     def _retranslate_tree(self):
         for iid, (kind, obj) in self.nodes.items():
-            if kind == "stream":
+            if kind == "group":
+                self.tree.item(iid, text=self._group_text(obj[0], obj[1]))
+                self.tree.set(iid, "ch", tr("n_awc", n=obj[2]))
+            elif kind == "stream":
                 ref, s = obj
                 self.tree.item(iid, text=s.label)
                 self.tree.set(iid, "ch", tr("stereo") if s.opus_channels == 2 else tr("mono"))
@@ -196,6 +242,7 @@ class App(tk.Tk):
         self.tree.pack(side="left", fill="both", expand=True)
         sb.pack(side="left", fill="y")
         self.tree.bind("<Double-1>", self._dbl)
+        self.tree.bind("<Button-3>", self._context_menu)
 
         pl = self._reg(ttk.LabelFrame(self), "text", "lf_player")
         pl.pack(fill="x", **pad)
@@ -318,7 +365,15 @@ class App(tk.Tk):
             cid = self.tree.insert("", "end", text="%s  [%s]" % (c["path"], c["kind"].upper()), open=False,
                                    values=("", "", tr("n_awc", n=len(items)), fmt_time(tot_sec), csize))
             self.nodes[cid] = ("container", c)
+            # per-group totals (groups = clusters of AWCs that sit together in the archive, see core.add_groups)
+            gstat = {}
             for it in items:
+                st = gstat.setdefault(it.get("g", 0), [0, 0.0, 0])
+                st[0] += 1
+                st[1] += max((s["sec"] for s in it["streams"]), default=0)
+                st[2] += it["length"] or 0
+            gnodes = {}
+            for it in sorted(items, key=lambda x: x["base"]):
                 ref = AwcRef(it)
                 self.refs[ref.key] = ref
                 n_awc += 1
@@ -327,7 +382,16 @@ class App(tk.Tk):
                     parent = cid          # standalone AWC: streams directly under the container node
                     self.tree.item(cid, text=ref.path)
                 else:
-                    parent = self.tree.insert(cid, "end", text=ref.name, open=False,
+                    gparent = cid
+                    if ref.group:
+                        if ref.group not in gnodes:
+                            n, sec, size = gstat[ref.group]
+                            gnodes[ref.group] = self.tree.insert(
+                                cid, "end", text=self._group_text(c["path"], ref.group), open=False,
+                                values=("", "", tr("n_awc", n=n), fmt_time(sec), fmt_size(size)))
+                            self.nodes[gnodes[ref.group]] = ("group", (c["path"], ref.group, n))
+                        gparent = gnodes[ref.group]
+                    parent = self.tree.insert(gparent, "end", text=ref.name, open=False,
                                               values=("", "", len(ref.streams), "~" + fmt_time(nsec),
                                                       fmt_size(ref.size)))
                     self.nodes[parent] = ("awc", ref)
@@ -386,6 +450,34 @@ class App(tk.Tk):
 
     def _all_streams(self):
         return [v[1] for v in self.nodes.values() if v[0] == "stream"]
+
+    def _context_menu(self, e):
+        iid = self.tree.identify_row(e.y)
+        if not iid or self.nodes.get(iid, (None,))[0] != "group":
+            return
+        self.tree.selection_set(iid)
+        m = tk.Menu(self, tearoff=0)
+        m.add_command(label=tr("ctx_rename"), command=lambda: self.rename_group(iid))
+        if self._gname(self.nodes[iid][1][0], self.nodes[iid][1][1]):
+            m.add_command(label=tr("ctx_clear_name"), command=lambda: self.rename_group(iid, clear=True))
+        m.tk_popup(e.x_root, e.y_root)
+
+    def rename_group(self, iid, clear=False):
+        cpath, g, _n = self.nodes[iid][1]
+        if clear:
+            name = ""
+        else:
+            name = simpledialog.askstring(tr("dlg_rename_title"), tr("dlg_rename_prompt", g=g),
+                                          initialvalue=self._gname(cpath, g), parent=self)
+            if name is None:
+                return
+        d = self.group_names.setdefault(self._gkey(cpath), {})
+        if name.strip():
+            d[str(g)] = name.strip()
+        else:
+            d.pop(str(g), None)
+        save_group_names(self.group_names)
+        self.tree.item(iid, text=self._group_text(cpath, g))
 
     def _dbl(self, e):
         iid = self.tree.identify_row(e.y)
@@ -480,7 +572,7 @@ class App(tk.Tk):
             for gi, k in enumerate(order):
                 ref, streams = groups[k]
                 w = max(1, ref.size) / float(total)
-                folder = os.path.join(out, safe_name(ref.container)) if ref.in_rpf else out
+                folder = os.path.join(out, safe_name(ref.container), self._group_dir(ref)) if ref.in_rpf else out
                 os.makedirs(folder, exist_ok=True)
                 jobs, final = {}, {}
                 for s in streams:

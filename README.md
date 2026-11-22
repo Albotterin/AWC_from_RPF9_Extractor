@@ -2,7 +2,7 @@
 
 **Find, play and extract music streams from RAGE-engine `.rpf` archives (RPF9) and `.awc` files – with a simple GUI.**
 
-🇩🇪 [Deutsche Version](README.de.md) · 📄 [Technical format notes](docs/FORMAT.md)
+🇩🇪 [Deutsche Version](README.de.md) · 📄 [Technical format notes](docs/FORMAT.md) · ⬇️ [**Download (Releases)**](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/latest)
 
 ![Main window](docs/screenshots/01-main.png)
 
@@ -18,14 +18,15 @@
 6. [Usage](#usage)
 7. [Output formats and file naming](#output-formats-and-file-naming)
 8. [How it works (short version)](#how-it-works-short-version)
-9. [Using the code as a library](#using-the-code-as-a-library)
-10. [Building a standalone `.exe`](#building-a-standalone-exe)
-11. [Languages](#languages)
-12. [Limitations](#limitations)
-13. [Troubleshooting](#troubleshooting)
-14. [Project layout](#project-layout)
-15. [Credits](#credits)
-16. [License](#license)
+9. [Grouping: which files belong together?](#grouping-which-files-belong-together)
+10. [Using the code as a library](#using-the-code-as-a-library)
+11. [Building a standalone `.exe`](#building-a-standalone-exe)
+12. [Languages](#languages)
+13. [Limitations](#limitations)
+14. [Troubleshooting](#troubleshooting)
+15. [Project layout](#project-layout)
+16. [Credits](#credits)
+17. [License](#license)
 
 ---
 
@@ -46,6 +47,9 @@ This tool takes a different route:
    the game plays.
 4. Optionally it **converts to FLAC, WAV or MP3** with ffmpeg, and it can **play any stream directly** from the
    archive, with seek and volume control.
+5. Because the archive's table of contents (and with it every file name) is unreadable, it **groups the AWCs by their
+   position in the archive** – files of one folder are stored back to back, so a group is typically one radio station
+   or one folder. You can **name the groups yourself** (right-click), and the names become export folder names.
 
 You can point it at a single `.awc`, a single `.rpf`, or a **whole folder** – it searches all subfolders for
 every `.rpf` and `.awc` file and lists all music streams it finds.
@@ -69,7 +73,8 @@ every `.rpf` and `.awc` file and lists all music streams it finds.
 |---|---|
 | 🔍 **Archive scanning** | Header scan of `.rpf` files of any size (64 MiB read chunks, strict validation, skips over found AWCs). |
 | 📂 **Folder mode** | Choose a folder – all subfolders are searched for `*.rpf` and `*.awc`. |
-| 🌳 **Tree view** | Container → AWC → stream, with stream ID, codec, stereo/mono, duration and size. |
+| 🌳 **Tree view** | Container → group → AWC → stream, with stream ID, codec, stereo/mono, duration and size. |
+| 🗂 **Groups** | AWCs are clustered by their position in the archive (≈ one folder / radio station each). Right-click a group → **Rename group…**; the name is used for the export folder. |
 | ▶️ **Player** | Play any stream straight from the archive (play/pause/stop, seek bar, volume). Uses `ffplay`. |
 | 💾 **Extraction** | Opus (lossless remux), FLAC, WAV (16-bit PCM) or MP3 (320 kbit/s). Select streams, whole AWCs or whole containers. |
 | ⏱ **Duration filter** | "Only streams longer than N seconds" – skips the many short snippets. |
@@ -85,6 +90,12 @@ every `.rpf` and `.awc` file and lists all music streams it finds.
 streams. The selection can be extracted or played.
 
 ![Main window](docs/screenshots/01-main.png)
+
+**Groups.** Without a readable table of contents the tool clusters the AWCs by where they sit in the archive.
+Each *Group NN* is typically one folder / radio station. Right-click a group to give it a name (here:
+"My station name" – the name is stored on your PC and used for the export folder).
+
+![Groups](docs/screenshots/05-groups.png)
 
 **Playing a stream** directly from the archive – here at 44:38 of a two-hour stream, with the seek bar.
 
@@ -134,6 +145,8 @@ On Windows you can also double-click `Start AWC-Tool.bat`.
    **output folder**, and click **Extract selected**. **Extract all streams** processes everything in the list.
    *Selected → FLAC* and *Selected → WAV* are one-click shortcuts.
 5. Use **Only streams longer than (sec.)** to skip short snippets (e.g. `60` keeps only streams of a minute or more).
+6. **Name the groups** (optional): right-click a *Group NN* row → **Rename group…** (e.g. after listening to a few
+   tracks). Names are stored in `%APPDATA%\AWC-Tool\group_names.json` and become part of the export folder name.
 
 ### Player controls
 
@@ -163,13 +176,16 @@ python awc_tool.py --selftest <report.txt> <file.awc>     # diagnostics (used fo
 > The source audio is lossy (Opus, 128 kbit/s stereo). FLAC/WAV don't add quality – they are for compatibility
 > with tools that can't read Opus.
 
-Files are written to `<output folder>/<container name>/<awc name>_stream<N>_<STREAMID>.<ext>`, for example:
+Files are written to `<output folder>/<container name>/<group folder>/<awc name>_stream<N>_<STREAMID>.<ext>`,
+for example:
 
 ```
-AWC-Export/audio/audio_956_at_000000015034A000_stream0_1D7CA6CC.opus
+AWC-Export/audio/group_04/audio_956_at_000000015034A000_stream0_1D7CA6CC.opus
+AWC-Export/audio/group_04_My station name/audio_956_at_000000015034A000_stream0_1D7CA6CC.opus   (after naming the group)
 ```
 
-* `audio` – name of the `.rpf` the AWC was found in (omitted for standalone `.awc` files),
+* `audio` – name of the `.rpf` the AWC was found in (standalone `.awc` files are written directly into the output folder),
+* `group_04` – the group (see [Grouping](#grouping-which-files-belong-together)), plus your own name if you gave one,
 * `956` – running number of the AWC header in the archive,
 * `000000015034A000` – byte offset of the AWC inside the archive,
 * `stream0` / `1D7CA6CC` – stream index and the stream's 32-bit ID (a hash; real names are not stored in the AWC).
@@ -187,6 +203,24 @@ audio.rpf (28 GB)
 ```
 
 The full byte-level description is in **[docs/FORMAT.md](docs/FORMAT.md)**.
+
+## Grouping: which files belong together?
+
+The RPF9 table of contents can't be read, so the archive doesn't tell us which AWC belongs to which radio station or
+folder. The tool uses a **heuristic based on the physical layout**:
+
+* Files of one folder are stored **back to back**; between two folders there is usually a larger gap (and a
+  non-music AWC). A new group starts where the gap to the previous music AWC is **≥ 64 KiB** or where the running AWC
+  number jumps (= a non-music AWC sits in between).
+* In the sample archive this gave **29 groups** (one of them ~300 files, a few with only 4–7 long pieces).
+* Typical group contents: songs (3–5 min), many short voice/jingle snippets, and sometimes a 1–2 hour continuous
+  stream. Groups that contain only very short snippets are probably not radio at all.
+
+**What it can't do:** it can't tell you the *names* – neither of stations nor of songs. A group is *probably* one
+folder, but that is an inference, not a fact. Listen to a few tracks, then name the groups in the tool.
+Handy: `Only streams longer than (sec.)` with `90` keeps just the real tracks.
+
+In code: `awc_core.add_groups(items)` sets `item["g"]` (1-based) on the items returned by the scanner.
 
 ## Using the code as a library
 
@@ -232,6 +266,7 @@ To add a language, edit `awc_i18n.py`: add an entry to `LANGUAGES` and a table w
 * The **RPF9 table of contents is not parsed** (it appears to be encrypted/obfuscated), so there are **no real
   file names** – only offsets and stream IDs. The tool relies on the fact that the AWC payloads inside the archive
   are stored uncompressed and unencrypted.
+* **Groups are a layout heuristic** (see above), not real folders; names have to be given by you.
 * Developed and tested against the AWC files of **one** RPF9 archive. Other games/versions may use different
   codecs or layouts.
 * Durations in the list are estimates (marked with `~`) from the block headers; the exact length is known after
