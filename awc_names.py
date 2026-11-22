@@ -21,10 +21,17 @@ BAD_CHARS = '<>:"/\\|?*'
 
 
 # --------------------------------------------------------------------------- hashing
+STREAM_ID_MASK = 0x1FFFFFFF   # an AWC stream ID is the name hash with the top 3 bits cleared
+
+
 def joaat(text):
-    """Jenkins one-at-a-time hash of the lower-cased text (as used by RAGE for names)."""
+    """Jenkins one-at-a-time hash of the lower-cased text (as used by RAGE for names).
+
+    Works on the latin-1 bytes (a non-ASCII character is one byte, e.g. 'é' = 0xE9), like the other RAGE
+    tooling; UTF-8 would give a hash that no stream ID matches.
+    """
     h = 0
-    for b in text.lower().encode("utf-8"):
+    for b in text.lower().encode("latin-1", "replace"):
         h = (h + b) & 0xFFFFFFFF
         h = (h + (h << 10)) & 0xFFFFFFFF
         h ^= h >> 6
@@ -32,6 +39,19 @@ def joaat(text):
     h ^= h >> 11
     h = (h + (h << 15)) & 0xFFFFFFFF
     return h
+
+
+def normalized_name(text):
+    """Lower-case; every run of non-alphanumeric characters becomes a single underscore."""
+    out, last = [], False
+    for ch in text.lower():
+        if ch.isalnum():
+            out.append(ch)
+            last = False
+        elif not last:
+            out.append("_")
+            last = True
+    return "".join(out).strip("_")
 
 
 def parse_id(text):
@@ -125,10 +145,12 @@ class NameStore:
 
         Two kinds of entries are understood:
           * with a stream ID (column id/hash, or a JSON key like "1A2B3C4D")  -> stored as given
-          * with an internal name (column name/key, a plain text line, a JSON key)  -> hashed with joaat() and
+          * with an internal name (column name/key, a plain text line, a JSON key)  -> hashed with joaat() (29-bit) and
             kept only if the hash is the ID of a stream that is currently loaded (known_ids)
         """
-        known = {i & 0xFFFFFFFF for i in known_ids}
+        known = {}                  # 29-bit stream ID -> ID as it appears in the files
+        for i in known_ids:
+            known.setdefault(i & STREAM_ID_MASK, i & 0xFFFFFFFF)
         raw = open(path, "rb").read()
         try:
             text = raw.decode("utf-8-sig")
@@ -141,10 +163,12 @@ class NameStore:
         matched = skipped = 0
         for sid, name_key, rec in entries:
             if sid is None and name_key:
-                for cand in {name_key, name_key.replace(" ", "_"), os.path.splitext(name_key)[0]}:
-                    h = joaat(cand)
+                base = os.path.splitext(name_key)[0]
+                for cand in (name_key, name_key.replace(" ", "_"), base, normalized_name(name_key),
+                             normalized_name(base)):
+                    h = joaat(cand) & STREAM_ID_MASK
                     if h in known:
-                        sid = h
+                        sid = known[h]
                         break
             if sid is None or not (rec["title"] or rec["artist"]):
                 skipped += 1
