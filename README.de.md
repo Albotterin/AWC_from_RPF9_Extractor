@@ -1,0 +1,216 @@
+# AWC from RPF9 Extractor
+
+**Musik-Streams aus RAGE-Engine-`.rpf`-Archiven (RPF9) und `.awc`-Dateien finden, abspielen und extrahieren – mit einfacher GUI.**
+
+🇬🇧 [English version](README.md) · 📄 [Technische Format-Notizen (englisch)](docs/FORMAT.md)
+
+![Hauptfenster](docs/screenshots/04-german.png)
+
+---
+
+## Inhalt
+
+1. [Was macht das Tool?](#was-macht-das-tool)
+2. [Rechtlicher Hinweis](#rechtlicher-hinweis)
+3. [Funktionen](#funktionen)
+4. [Screenshots](#screenshots)
+5. [Voraussetzungen & Installation](#voraussetzungen--installation)
+6. [Bedienung](#bedienung)
+7. [Ausgabeformate und Dateinamen](#ausgabeformate-und-dateinamen)
+8. [So funktioniert es](#so-funktioniert-es)
+9. [Als Bibliothek nutzen](#als-bibliothek-nutzen)
+10. [Eigene `.exe` bauen](#eigene-exe-bauen)
+11. [Sprachen](#sprachen)
+12. [Einschränkungen](#einschränkungen)
+13. [Fehlerbehebung](#fehlerbehebung)
+14. [Lizenz & Credits](#lizenz--credits)
+
+---
+
+## Was macht das Tool?
+
+Spiele auf Basis der RAGE-Engine von Rockstar speichern ihr Audio in großen `audio.rpf`-Archiven. Die Musik liegt
+darin in **AWC**-Containern (Header `ADAT`). Die neueren **RPF9**-Archive lassen sich mit den üblichen RPF7-Tools nicht
+öffnen, und ihr Inhaltsverzeichnis ist nicht lesbar – die AWC-Dateien kann man also nicht einfach über Namen finden.
+
+Dieses Tool geht einen anderen Weg:
+
+1. **Es durchsucht das rohe Archiv nach AWC-Headern** (`ADAT`) – ohne Inhaltsverzeichnis. Ein 28-GB-Archiv dauert
+   auf einer normalen Festplatte etwa 6 Minuten; das Ergebnis wird zwischengespeichert, der nächste Scan ist sofort fertig.
+2. **Es erkennt die Musik-Container** (Mehrkanal-AWC mit Stream-Format-Chunk) und liest Stream-IDs, Codec,
+   Kanal-Aufbau und Dauer.
+3. **Es entschlüsselt das Container-Layout** (Blöcke → Kanal-Einträge → Opus-Pakete) und **schreibt die originalen
+   Opus-Pakete 1:1 in normale Ogg-Opus-Dateien** – es gibt *keine Neukodierung*, das Audio ist also bitgleich zu dem,
+   was das Spiel abspielt.
+4. Optional **konvertiert es nach FLAC, WAV oder MP3** (mit ffmpeg) und kann **jeden Stream direkt abspielen**,
+   mit Vor-/Zurückspulen und Lautstärkeregler.
+
+Du kannst eine einzelne `.awc`, eine `.rpf` oder einen **ganzen Ordner** angeben – dann werden alle Unterordner nach
+`.rpf`- und `.awc`-Dateien durchsucht und alle gefundenen Musik-Streams aufgelistet.
+
+> Beispiel: 28,5-GB-`audio.rpf` → 4.153 AWC-Header, davon 2.684 Musik-Container mit 2.700 Streams
+> (Opus, 48 kHz) ≈ 90 Stunden Audio ≈ 4,8 GB als `.opus`.
+
+## Rechtlicher Hinweis
+
+* Dieses Repository enthält **nur Quellcode und Dokumentation**. Es enthält **keine Spieldateien, keine Archive und
+  keine extrahierten Audiodaten** – und wird das auch nie.
+* Du brauchst deine eigenen Dateien aus einem Spiel, das du rechtmäßig besitzt. Für extrahiertes Audio bist du selbst
+  verantwortlich – es unterliegt dem Urheberrecht der Rechteinhaber. Private, nicht-kommerzielle Analyse und
+  Archivierung ist eine Sache, die Weitergabe in der Regel nicht erlaubt.
+* Das Projekt steht in **keiner Verbindung** zu Rockstar Games, Take-Two oder anderen Publishern und wird von
+  diesen nicht unterstützt. Alle Marken gehören ihren jeweiligen Inhabern.
+
+## Funktionen
+
+* 🔍 **Archiv-Scan** per Header-Suche in `.rpf`-Dateien beliebiger Größe (64-MiB-Blöcke, strenge Prüfung).
+* 📂 **Ordner-Modus**: alle Unterordner nach `*.rpf` und `*.awc` durchsuchen.
+* 🌳 **Baumansicht** Container → AWC → Stream mit Stream-ID, Codec, Stereo/Mono, Dauer und Größe.
+* ▶️ **Player** direkt aus dem Archiv (Play/Pause/Stop, Positionsleiste, Lautstärke) über `ffplay`.
+* 💾 **Extraktion** als Opus (verlustfrei), FLAC, WAV (16 Bit) oder MP3 (320 kbit/s) – für Streams, ganze AWCs oder Container.
+* ⏱ **Dauer-Filter** („Nur Streams ab N Sekunden“) blendet die vielen Kurz-Schnipsel aus.
+* 🛡 **Sicherheitsnetz**: geschätzte Ausgabegröße, Warnung bei zu wenig Speicher, Rückfrage bei großen Jobs.
+* ⚡ **Schnell**: Ogg-Muxer in reinem Python mit zlib-basierter Prüfsumme (~100 MB Opus in etwa einer Sekunde).
+* 🧠 **Scan-Cache** in `%APPDATA%\AWC-Tool\cache` (abschaltbar).
+* 🌍 **Mehrsprachige Oberfläche** (Englisch/Deutsch), zur Laufzeit umschaltbar und leicht erweiterbar.
+* ❌ Scans und Extraktionen sind **abbrechbar**; angefangene Dateien werden entfernt.
+
+## Screenshots
+
+**Musik-Container eines Archivs durchsuchen** – Mehrstream-AWCs (hier 3 Stereo-Streams) lassen sich aufklappen:
+
+![Hauptfenster](docs/screenshots/01-main.png)
+
+**Direkt aus dem Archiv abspielen** (hier bei 44:38 eines zweistündigen Streams):
+
+![Player](docs/screenshots/02-player.png)
+
+**Extraktion läuft** (FLAC) mit Fortschrittsbalken und *Abbrechen*-Button:
+
+![Extraktion](docs/screenshots/03-extracting.png)
+
+**Sprachumschaltung** – dasselbe Fenster auf Deutsch:
+
+![Deutsche Oberfläche](docs/screenshots/04-german.png)
+
+## Voraussetzungen & Installation
+
+* **Windows** (GUI und `.exe` zielen auf Windows; die Kernmodule sind reines, portables Python).
+* **Python 3 mit tkinter** (im Standard-Installer von python.org enthalten; entwickelt und getestet mit 3.14). Keine `pip`-Pakete nötig.
+* **ffmpeg + ffplay** – nur für *Abspielen* und den Export nach *FLAC/WAV/MP3*. Opus-Extraktion geht auch ohne.
+  ffmpeg gibt es unter <https://ffmpeg.org/download.html>; `ffmpeg.exe` und `ffplay.exe` **neben das Programm** oder in den `PATH` legen.
+
+```bash
+git clone https://github.com/Albotterin/AWC_from_RPF9_Extractor.git
+cd AWC_from_RPF9_Extractor
+python awc_tool.py
+```
+
+Unter Windows geht auch ein Doppelklick auf `Start AWC-Tool.bat`.
+
+## Bedienung
+
+1. **Ordner scannen…** klicken und einen Ordner mit `.rpf`/`.awc`-Dateien wählen (Unterordner inklusive) – oder
+   **Dateien öffnen (AWC/RPF)…** für einzelne Dateien. Pfade können auch auf der Kommandozeile übergeben werden:
+   ```bash
+   python awc_tool.py "D:\spiel\audio.rpf"
+   python awc_tool.py "D:\spiel"          # ganzer Ordner
+   python awc_tool.py --lang=de           # auf Deutsch starten
+   ```
+2. Scan abwarten. Der Balken zeigt, wie viel vom Archiv gelesen wurde und wie viele Musik-AWCs bisher gefunden wurden.
+3. Im Baum **stöbern**. Doppelklick auf einen Stream **spielt** ihn ab (beim ersten Mal wird er kurz in einen
+   temporären Cache extrahiert – etwa eine Sekunde pro 100 MB).
+4. **Extrahieren**: Streams, AWCs oder einen ganzen Container markieren (Strg/Umschalt für Mehrfachauswahl), **Format**
+   und **Zielordner** wählen und **Markierte extrahieren** klicken. **Alle Streams extrahieren** verarbeitet die ganze
+   Liste. *Markierte → FLAC* / *→ WAV* sind Ein-Klick-Abkürzungen.
+5. Mit **Nur Streams ab (Sek.)** lassen sich kurze Schnipsel überspringen (z. B. `60` = nur Streams ab einer Minute).
+
+Kommandozeile: `python awc_tool.py [--lang=en|de] [Ordner | datei.awc | datei.rpf ...]`
+
+## Ausgabeformate und Dateinamen
+
+| Format | Größe (Stereo, pro Stunde) | Hinweis |
+|---|---|---|
+| **Opus** | ≈ 58 MB | Originalpakete im Ogg-Container – **bitgleiches Audio, keine Neukodierung**. |
+| FLAC | ≈ 600 MB | Verlustfreie Kopie des *dekodierten* Audios (die Quelle ist verlustbehaftetes Opus). |
+| WAV | ≈ 700 MB | 16 Bit PCM, 48 kHz. Sehr groß. |
+| MP3 | ≈ 140 MB | 320 kbit/s, aus dem dekodierten Audio neu kodiert. |
+
+> Die Quelle ist verlustbehaftet (Opus, 128 kbit/s Stereo). FLAC/WAV verbessern die Qualität nicht – sie dienen der
+> Kompatibilität mit Programmen, die kein Opus lesen können.
+
+Dateiname: `<Zielordner>/<Container>/<awc-name>_stream<N>_<STREAMID>.<ext>`, z. B.
+`AWC-Export/audio/audio_956_at_000000015034A000_stream0_1D7CA6CC.opus` – `956` ist die laufende Nummer des AWC-Headers,
+`000000015034A000` der Byte-Offset im Archiv, `1D7CA6CC` die 32-Bit-Stream-ID (ein Hash; echte Namen stehen nicht in der AWC).
+
+## So funktioniert es
+
+```
+audio.rpf (28 GB)
+  └─ Suche nach "ADAT" ──► Kandidaten ──► strenge Header-Prüfung ──► AWC bei Offset X, Länge L
+        └─ Chunk-Tabelle: 0x48 Stream-Format · 0x55 Daten · 0xA3 Seek-Tabelle · 0xBD Events
+              └─ Daten = Blöcke à 512 KiB
+                    └─ Block: Kanal-Tabelle · Seek-Tabellen · 0x800-Byte-Einheiten [u16 Länge | Opus-Paket]*
+                          └─ Opus-Pakete ──► Ogg-Seiten (OpusHead/OpusTags + CRC) ──► .opus
+                                                  └─ ffmpeg ──► FLAC / WAV / MP3
+```
+
+Die Byte-genaue Beschreibung steht in **[docs/FORMAT.md](docs/FORMAT.md)** (englisch).
+
+## Als Bibliothek nutzen
+
+```python
+import awc_core as core
+
+items, total_awc, from_cache = core.scan_container_cached(r"D:\spiel\audio.rpf")
+ref = core.AwcRef(items[0])
+jobs = {s.index: f"out_{s.index}_{s.id:08X}.opus" for s in ref.streams if s.supported}
+seconds = ref.extract(jobs, progress=lambda f: print(f"{f:.0%}"))
+```
+
+## Eigene `.exe` bauen
+
+```bat
+build_exe.bat
+```
+
+Installiert bei Bedarf PyInstaller und erzeugt `dist\AWC-Tool.exe`. `ffmpeg.exe` und `ffplay.exe` daneben legen.
+(Die `.exe` und ffmpeg sind bewusst **nicht** Teil dieses Repositories. PyInstaller-Programme werden von Virenscannern
+manchmal fälschlich gemeldet – im Zweifel aus dem Quellcode starten.)
+
+## Sprachen
+
+Die Oberfläche lässt sich jederzeit über das Feld **Sprache** (oben rechts) umschalten; die Wahl wird in
+`%APPDATA%\AWC-Tool\settings.json` gespeichert. Aktuell: **English** (Standard) und **Deutsch**. Weitere Sprachen:
+in `awc_i18n.py` einen Eintrag in `LANGUAGES` und eine Tabelle in `STRINGS` ergänzen (fehlende Schlüssel fallen auf
+Englisch zurück). Pull Requests mit Übersetzungen sind willkommen.
+
+## Einschränkungen
+
+* **Nur Musik-Container mit Opus-Codec (`0x0B`)**. Andere AWC-Arten (Effekte, Sprache, Vorbis/ADPCM/XMA …) werden
+  als „kein Musik-Container“ erkannt und übersprungen.
+* Das **RPF9-Inhaltsverzeichnis wird nicht gelesen** (es wirkt verschlüsselt/verschleiert) – deshalb gibt es **keine
+  echten Dateinamen**, nur Offsets und Stream-IDs.
+* Entwickelt und getestet mit den AWC-Dateien **eines** RPF9-Archivs; andere Spiele/Versionen können abweichen.
+* Dauern in der Liste sind Schätzungen (mit `~`); die genaue Länge steht nach Extraktion/Wiedergabe fest.
+* Beim Spulen startet `ffplay` an der neuen Stelle neu (kurze Lücke ist normal).
+
+## Fehlerbehebung
+
+| Problem | Lösung |
+|---|---|
+| Warnung „ffmpeg fehlt“ | `ffmpeg.exe` und `ffplay.exe` neben das Programm oder in den `PATH`. Opus-Extraktion geht trotzdem. |
+| Scan großer Archive ist langsam | Festplatten-Tempo (≈ 80 MB/s HDD, SSD deutlich schneller). Der zweite Lauf ist dank Cache sofort fertig. |
+| Neu scannen | **Scan-Cache nutzen** abwählen (oder `%APPDATA%\AWC-Tool\cache` löschen). |
+| „Kein Mehrkanal-Musik-Container“ | Es ist eine andere AWC-Art (Effekte/Sprache) – nicht unterstützt. |
+| Zu wenig Speicherplatz | WAV/FLAC sind groß – Opus nehmen oder nach Dauer filtern. |
+
+## Lizenz & Credits
+
+[MIT](LICENSE) – gilt nur für den Quellcode, nicht für Spieldaten.
+
+Das Block-Layout der AWC-Musikstreams wurde anhand des Open-Source-Codes von
+[vgmstream](https://github.com/vgmstream/vgmstream) (`awc.c`, `awc_streamfile.h`) und durch Analyse von Beispieldateien
+erarbeitet; allgemeines AWC/RPF-Wissen stammt aus der Community, v. a. von
+[CodeWalker](https://github.com/dexyfex/CodeWalker). Opus: Xiph.Org/IETF (RFC 6716), Ogg: RFC 3533/7845.
+Abspielen und Konvertieren übernimmt [FFmpeg](https://ffmpeg.org/).

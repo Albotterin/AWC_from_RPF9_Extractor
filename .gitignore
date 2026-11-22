@@ -1,0 +1,28 @@
+# --- Never commit game data or extracted audio (copyright) ---
+*.rpf
+*.awc
+*.opus
+*.ogg
+*.flac
+*.wav
+*.mp3
+*.oga
+music_streams/
+extracted_audio/
+AWC-Export/
+recovered/
+
+# --- Binaries / build output ---
+dist/
+build/
+*.exe
+*.spec
+ffmpeg*
+ffplay*
+
+# --- Python / editor ---
+__pycache__/
+*.pyc
+.venv/
+.vscode/
+.idea/
