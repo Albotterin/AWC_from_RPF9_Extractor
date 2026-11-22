@@ -22,6 +22,7 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import awc_core as core  # noqa: E402
 import awc_i18n  # noqa: E402
+import awc_names as names  # noqa: E402
 from awc_core import AwcError, AwcFile, AwcRef  # noqa: E402
 from awc_i18n import LANGUAGES, tr  # noqa: E402
 
@@ -107,6 +108,7 @@ class App(tk.Tk):
         self.refs = {}             # ref.key -> AwcRef
         self.containers = set()    # paths that are already loaded
         self.group_names = load_group_names()
+        self.names = names.NameStore()   # known titles/artists per stream ID
         self.cache = {}            # (ref.key, stream_idx) -> (opus_path, seconds)  (playback/extract cache)
         self.busy = False
         self.cancel_flag = False
@@ -166,7 +168,7 @@ class App(tk.Tk):
         self._set_play_btn()
         self.status.config(text=tr(self._status[0], **self._status[1]))
         if self.cur:
-            self.lbl_now.config(text="%s  –  %s" % (self.cur[0].name, self.cur[1].label))
+            self.lbl_now.config(text="%s  –  %s" % (self.cur[0].name, self._stream_text(self.cur[1])))
         else:
             self.lbl_now.config(text=tr("lbl_no_track"))
         self._retranslate_tree()
@@ -179,6 +181,14 @@ class App(tk.Tk):
 
     def _gname(self, cpath, g):
         return self.group_names.get(self._gkey(cpath), {}).get(str(g), "")
+
+    def _stream_text(self, s):
+        label = names.track_label(self.names.get(s.id))
+        return "%s   [%s]" % (label, s.label) if label else s.label
+
+    def _station(self, ref, s):
+        rec = self.names.get(s.id) or {}
+        return rec.get("station") or (self._gname(ref.path, ref.group) if ref.in_rpf and ref.group else "")
 
     def _group_text(self, cpath, g):
         name = self._gname(cpath, g)
@@ -198,7 +208,7 @@ class App(tk.Tk):
                 self.tree.set(iid, "ch", tr("n_awc", n=obj[2]))
             elif kind == "stream":
                 ref, s = obj
-                self.tree.item(iid, text=s.label)
+                self.tree.item(iid, text=self._stream_text(s))
                 self.tree.set(iid, "ch", tr("stereo") if s.opus_channels == 2 else tr("mono"))
             elif kind == "container":
                 self.tree.set(iid, "ch", tr("n_awc", n=len(obj["items"])))
@@ -243,6 +253,18 @@ class App(tk.Tk):
         sb.pack(side="left", fill="y")
         self.tree.bind("<Double-1>", self._dbl)
         self.tree.bind("<Button-3>", self._context_menu)
+
+        nf = self._reg(ttk.LabelFrame(self), "text", "lf_names")
+        nf.pack(fill="x", **pad)
+        nrow = ttk.Frame(nf)
+        nrow.pack(fill="x", padx=8, pady=6)
+        self._reg(ttk.Button(nrow, command=self.import_names), "text", "btn_names_import").pack(side="left")
+        self._reg(ttk.Button(nrow, command=self.export_template), "text", "btn_names_template").pack(side="left", padx=6)
+        self._reg(ttk.Button(nrow, command=self.clear_names), "text", "btn_names_clear").pack(side="left")
+        self.write_playlist = tk.BooleanVar(value=True)
+        self._reg(ttk.Checkbutton(nrow, variable=self.write_playlist), "text", "chk_playlist").pack(side="left", padx=14)
+        self.lbl_named = ttk.Label(nrow, text="", foreground="gray40")
+        self.lbl_named.pack(side="right")
 
         pl = self._reg(ttk.LabelFrame(self), "text", "lf_player")
         pl.pack(fill="x", **pad)
@@ -396,13 +418,14 @@ class App(tk.Tk):
                                                       fmt_size(ref.size)))
                     self.nodes[parent] = ("awc", ref)
                 for s in ref.streams:
-                    sid = self.tree.insert(parent, "end", text=s.label,
+                    sid = self.tree.insert(parent, "end", text=self._stream_text(s),
                                            values=("%08X" % s.id, s.codec_name,
                                                    tr("stereo") if s.opus_channels == 2 else tr("mono"),
                                                    "~" + fmt_time(s.est_seconds), ""))
                     self.nodes[sid] = ("stream", (ref, s))
                     n_str += 1
         self._update_count()
+        self._refresh_names()
         if not res:
             self.set_status("st_scan_none", n=len(files))
         else:
@@ -453,7 +476,17 @@ class App(tk.Tk):
 
     def _context_menu(self, e):
         iid = self.tree.identify_row(e.y)
-        if not iid or self.nodes.get(iid, (None,))[0] != "group":
+        kind = self.nodes.get(iid, (None,))[0] if iid else None
+        if kind == "stream":
+            self.tree.selection_set(iid)
+            s = self.nodes[iid][1][1]
+            m = tk.Menu(self, tearoff=0)
+            m.add_command(label=tr("ctx_set_track"), command=lambda: self.name_stream(iid))
+            if self.names.get(s.id):
+                m.add_command(label=tr("ctx_clear_track"), command=lambda: self.name_stream(iid, clear=True))
+            m.tk_popup(e.x_root, e.y_root)
+            return
+        if kind != "group":
             return
         self.tree.selection_set(iid)
         m = tk.Menu(self, tearoff=0)
@@ -478,6 +511,74 @@ class App(tk.Tk):
             d.pop(str(g), None)
         save_group_names(self.group_names)
         self.tree.item(iid, text=self._group_text(cpath, g))
+
+    # ------------------------------------------------------------------ names
+    def _refresh_names(self):
+        known = 0
+        for iid, (kind, obj) in self.nodes.items():
+            if kind == "stream":
+                self.tree.item(iid, text=self._stream_text(obj[1]))
+                known += 1 if self.names.get(obj[1].id) else 0
+        total = len(self._all_streams())
+        self.lbl_named.config(text=tr("lbl_named", k=known, n=total) if total else "")
+        if self.cur:
+            self.lbl_now.config(text="%s  –  %s" % (self.cur[0].name, self._stream_text(self.cur[1])))
+
+    def name_stream(self, iid, clear=False):
+        s = self.nodes[iid][1][1]
+        if clear:
+            self.names.set(s.id)
+        else:
+            rec = self.names.get(s.id) or {}
+            cur = "%s - %s" % (rec["artist"], rec["title"]) if rec.get("artist") else rec.get("title", "")
+            txt = simpledialog.askstring(tr("dlg_track_title"), tr("dlg_track_prompt", id="%08X" % s.id),
+                                         initialvalue=cur, parent=self)
+            if txt is None:
+                return
+            a, t = names.split_artist_title(txt)
+            self.names.set(s.id, t, a, rec.get("station", ""))
+        self.names.save()
+        self._refresh_names()
+
+    def import_names(self):
+        path = filedialog.askopenfilename(
+            title=tr("dlg_names_import"),
+            filetypes=[(tr("ft_names"), "*.csv *.tsv *.txt *.json"), (tr("ft_all"), "*.*")])
+        if not path:
+            return
+        known = [s.id for _r, s in self._all_streams()]
+        try:
+            ok, skipped = self.names.import_file(path, known)
+        except (OSError, ValueError) as e:
+            messagebox.showerror(tr("err_title"), str(e))
+            return
+        self._refresh_names()
+        messagebox.showinfo(tr("dlg_names_title"), tr("dlg_names_result", ok=ok, skipped=skipped))
+
+    def export_template(self):
+        streams = self._all_streams()
+        if not streams:
+            messagebox.showinfo(tr("dlg_nothing_title"), tr("dlg_names_noscan"))
+            return
+        path = filedialog.asksaveasfilename(title=tr("dlg_names_template"), defaultextension=".csv",
+                                            initialfile="track_names.csv", filetypes=[("CSV", "*.csv")])
+        if not path:
+            return
+        rows = [(s.id, ref.name, self._group_text(ref.path, ref.group) if ref.in_rpf and ref.group else "",
+                 self._gname(ref.path, ref.group) if ref.in_rpf and ref.group else "")
+                for ref, s in streams]
+        try:
+            names.NameStore.write_template(path, rows, self.names)
+        except OSError as e:
+            messagebox.showerror(tr("err_title"), str(e))
+            return
+        messagebox.showinfo(tr("dlg_names_title"), tr("dlg_names_template_done", n=len(rows), path=path))
+
+    def clear_names(self):
+        if self.names.tracks and messagebox.askyesno(tr("dlg_names_title"), tr("dlg_names_clear_q")):
+            self.names.clear()
+            self.names.save()
+            self._refresh_names()
 
     def _dbl(self, e):
         iid = self.tree.identify_row(e.y)
@@ -555,9 +656,10 @@ class App(tk.Tk):
                 return
         self.cancel_flag = False
         self._set_busy(True)
-        threading.Thread(target=self._extract_worker, args=(items, out, ext, ff_args), daemon=True).start()
+        threading.Thread(target=self._extract_worker, args=(items, out, ext, ff_args, self.write_playlist.get()),
+                         daemon=True).start()
 
-    def _extract_worker(self, items, out, ext, ff_args):
+    def _extract_worker(self, items, out, ext, ff_args, playlist=True):
         try:
             # group by AWC so that every AWC is read only once
             groups, order = {}, []
@@ -569,15 +671,30 @@ class App(tk.Tk):
             total = sum(max(1, ref.size) for ref, _ in groups.values()) or 1
             done = 0.0
             made = 0
+            used, lists = set(), {}        # file names handed out per folder / playlist entries per folder
             for gi, k in enumerate(order):
                 ref, streams = groups[k]
                 w = max(1, ref.size) / float(total)
                 folder = os.path.join(out, safe_name(ref.container), self._group_dir(ref)) if ref.in_rpf else out
                 os.makedirs(folder, exist_ok=True)
-                jobs, final = {}, {}
+                jobs, final, tags, labels = {}, {}, {}, {}
                 for s in streams:
-                    base = ref.name if ref.in_rpf else os.path.splitext(ref.name)[0]
-                    name = "%s_stream%d_%08X.%s" % (safe_name(base), s.index, s.id, ext)
+                    rec = self.names.get(s.id)
+                    entries = lists.setdefault(folder, [])
+                    if rec:
+                        labels[s.index] = names.track_label(rec)
+                        tags[s.index] = names.make_tags(rec, self._station(ref, s), len(entries) + 1)
+                        stem = names.safe_filename(labels[s.index].replace(" – ", " - "))
+                        n, name = 2, stem
+                        while (folder, name.lower()) in used:
+                            name = "%s (%d)" % (stem, n)
+                            n += 1
+                        used.add((folder, name.lower()))
+                        name += "." + ext
+                    else:
+                        base = ref.name if ref.in_rpf else os.path.splitext(ref.name)[0]
+                        name = "%s_stream%d_%08X.%s" % (safe_name(base), s.index, s.id, ext)
+                    entries.append((name, s.est_seconds, labels.get(s.index, "")))
                     final[s.index] = os.path.join(folder, name)
                     jobs[s.index] = final[s.index] if ext == "opus" else os.path.join(
                         self.cache_dir, "x_%d_%d_%d.opus" % (os.getpid(), gi, s.index))
@@ -587,7 +704,7 @@ class App(tk.Tk):
                 need = dict(jobs)
                 for i in list(need):   # already in the playback cache?
                     c = self.cache.get((ref.key, i))
-                    if c and os.path.isfile(c[0]):
+                    if c and os.path.isfile(c[0]) and not (ext == "opus" and i in tags):
                         if ext == "opus":
                             shutil.copyfile(c[0], final[i])
                         else:
@@ -595,10 +712,11 @@ class App(tk.Tk):
                         del need[i]
                 if need:
                     ref.extract(need, progress=lambda f, d=done, sh=share: self.q.put(("progress", d + f * sh)),
-                                cancel=lambda: self.cancel_flag)
+                                cancel=lambda: self.cancel_flag, tags=tags)
                 if ext != "opus":
                     for s in streams:
-                        self._ffmpeg_convert(jobs[s.index], final[s.index], ff_args, s.est_seconds,
+                        self._ffmpeg_convert(jobs[s.index], final[s.index],
+                                             ff_args + names.ffmpeg_meta_args(tags.get(s.index)), s.est_seconds,
                                              done + share, w * 0.5 / len(streams))
                         if os.path.basename(jobs[s.index]).startswith("x_"):
                             try:
@@ -608,6 +726,9 @@ class App(tk.Tk):
                 made += len(streams)
                 done += w
                 self.q.put(("progress", done))
+            if playlist:
+                for folder, entries in lists.items():
+                    names.write_m3u8(folder, entries)
             self.q.put(("done", "st_extract_done", {"n": made, "out": out}))
         except InterruptedError:
             self.q.put(("done", "st_cancelled", {}))
@@ -654,7 +775,7 @@ class App(tk.Tk):
         self.cur = (ref, s)
         self.duration = s.est_seconds
         self.pos = start
-        self.lbl_now.config(text="%s  –  %s" % (ref.name, s.label))
+        self.lbl_now.config(text="%s  –  %s" % (ref.name, self._stream_text(s)))
         c = self.cache.get((ref.key, s.index))
         if c and os.path.isfile(c[0]):
             self.cur_path = c[0]

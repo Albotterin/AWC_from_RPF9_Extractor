@@ -76,7 +76,8 @@ def opus_packet_samples(pkt):
 class OggOpusWriter:
     """Writes Opus packets 1:1 into an Ogg file (headers are created on the first packet)."""
 
-    def __init__(self, path, serial, sample_rate=48000):
+    def __init__(self, path, serial, sample_rate=48000, tags=None):
+        self.tags = tags or {}
         self.fh = open(path, "wb")
         self.serial = serial
         self.rate = sample_rate
@@ -105,7 +106,9 @@ class OggOpusWriter:
         if not self.started:
             channels = 2 if (pkt[0] & 4) else 1
             head = b"OpusHead" + struct.pack("<BBHIhB", 1, channels, 312, self.rate, 0, 0)
-            tags = b"OpusTags" + struct.pack("<I", 7) + b"AWCTool" + struct.pack("<I", 0)
+            items = [("%s=%s" % (k, v)).encode("utf-8") for k, v in self.tags.items() if v]
+            tags = (b"OpusTags" + struct.pack("<I", 7) + b"AWCTool" + struct.pack("<I", len(items))
+                    + b"".join(struct.pack("<I", len(i)) + i for i in items))
             self._page([head], 0, 0x02)
             self._page([tags], 0, 0)
             self.started = True
@@ -235,13 +238,15 @@ class AwcFile:
             pos += ents[c] * 0x800
 
     # -- extraction -------------------------------------------------------------
-    def extract(self, jobs, progress=None, cancel=None):
-        """jobs: {stream_index: out_path.opus}. Returns {stream_index: seconds}."""
+    def extract(self, jobs, progress=None, cancel=None, tags=None):
+        """jobs: {stream_index: out_path.opus}; tags: optional {stream_index: {"TITLE": ...}} written as
+        Opus comments. Returns {stream_index: seconds}."""
+        tags = tags or {}
         nch = len(self.streams)
         for idx in jobs:
             if not self.streams[idx].supported:
                 raise AwcError(tr("err_codec", c=self.streams[idx].codec_name))
-        writers = {i: OggOpusWriter(p, 0x4157 + i, self.streams[i].sample_rate)
+        writers = {i: OggOpusWriter(p, 0x4157 + i, self.streams[i].sample_rate, tags.get(i))
                    for i, p in jobs.items()}
         ok = False
         try:
@@ -493,5 +498,5 @@ class AwcRef:
             self._awc = AwcFile(self.path, self.base, self.item["length"], self.name)
         return self._awc
 
-    def extract(self, jobs, progress=None, cancel=None):
-        return self.open().extract(jobs, progress, cancel)
+    def extract(self, jobs, progress=None, cancel=None, tags=None):
+        return self.open().extract(jobs, progress, cancel, tags)
