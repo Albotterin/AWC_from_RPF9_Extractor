@@ -268,3 +268,7 @@ Das Block-Layout der AWC-Musikstreams wurde anhand des Open-Source-Codes von
 erarbeitet; allgemeines AWC/RPF-Wissen stammt aus der Community, v. a. von
 [CodeWalker](https://github.com/dexyfex/CodeWalker). Opus: Xiph.Org/IETF (RFC 6716), Ogg: RFC 3533/7845.
 Abspielen und Konvertieren übernimmt [FFmpeg](https://ffmpeg.org/).
+
+Das Layout der Audio-Konfiguration des Spiels (Namensliste, die 29-Bit-Stream-IDs als `joaat`-Hashes) folgt den Notizen
+von [Leonida](https://github.com/ItsNotRexed/Leonida) (`docs/audio_config.md`, `docs/audio.md`). Die Funde zu den
+`0xBD`-Markern in `docs/FORMAT.md` wurden dort zurückgemeldet.

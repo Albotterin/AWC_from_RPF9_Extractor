@@ -322,6 +322,10 @@ files; general AWC/RPF knowledge comes from the community, notably
 [**CodeWalker**](https://github.com/dexyfex/CodeWalker). Opus is by Xiph.Org / IETF (RFC 6716), Ogg by Xiph.Org
 (RFC 3533, RFC 7845). Playback and conversion use [FFmpeg](https://ffmpeg.org/).
 
+The layout of the game's audio config (the name list, the 29-bit stream IDs as `joaat` hashes) follows the notes of
+[**Leonida**](https://github.com/ItsNotRexed/Leonida) (`docs/audio_config.md`, `docs/audio.md`). The `0xBD` marker
+findings in `docs/FORMAT.md` were reported back there.
+
 ## License
 
 [MIT](LICENSE) – applies to the source code in this repository only, not to any game data.
