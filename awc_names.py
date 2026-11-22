@@ -91,6 +91,29 @@ def _rec(title="", artist="", station=""):
 
 
 # --------------------------------------------------------------------------- store
+def stations_path():
+    return os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~"), "AWC-Tool", "stations.json")
+
+
+def load_stations():
+    """Station names found in the user's own game config (see awc_config), for the rename-group dialog."""
+    try:
+        with open(stations_path(), "r", encoding="utf-8") as f:
+            d = json.load(f).get("stations", [])
+        return sorted({s for s in d if isinstance(s, str) and s.strip()})
+    except (OSError, ValueError, AttributeError):
+        return []
+
+
+def save_stations(stations):
+    try:
+        os.makedirs(os.path.dirname(stations_path()), exist_ok=True)
+        with open(stations_path(), "w", encoding="utf-8") as f:
+            json.dump({"stations": sorted(set(stations))}, f, ensure_ascii=False, indent=1)
+    except OSError:
+        pass
+
+
 def default_path():
     return os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~"), "AWC-Tool", "track_names.json")
 

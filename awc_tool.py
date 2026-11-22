@@ -22,6 +22,7 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import awc_core as core  # noqa: E402
 import awc_i18n  # noqa: E402
+import awc_config as gamecfg  # noqa: E402
 import awc_names as names  # noqa: E402
 from awc_core import AwcError, AwcFile, AwcRef  # noqa: E402
 from awc_i18n import LANGUAGES, tr  # noqa: E402
@@ -109,6 +110,7 @@ class App(tk.Tk):
         self.containers = set()    # paths that are already loaded
         self.group_names = load_group_names()
         self.names = names.NameStore()   # known titles/artists per stream ID
+        self.stations = names.load_stations()   # station names found in the game config
         self.cache = {}            # (ref.key, stream_idx) -> (opus_path, seconds)  (playback/extract cache)
         self.busy = False
         self.cancel_flag = False
@@ -265,6 +267,9 @@ class App(tk.Tk):
         self._reg(ttk.Checkbutton(nrow, variable=self.write_playlist), "text", "chk_playlist").pack(side="left", padx=14)
         self.lbl_named = ttk.Label(nrow, text="", foreground="gray40")
         self.lbl_named.pack(side="right")
+        nrow2 = ttk.Frame(nf)
+        nrow2.pack(fill="x", padx=8, pady=(0, 6))
+        self._reg(ttk.Button(nrow2, command=self.read_game_names), "text", "btn_names_game").pack(side="left")
 
         pl = self._reg(ttk.LabelFrame(self), "text", "lf_player")
         pl.pack(fill="x", **pad)
@@ -500,8 +505,8 @@ class App(tk.Tk):
         if clear:
             name = ""
         else:
-            name = simpledialog.askstring(tr("dlg_rename_title"), tr("dlg_rename_prompt", g=g),
-                                          initialvalue=self._gname(cpath, g), parent=self)
+            name = self._ask_name(tr("dlg_rename_title"), tr("dlg_rename_prompt", g=g),
+                                  self._gname(cpath, g), self.stations)
             if name is None:
                 return
         d = self.group_names.setdefault(self._gkey(cpath), {})
@@ -512,7 +517,84 @@ class App(tk.Tk):
         save_group_names(self.group_names)
         self.tree.item(iid, text=self._group_text(cpath, g))
 
+    def _ask_name(self, title, prompt, initial, choices):
+        """Ask for a text; with `choices` the entry is an editable drop-down. Returns None when cancelled."""
+        if not choices:
+            return simpledialog.askstring(title, prompt, initialvalue=initial, parent=self)
+        dlg = tk.Toplevel(self)
+        dlg.title(title)
+        dlg.transient(self)
+        dlg.resizable(False, False)
+        ttk.Label(dlg, text=prompt, justify="left").pack(padx=12, pady=(12, 6), anchor="w")
+        var = tk.StringVar(value=initial)
+        cb = ttk.Combobox(dlg, textvariable=var, values=list(choices), width=42)
+        cb.pack(padx=12, fill="x")
+        res = []
+
+        def ok(_e=None):
+            res.append(var.get())
+            dlg.destroy()
+
+        row = ttk.Frame(dlg)
+        row.pack(pady=12)
+        ttk.Button(row, text=tr("btn_ok"), command=ok).pack(side="left", padx=4)
+        ttk.Button(row, text=tr("btn_cancel"), command=dlg.destroy).pack(side="left", padx=4)
+        dlg.bind("<Return>", ok)
+        dlg.bind("<Escape>", lambda _e: dlg.destroy())
+        cb.focus_set()
+        dlg.grab_set()
+        self.wait_window(dlg)
+        return res[0] if res else None
+
     # ------------------------------------------------------------------ names
+    def read_game_names(self):
+        if self.busy:
+            messagebox.showinfo(tr("dlg_busy_title"), tr("dlg_busy"))
+            return
+        by_path = {}
+        for ref in self.refs.values():
+            if ref.in_rpf:
+                by_path.setdefault(ref.path, set()).update(s.id for s in ref.streams)
+        if not by_path:
+            messagebox.showinfo(tr("dlg_names_title"), tr("dlg_gamenames_none"))
+            return
+        self._set_busy(True)
+        self.set_status("st_reading_names")
+        threading.Thread(target=self._gamenames_worker, args=(by_path,), daemon=True).start()
+
+    def _gamenames_worker(self, by_path):
+        found, stations, failed = {}, set(), []
+        for path, ids in by_path.items():
+            try:
+                n, st, _cnt = gamecfg.read_names(path, ids)
+                found.update(n)
+                stations.update(st)
+            except (OSError, ValueError) as e:
+                failed.append("%s (%s)" % (path, e))
+        self.q.put(("gamenames", found, sorted(stations), failed))
+
+    def _apply_game_names(self, found, stations, failed):
+        k = kept = 0
+        for sid, title in found.items():
+            if self.names.get(sid):
+                kept += 1
+            else:
+                self.names.set(sid, title)
+                k += 1
+        self.names.save()
+        if stations:
+            self.stations = sorted(set(self.stations) | set(stations))
+            names.save_stations(self.stations)
+        self._refresh_names()
+        self.set_status("st_names_read", k=k)
+        streams = self._all_streams()
+        total = len(streams)
+        missing = sum(1 for _r, st in streams if st.id not in found)
+        if failed:
+            messagebox.showwarning(tr("dlg_names_title"), tr("dlg_gamenames_error", paths="\n".join(failed)))
+        messagebox.showinfo(tr("dlg_names_title"), tr("dlg_gamenames_result", k=k, kept=kept, st=len(stations),
+                                                      n=missing, t=total))
+
     def _refresh_names(self):
         known = 0
         for iid, (kind, obj) in self.nodes.items():
@@ -911,6 +993,9 @@ class App(tk.Tk):
                     self._set_busy(False)
                     self.bar["value"] = 0
                     self._add_containers(msg[1], msg[2])
+                elif kind == "gamenames":
+                    self._set_busy(False)
+                    self._apply_game_names(msg[1], msg[2], msg[3])
                 elif kind == "done":
                     cancelled = msg[1] in ("st_cancelled", "st_scan_cancelled", "st_scan_error")
                     self.bar["value"] = 0 if cancelled else 1.0

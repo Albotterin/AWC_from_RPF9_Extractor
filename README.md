@@ -147,6 +147,15 @@ On Windows you can also double-click `Start AWC-Tool.bat`.
 5. Use **Only streams longer than (sec.)** to skip short snippets (e.g. `60` keeps only streams of a minute or more).
 6. **Name the groups** (optional): right-click a *Group NN* row → **Rename group…** (e.g. after listening to a few
    tracks). Names are stored in `%APPDATA%\AWC-Tool\group_names.json` and become part of the export folder name.
+7. **Names** (optional) – the AWC files only contain 32-bit hash IDs, no names:
+   * **Read names from game files** hashes the internal names in the game's own audio config (the zlib part at the
+     start of `audio.rpf`) and fills in titles for the streams it recognises (roughly a third of the music streams
+     in the sample archive; internal titles only, no artists). It also remembers the station names found there and
+     offers them in **Rename group…**.
+   * **Import names…** reads a CSV/TXT/JSON list (by stream ID or by internal name), **Export name list…** writes
+     a template to fill in, and right-click → **Set title / artist…** names a single stream.
+   * Named streams get `Artist - Title` file names and Opus/FLAC/MP3 tags on export, plus optional `.m3u8`
+     playlists. Names stay on your PC (`%APPDATA%\AWC-Tool\track_names.json`); nothing is shipped with the tool.
 
 ### Player controls
 
@@ -216,8 +225,8 @@ folder. The tool uses a **heuristic based on the physical layout**:
 * Typical group contents: songs (3–5 min), many short voice/jingle snippets, and sometimes a 1–2 hour continuous
   stream. Groups that contain only very short snippets are probably not radio at all.
 
-**What it can't do:** it can't tell you the *names* – neither of stations nor of songs. A group is *probably* one
-folder, but that is an inference, not a fact. Listen to a few tracks, then name the groups in the tool.
+**What it can't do:** it can't tell you which station a group is (the tool only suggests station names found in
+the game config). A group is *probably* one folder, but that is an inference, not a fact. Listen to a few tracks, then name the groups in the tool.
 Handy: `Only streams longer than (sec.)` with `90` keeps just the real tracks.
 
 In code: `awc_core.add_groups(items)` sets `item["g"]` (1-based) on the items returned by the scanner.
@@ -291,6 +300,8 @@ To add a language, edit `awc_i18n.py`: add an entry to `LANGUAGES` and a table w
 awc_tool.py        GUI (tkinter): tree, player, extraction, language switch
 awc_core.py        AWC parser, RPF scanner, Ogg Opus writer (no GUI dependencies)
 awc_i18n.py        Translations (English, Deutsch) + settings
+awc_names.py       Track/station name store, import/export, tags, playlists
+awc_config.py      Reads internal names from the game's audio config
 Start AWC-Tool.bat Launcher
 build_exe.bat      Builds dist\AWC-Tool.exe with PyInstaller
 docs/FORMAT.md     Technical notes on the AWC/RPF9 layout

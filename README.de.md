@@ -138,6 +138,17 @@ Unter Windows geht auch ein Doppelklick auf `Start AWC-Tool.bat`.
 5. Mit **Nur Streams ab (Sek.)** lassen sich kurze Schnipsel überspringen (z. B. `60` = nur Streams ab einer Minute).
 6. **Gruppen benennen** (optional): Rechtsklick auf eine Zeile *Gruppe NN* → **Gruppe umbenennen…** (z. B. nach dem
    Reinhören). Die Namen liegen in `%APPDATA%\AWC-Tool\group_names.json` und werden Teil des Export-Ordnernamens.
+7. **Namen** (optional) – die AWC-Dateien enthalten nur 32-Bit-Hash-IDs, keine Namen:
+   * **Namen aus Spieldateien lesen** hasht die internen Namen aus der Audio-Konfiguration des Spiels (der
+     zlib-Teil am Anfang der `audio.rpf`) und trägt Titel für die erkannten Streams ein (im Beispielarchiv etwa ein
+     Drittel der Musik-Streams; nur interne Titel, keine Interpreten). Die dort gefundenen Stationsnamen werden
+     bei **Gruppe umbenennen…** vorgeschlagen.
+   * **Namen importieren…** liest eine CSV/TXT/JSON-Liste (nach Stream-ID oder internem Namen), **Namensliste
+     exportieren…** schreibt eine Vorlage zum Ausfüllen, Rechtsklick → **Titel / Interpret setzen…** benennt einen
+     einzelnen Stream.
+   * Benannte Streams bekommen beim Export `Interpret - Titel` als Dateinamen und Opus/FLAC/MP3-Tags, optional
+     `.m3u8`-Playlists. Die Namen bleiben auf deinem PC (`%APPDATA%\AWC-Tool\track_names.json`), das Tool liefert
+     keine mit.
 
 Kommandozeile: `python awc_tool.py [--lang=en|de] [Ordner | datei.awc | datei.rpf ...]`
 
@@ -184,7 +195,8 @@ gehört. Das Tool nutzt deshalb eine **Heuristik über die physische Anordnung**
 * Typischer Inhalt: Songs (3–5 Min.), viele kurze Sprach-/Jingle-Schnipsel und manchmal ein 1–2-stündiger
   Dauerstream. Gruppen mit nur sehr kurzen Schnipseln sind vermutlich gar kein Radio.
 
-**Was es nicht kann:** die *Namen* liefern – weder von Sendern noch von Songs. Eine Gruppe ist *wahrscheinlich* ein Ordner,
+**Was es nicht kann:** sagen, welcher Sender eine Gruppe ist (das Tool schlägt nur die in der Spiel-Konfiguration gefundenen
+Sendernamen vor). Eine Gruppe ist *wahrscheinlich* ein Ordner,
 aber das ist ein Schluss, keine Tatsache. Ein paar Titel anhören, dann die Gruppen im Tool benennen.
 Praktisch: `Nur Streams ab (Sek.)` mit `90` behält nur die echten Titel.
 
