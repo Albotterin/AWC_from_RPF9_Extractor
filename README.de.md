@@ -149,6 +149,12 @@ Unter Windows geht auch ein Doppelklick auf `Start AWC-Tool.bat`.
    * Benannte Streams bekommen beim Export `Interpret - Titel` als Dateinamen und Opus/FLAC/MP3-Tags, optional
      `.m3u8`-Playlists. Die Namen bleiben auf deinem PC (`%APPDATA%\AWC-Tool\track_names.json`), das Tool liefert
      keine mit.
+8. **Sender-Mixe** (optional): ein paar sehr lange Streams (40-120 Min.) sind komplette Radio-Mixe. Das Spiel legt
+   für jeden gespielten Track einen `trackid`-Marker ab; das Tool zeigt sie als Kapitel unter dem Stream (Doppelklick
+   spielt ab dort) und benennt sie, wenn der passende Einzel-Track einen Titel hat. Mit **Sender-Mixe an
+   Track-Markern teilen** wird jedes Kapitel zusätzlich als eigene Datei in einem Ordner `... (tracks)`
+   geschrieben (braucht ffmpeg; der Schnitt ist eine Stream-Kopie, markergenau). Die Bedeutung der Marker ist
+   erschlossen, siehe `docs/FORMAT.md`.
 
 Kommandozeile: `python awc_tool.py [--lang=en|de] [Ordner | datei.awc | datei.rpf ...]`
 

@@ -111,6 +111,7 @@ class App(tk.Tk):
         self.group_names = load_group_names()
         self.names = names.NameStore()   # known titles/artists per stream ID
         self.stations = names.load_stations()   # station names found in the game config
+        self.cue_info = {}         # ref.key -> [(standalone AWC name, stream id) or None] per cue of a mix
         self.cache = {}            # (ref.key, stream_idx) -> (opus_path, seconds)  (playback/extract cache)
         self.busy = False
         self.cancel_flag = False
@@ -192,6 +193,16 @@ class App(tk.Tk):
         rec = self.names.get(s.id) or {}
         return rec.get("station") or (self._gname(ref.path, ref.group) if ref.in_rpf and ref.group else "")
 
+    def _cue_label(self, ref, k):
+        """Name of the track that starts at marker k of a mix: its title if known, else its number."""
+        val = ref.cues[k][1]
+        link = (self.cue_info.get(ref.key) or [None] * (k + 1))[k]
+        title = names.track_label(self.names.get(link[1])) if link else ""
+        return title or tr("cue_track", v=val)
+
+    def _cue_text(self, ref, k):
+        return "%s  %s" % (fmt_time(ref.cues[k][0]), self._cue_label(ref, k))
+
     def _group_text(self, cpath, g):
         name = self._gname(cpath, g)
         return tr("grp_label_named", g=g, name=name) if name else tr("grp_label", g=g)
@@ -212,6 +223,8 @@ class App(tk.Tk):
                 ref, s = obj
                 self.tree.item(iid, text=self._stream_text(s))
                 self.tree.set(iid, "ch", tr("stereo") if s.opus_channels == 2 else tr("mono"))
+            elif kind == "cue":
+                self.tree.item(iid, text=self._cue_text(obj[0], obj[2]))
             elif kind == "container":
                 self.tree.set(iid, "ch", tr("n_awc", n=len(obj["items"])))
 
@@ -270,6 +283,8 @@ class App(tk.Tk):
         nrow2 = ttk.Frame(nf)
         nrow2.pack(fill="x", padx=8, pady=(0, 6))
         self._reg(ttk.Button(nrow2, command=self.read_game_names), "text", "btn_names_game").pack(side="left")
+        self.split_mixes = tk.BooleanVar(value=False)
+        self._reg(ttk.Checkbutton(nrow2, variable=self.split_mixes), "text", "chk_split").pack(side="left", padx=14)
 
         pl = self._reg(ttk.LabelFrame(self), "text", "lf_player")
         pl.pack(fill="x", **pad)
@@ -399,6 +414,10 @@ class App(tk.Tk):
                 st[0] += 1
                 st[1] += max((s["sec"] for s in it["streams"]), default=0)
                 st[2] += it["length"] or 0
+            tids = {}          # (group, track number) -> standalone AWC item that carries that number
+            for it in items:
+                if it.get("tid") is not None:
+                    tids.setdefault((it.get("g", 0), it["tid"]), it)
             gnodes = {}
             for it in sorted(items, key=lambda x: x["base"]):
                 ref = AwcRef(it)
@@ -429,6 +448,15 @@ class App(tk.Tk):
                                                    "~" + fmt_time(s.est_seconds), ""))
                     self.nodes[sid] = ("stream", (ref, s))
                     n_str += 1
+                    if ref.cues:
+                        links = self.cue_info.setdefault(ref.key, [])
+                        for k, (t, val) in enumerate(ref.cues):
+                            cand = tids.get((ref.group, val))
+                            if len(links) <= k:
+                                links.append((cand["name"], cand["streams"][0]["id"]) if cand else None)
+                            cid2 = self.tree.insert(sid, "end", text="", values=("", "", "", fmt_time(t), ""))
+                            self.nodes[cid2] = ("cue", (ref, s, k))
+                            self.tree.item(cid2, text=self._cue_text(ref, k))
         self._update_count()
         self._refresh_names()
         if not res:
@@ -601,6 +629,8 @@ class App(tk.Tk):
             if kind == "stream":
                 self.tree.item(iid, text=self._stream_text(obj[1]))
                 known += 1 if self.names.get(obj[1].id) else 0
+            elif kind == "cue":
+                self.tree.item(iid, text=self._cue_text(obj[0], obj[2]))
         total = len(self._all_streams())
         self.lbl_named.config(text=tr("lbl_named", k=known, n=total) if total else "")
         if self.cur:
@@ -664,8 +694,12 @@ class App(tk.Tk):
 
     def _dbl(self, e):
         iid = self.tree.identify_row(e.y)
-        if iid and self.nodes.get(iid, (None,))[0] == "stream":
+        kind = self.nodes.get(iid, (None,))[0] if iid else None
+        if kind == "stream":
             self._load_and_play(*self.nodes[iid][1], start=0.0)
+        elif kind == "cue":
+            ref, s, k = self.nodes[iid][1]
+            self._load_and_play(ref, s, start=ref.cues[k][0])
 
     # --------------------------------------------------------------- extraction
     def pick_out(self):
@@ -703,7 +737,8 @@ class App(tk.Tk):
             self._set_fmt(fmt_id)
         fmt_id = self._fmt_id()
         ext, ff_args, bps = FORMATS[fmt_id]
-        if ff_args and not self.ffmpeg:
+        split = self.split_mixes.get()
+        if (ff_args or split) and not self.ffmpeg:
             messagebox.showerror(tr("dlg_ffmpeg_title"), tr("dlg_need_ffmpeg"))
             return
         try:
@@ -738,10 +773,10 @@ class App(tk.Tk):
                 return
         self.cancel_flag = False
         self._set_busy(True)
-        threading.Thread(target=self._extract_worker, args=(items, out, ext, ff_args, self.write_playlist.get()),
+        threading.Thread(target=self._extract_worker, args=(items, out, ext, ff_args, self.write_playlist.get(), split),
                          daemon=True).start()
 
-    def _extract_worker(self, items, out, ext, ff_args, playlist=True):
+    def _extract_worker(self, items, out, ext, ff_args, playlist=True, split=False):
         try:
             # group by AWC so that every AWC is read only once
             groups, order = {}, []
@@ -805,6 +840,9 @@ class App(tk.Tk):
                                 os.remove(jobs[s.index])
                             except OSError:
                                 pass
+                if split and ref.cues:
+                    for s in streams:
+                        self._split_mix(final[s.index], ref, s)
                 made += len(streams)
                 done += w
                 self.q.put(("progress", done))
@@ -816,6 +854,25 @@ class App(tk.Tk):
             self.q.put(("done", "st_cancelled", {}))
         except Exception as e:  # noqa: BLE001
             self.q.put(("error", str(e)))
+
+    def _split_mix(self, path, ref, s):
+        """Cut an exported station mix at its track markers (stream copy, no re-encode)."""
+        stem, ext = os.path.splitext(path)
+        folder = stem + " (tracks)"
+        os.makedirs(folder, exist_ok=True)
+        n = len(ref.cues)
+        for k, (t, _val) in enumerate(ref.cues):
+            if self.cancel_flag:
+                raise InterruptedError()
+            label = self._cue_label(ref, k)
+            dst = os.path.join(folder, "%02d %s%s" % (k + 1, names.safe_filename(label), ext))
+            cmd = [self.ffmpeg, "-y", "-v", "error", "-ss", "%.3f" % t, "-i", path]
+            if k + 1 < n:
+                cmd += ["-t", "%.3f" % max(0.1, ref.cues[k + 1][0] - t)]
+            cmd += ["-c", "copy", "-metadata", "title=" + label, "-metadata", "track=%d/%d" % (k + 1, n), dst]
+            r = subprocess.run(cmd, capture_output=True, text=True, creationflags=NO_WINDOW)
+            if r.returncode != 0:
+                raise RuntimeError(tr("err_ffmpeg", e=r.stderr[-800:]))
 
     def _ffmpeg_convert(self, src, dst, ff_args, dur, lo, span):
         cmd = [self.ffmpeg, "-y", "-v", "error", "-nostats", "-progress", "pipe:1", "-i", src] + ff_args + [dst]

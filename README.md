@@ -156,6 +156,11 @@ On Windows you can also double-click `Start AWC-Tool.bat`.
      a template to fill in, and right-click → **Set title / artist…** names a single stream.
    * Named streams get `Artist - Title` file names and Opus/FLAC/MP3 tags on export, plus optional `.m3u8`
      playlists. Names stay on your PC (`%APPDATA%\AWC-Tool\track_names.json`); nothing is shipped with the tool.
+8. **Station mixes** (optional): a few very long streams (40-120 min) are whole radio mixes. The game stores a
+   `trackid` marker for every track it plays; the tool shows them as chapters under the stream (double-click to play
+   from there) and names them when the matching standalone track has a title. Tick **Split station mixes at track
+   markers** to also write every chapter as its own file in a `... (tracks)` folder (needs ffmpeg; the cut is a
+   stream copy, accurate to the marker). The marker meaning is inferred, see `docs/FORMAT.md`.
 
 ### Player controls
 

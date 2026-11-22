@@ -9,6 +9,10 @@ import zlib
 from awc_i18n import tr
 
 BLOCK_CHUNK_TAGS = (0x48, 0x55, 0xA3, 0xBD)
+# Chunk 0xBD holds 16-byte events: u32 type hash | f32 value | u32 time (samples @ 48 kHz) | u32 flags.
+# The type 0xA6D93246 is joaat("trackid"): the value is a track number. A standalone track carries one such
+# event; a long station mix carries one per track it plays, at the time that track starts.
+TRACKID_EVENT = 0xA6D93246
 CODEC_NAMES = {
     0x00: "PCM", 0x01: "PCM", 0x04: "IMA-ADPCM", 0x05: "XMA2", 0x07: "MPEG",
     0x08: "Vorbis", 0x0B: "Opus", 0x0C: "DSP", 0x0D: "Opus (RDR)", 0x0F: "ATRAC9",
@@ -169,6 +173,8 @@ class AwcFile:
         self.size = (total - base) if length is None else min(length, total - base)
         self.name = name or os.path.basename(path)
         self.streams = []
+        self.tid = None      # track number of a standalone track (one trackid event)
+        self.cues = []       # [(seconds, track number)] of a mix (two or more trackid events)
         self._parse()
 
     @property
@@ -211,6 +217,22 @@ class AwcFile:
             self.n_blocks = (self.data_size + self.block_size - 1) // self.block_size
             self.truncated = self.data_size < chunks[0x55][1]
             self._estimate(f)
+            self._read_cues(f, chunks.get(0xBD))
+
+    def _read_cues(self, f, chunk):
+        if not chunk or chunk[1] < 16 or chunk[1] > 0x100000 or chunk[0] + chunk[1] > self.size:
+            return
+        f.seek(self.base + chunk[0])
+        b = f.read(chunk[1])
+        ev = []
+        for i in range(0, len(b) - 15, 16):
+            typ, val, ts, _fl = struct.unpack_from("<IfII", b, i)
+            if typ == TRACKID_EVENT and val == val and 0 <= val < 1e7:
+                ev.append((ts / 48000.0, int(round(val))))
+        if len(ev) == 1:
+            self.tid = ev[0][1]
+        elif len(ev) >= 2:
+            self.cues = ev
 
     def _estimate(self, f):
         nch = len(self.streams)
@@ -322,12 +344,17 @@ def _probe_adat(g, pos, container_size):
 
 
 def item_from_awc(awc, ordinal):
-    return {
+    d = {
         "n": ordinal, "name": awc.name, "path": awc.path, "base": awc.base, "length": awc.size,
         "blocks": awc.n_blocks,
         "streams": [{"i": s.index, "id": s.id, "codec": s.codec, "ch": s.opus_channels,
                      "sps": s.sample_rate, "sec": round(s.est_seconds, 2)} for s in awc.streams],
     }
+    if awc.tid is not None:
+        d["tid"] = awc.tid
+    if awc.cues:
+        d["cues"] = [[round(t, 2), v] for t, v in awc.cues]
+    return d
 
 
 def scan_container(path, progress=None, cancel=None):
@@ -400,7 +427,7 @@ def scan_container_cached(path, progress=None, cancel=None, use_cache=True):
         try:
             with open(cf, "r", encoding="utf-8") as fh:
                 c = json.load(fh)
-            if c.get("size") == st.st_size and c.get("mtime") == int(st.st_mtime) and c.get("v") == 3:
+            if c.get("size") == st.st_size and c.get("mtime") == int(st.st_mtime) and c.get("v") == 4:
                 for it in c["items"]:
                     it["path"] = path          # the archive may have been moved/renamed since the scan
                 add_groups(c["items"])
@@ -411,7 +438,7 @@ def scan_container_cached(path, progress=None, cancel=None, use_cache=True):
     add_groups(items)
     try:
         with open(cf, "w", encoding="utf-8") as fh:
-            json.dump({"v": 3, "path": path, "size": st.st_size, "mtime": int(st.st_mtime),
+            json.dump({"v": 4, "path": path, "size": st.st_size, "mtime": int(st.st_mtime),
                        "total": total, "items": items}, fh)
     except OSError:
         pass
@@ -488,6 +515,8 @@ class AwcRef:
         self.key = "%s@%d" % (self.path, self.base)
         self.in_rpf = self.path.lower().endswith(".rpf")
         self.group = item.get("g", 0)
+        self.tid = item.get("tid")
+        self.cues = [(t, v) for t, v in item.get("cues", [])]
         self.container = os.path.splitext(os.path.basename(self.path))[0]
         self.streams = []
         for si in item["streams"]:
