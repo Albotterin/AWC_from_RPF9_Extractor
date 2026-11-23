@@ -100,3 +100,75 @@ def match(songs, wanted):
             if sid in wanted and sid not in found:
                 found[sid] = (display_title(s["title"]), s["artist"], s["station"])
     return found
+
+
+def _name_tokens(name):
+    return [t for t in re.split(r"[_\s]+", unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().lower().replace("'", "")) if t]
+
+
+def _score(title_words, artist_words, name_words):
+    """0..1: how well the internal name of a stream fits a title of the credits list."""
+    import difflib
+    a, b = " ".join(title_words), " ".join(name_words)
+    if not a or not b:
+        return 0.0
+    r = difflib.SequenceMatcher(None, a, b).ratio()
+    if (a.startswith(b) or b.startswith(a)) and min(len(title_words), len(name_words)) >= 2:
+        r = max(r, 0.9)
+    if len(name_words) >= 3:                                     # classical pieces: composer + work, words in any order
+        pool = set(title_words) | set(artist_words)
+        r = max(r, 0.95 * sum(1 for w in name_words if w in pool) / len(name_words))
+    # names with words run together ("symphonyno5e_flat..."): how much of the name's letters do the credit words explain?
+    comp = "".join(name_words)
+    needed = 3
+    if comp.startswith("symphonyfm"):                            # these names always hold the composer and the work
+        comp, needed = comp[10:], 2
+    if len(comp) >= 12:
+        covered = [False] * len(comp)
+        hits = 0
+        for w in sorted(set(title_words) | set(artist_words), key=len, reverse=True):
+            if len(w) < 3 and not w.isdigit():
+                continue
+            i = comp.find(w)
+            if i >= 0 and not all(covered[i:i + len(w)]):
+                for k in range(i, i + len(w)):
+                    covered[k] = True
+                hits += len(w) >= 4
+        if hits >= needed:
+            r = max(r, 0.97 * sum(covered) / len(comp))
+    return r
+
+
+def match_names(songs, found, names, min_score=0.75, margin=0.03):
+    """-> {stream id: (title, artist, station)} for streams whose game name (from the audio config) is only SIMILAR to a title
+    of the credits list (the exact hash match in match() failed: 'IM_IN_LUV' for \"I'm N Luv (Wit a Stripper)\" and the like).
+
+    songs  the credits list, found  what match() already found, names  {stream id: name} of the streams without a match.
+    Every title and every stream is used once; a pair is accepted when it is clearly the best for both sides."""
+    taken = {(v[0], v[1], v[2]) for v in found.values()}
+    cands = []
+    for s in songs:
+        if not is_radio(s["station"]) or (display_title(s["title"]), s["artist"], s["station"]) in taken:
+            continue
+        tw = _words(re.sub(r"\(.*?\)|\[.*?\]", " ", s["title"]))
+        aw = _words(s["artist"])
+        for sid, name in names.items():
+            if sid in found:
+                continue
+            sc = _score(tw, aw, _name_tokens(name))
+            if sc >= min_score:
+                cands.append((sc, id(s), s, sid))
+    best_for_stream, best_for_song = {}, {}
+    for sc, k, s, sid in cands:
+        best_for_stream.setdefault(sid, []).append(sc)
+        best_for_song.setdefault(k, []).append(sc)
+    out, used_song = {}, set()
+    for sc, k, s, sid in sorted(cands, key=lambda c: -c[0]):
+        if sid in out or k in used_song:
+            continue
+        others = [x for x in best_for_stream[sid] if x != sc] + [x for x in best_for_song[k] if x != sc]
+        if others and max(others) > sc - margin and max(others) >= min_score and sc < 0.97:
+            continue                                             # ambiguous: another candidate is almost as good
+        out[sid] = (display_title(s["title"]), s["artist"], s["station"])
+        used_song.add(k)
+    return out

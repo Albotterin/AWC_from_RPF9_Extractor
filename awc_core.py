@@ -362,7 +362,7 @@ def scan_container(path, progress=None, cancel=None):
     Returns (items, total_awc); items = music AWCs only (with stream info)."""
     size = os.path.getsize(path)
     base_name = os.path.splitext(os.path.basename(path))[0]
-    items, total, skip_until, last_hit = [], 0, 0, -1
+    items, total, last_hit = [], 0, -1
     pos = 0
     with open(path, "rb") as f, open(path, "rb") as g:
         while pos < size:
@@ -375,13 +375,11 @@ def scan_container(path, progress=None, cancel=None):
             i = buf.find(b"ADAT")
             while i != -1:
                 a = pos + i
-                if a > last_hit and a >= skip_until:
+                if a > last_hit:
                     last_hit = a
                     info = _probe_adat(g, a, size)
                     if info is not None:
                         total += 1
-                        if info["length"]:
-                            skip_until = a + info["length"]
                         try:
                             awc = AwcFile(path, a, info["length"], "%s_%d_at_%016X" % (base_name, total, a))
                             items.append(item_from_awc(awc, total))
@@ -427,7 +425,7 @@ def scan_container_cached(path, progress=None, cancel=None, use_cache=True):
         try:
             with open(cf, "r", encoding="utf-8") as fh:
                 c = json.load(fh)
-            if c.get("size") == st.st_size and c.get("mtime") == int(st.st_mtime) and c.get("v") == 4:
+            if c.get("size") == st.st_size and c.get("mtime") == int(st.st_mtime) and c.get("v") == 5:
                 for it in c["items"]:
                     it["path"] = path          # the archive may have been moved/renamed since the scan
                 add_groups(c["items"])
@@ -438,7 +436,7 @@ def scan_container_cached(path, progress=None, cancel=None, use_cache=True):
     add_groups(items)
     try:
         with open(cf, "w", encoding="utf-8") as fh:
-            json.dump({"v": 4, "path": path, "size": st.st_size, "mtime": int(st.st_mtime),
+            json.dump({"v": 5, "path": path, "size": st.st_size, "mtime": int(st.st_mtime),
                        "total": total, "items": items}, fh)
     except OSError:
         pass

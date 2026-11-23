@@ -53,8 +53,8 @@ Dieses Tool geht einen anderen Weg:
 Du kannst eine einzelne `.awc`, eine `.rpf` oder einen **ganzen Ordner** angeben – dann werden alle Unterordner nach
 `.rpf`- und `.awc`-Dateien durchsucht und alle gefundenen Musik-Streams aufgelistet.
 
-> Beispiel: 28,5-GB-`audio.rpf` → 4.153 AWC-Header, davon 2.684 Musik-Container mit 2.700 Streams
-> (Opus, 48 kHz) ≈ 90 Stunden Audio ≈ 4,8 GB als `.opus`.
+> Beispiel: 28,5-GB-`audio.rpf` → 6.636 AWC-Header, davon 2.968 Musik-Container mit 2.992 Streams
+> (Opus, 48 kHz) ≈ 96 Stunden Audio ≈ 5 GB als `.opus`.
 
 ## Rechtlicher Hinweis
 
@@ -208,7 +208,8 @@ Spätere Starts gehen sofort. Die Songs kommen aus der Credits-Liste; als **Jing
 dienen die kurzen unbenannten Streams, die im Archiv zwischen den Tracks des Senders liegen (eine begründete
 Vermutung - manche können Sprecher-Ansagen o. Ä. sein). Braucht wie das Hauptprogramm `ffplay`.
 
-**Fortschritt:** 658 von 837 gelisteten Songs (78,6 %) wurden als Dateien gefunden; alle Sender in [Fortschritt der Sender](docs/RADIO-PROGRESS.de.md).
+**Fortschritt:** 754 von 837 gelisteten Songs (90,1 %) wurden als Dateien gefunden; alle Sender in [Fortschritt der Sender](docs/RADIO-PROGRESS.de.md).
+Drei lange DJ-Mixe (Radio On-U, Worldwide FM, The Sniper Of La Perle) laufen zusätzlich als eigene „(Mix)“-Sender.
 
 ### AWC Radio für Android
 
@@ -220,7 +221,7 @@ Es sind zwei Dateien:
   Sperrbildschirm- und Kopfhörertasten (voriger / nächster Sender, Pause) und hat einen Einschlaftimer.
 * **Ein Sender-Pack (`.dat`)** - wird am PC erzeugt: in AWC Radio auf **Android-Pack...** klicken, Sender ankreuzen und
   speichern. Darin liegen die Songs dieser Sender in der Originalqualität des Spiels (ca. 128 kbit/s, nicht neu kodiert;
-  etwa 2,5 GB für alle 20 Sender), ihre Logos und das Programm. Aufs Handy kopieren, die App starten und die Datei
+  etwa 3 GB für alle 26 Sender), ihre Logos und das Programm. Aufs Handy kopieren, die App starten und die Datei
   einmal auswählen; die Songs werden direkt daraus abgespielt.
 
 Das Pack enthält Spiel-Audio: nur für den eigenen Gebrauch, bitte nicht weitergeben. Ohne Pack ist die App leer.

@@ -104,6 +104,7 @@ def icon_path(station):
     """Path of the extracted logo of a station, or "" if there is none."""
     if not station:
         return ""
+    station = re.sub(r"\s*\(Mix\)$", "", station)              # a mix station uses the logo of its station
     p = os.path.join(icon_dir(), slug(station) + ".png")
     return p if os.path.isfile(p) else ""
 

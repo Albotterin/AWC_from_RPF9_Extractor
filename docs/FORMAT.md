@@ -21,13 +21,15 @@ starting with the magic `ADAT`. So the archive can be scanned for AWC headers.
    * `version == 1`
    * `1 <= stream_count <= 65536`
    * `0x10 <= info_offset <= 0xFFF0`
-3. Locate the chunk table (see below) to compute the AWC's length (`max(offset + size)` over its chunks), then
-   skip every other `ADAT` hit inside that range (they are payload bytes, not new files).
+3. Locate the chunk table (see below) to compute the AWC's length (`max(offset + size)` over its chunks; used for grouping).
+   Every `ADAT` hit is tested, also those inside the computed range of an earlier AWC: payload bytes fail the header
+   check or open as nothing, but skipping the range wrongly skipped 284 real music containers (found by comparing with
+   an unskipped scan; the cache version was raised to 5 for that).
 4. Try to open the candidate as a **music container**. If that fails (other AWC kind, damaged) it is only counted.
 5. Results (`offset`, `length`, streams, estimated durations) are cached as JSON in
    `%APPDATA%\AWC-Tool\cache\<sha1 of path>.json`, keyed by file size and mtime.
 
-Example: a 28.5 GB archive → 4,153 valid AWC headers, 2,684 music containers, 2,700 streams, ~6 minutes
+Example: a 28.5 GB archive → 6,636 valid AWC headers, 2,968 music containers, 2,992 streams, ~6 minutes
 (disk-bound).
 
 ## 2. AWC header
@@ -138,9 +140,9 @@ by their position in the archive:
 2. start a new group when `offset - previous_end >= 0x10000` **or** the running AWC number (ordinal among *all* valid
    `ADAT` headers found, music or not) is not `previous + 1`, i.e. a non-music AWC sits in between.
 
-Observed in the sample archive: the 2,684 music AWCs form one almost gap-free region (2,587 of 2,683 transitions have
-less than 4 KiB of padding); the 28 boundaries inside it are mostly exactly one non-music AWC plus a gap of up to
-~24 MB, giving 29 groups. Whether a group really is one directory (e.g. one radio station) can't be proven without the
+Observed in the sample archive: the 2,968 music AWCs lie in 47 groups between 0.08 GB and 26.4 GB (2,849 of 2,967
+transitions have less than 4 KiB of padding); the boundaries between the groups are mostly one non-music AWC or a gap
+of up to ~24 MB. Whether a group really is one directory (e.g. one radio station) can't be proven without the
 table of contents - it is an inference from the layout.
 
 ## 7. Markers (chunk `0xBD`)

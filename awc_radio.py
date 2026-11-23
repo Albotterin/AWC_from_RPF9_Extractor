@@ -29,7 +29,7 @@ NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 SONG_MIN, SONG_MAX = 60.0, 1500.0          # seconds: shorter is not a song, longer is a mix
 JINGLE_MIN, JINGLE_MAX = 2.0, 25.0         # unnamed short streams of a station are used as jingles
 MIN_SONGS = 5                              # a station needs at least this many songs to be listed
-INDEX_VERSION = 1
+INDEX_VERSION = 2
 
 BG, PANEL, CARD, CARD_SEL, FG, DIM, ACCENT = "#14161c", "#1c1f27", "#232733", "#2f3550", "#eceef4", "#8b91a3", "#ff5a36"
 
@@ -225,6 +225,79 @@ def build_stations(items, found, cfg_names):
             elif JINGLE_MIN <= sec <= JINGLE_MAX:
                 add(st_inf, "jingles", it, s)
     return {k: v for k, v in sorted(out.items(), key=lambda kv: sort_key(kv[0])) if len(v["songs"]) >= MIN_SONGS}
+
+
+def build_mixes(items, found):
+    """-> {"<station> (Mix)": {"songs": [track], "jingles": []}} for the long continuous mixes of the archive.
+
+    A mix is a stream far longer than a song whose bank carries `trackid` markers. The markers hold the track numbers of
+    single songs of the same station, so the station of a mix is the one that owns most of the songs it links to (at
+    least 5 links, at least 70 % one station); a mix without such links is left out because its station is unknown.
+    The mix is played like a one-song station: the programme just plays it over and over."""
+    by_tid = {}
+    for it in items:
+        if it.get("tid") is not None and not it.get("cues"):
+            by_tid.setdefault(it["tid"], []).append(it)
+    out = {}
+    for it in sorted(items, key=lambda x: x["base"]):
+        if not it.get("cues"):
+            continue
+        votes = {}
+        for _t, v in it["cues"]:
+            for o in by_tid.get(v, ()):
+                hit = next((found[s["id"]] for s in o["streams"] if s["id"] in found), None)
+                if hit and credits.is_radio(hit[2]):
+                    votes[hit[2]] = votes.get(hit[2], 0) + 1
+                    break
+        total = sum(votes.values())
+        if total < 5:
+            continue
+        station = max(votes, key=votes.get)
+        if votes[station] < 0.7 * total:
+            continue
+        for s in it["streams"]:
+            if s["sec"] > SONG_MAX:
+                out.setdefault(station + " (Mix)", {"songs": [], "jingles": []})["songs"].append(
+                    {"base": it["base"], "idx": s["i"], "sid": s["id"], "title": "Mix", "artist": "", "sec": s["sec"]})
+    return {k: v for k, v in out.items() if len(v["songs"]) == 1}     # several candidates for one station: unclear, leave out
+
+
+def make_index(rpf, pool, get_songs, status=None, progress=None):
+    """Scan the archive, match the songs of the credits list, build the stations and save the index (radio_index.json).
+
+    get_songs() is called after the scan and returns the credits songs. Returns the index, or None when nothing was found."""
+    res = core.scan_files([rpf], progress=(lambda f, n, nt: progress(f * 0.7)) if progress else None)
+    items = [it for c in res for it in c["items"]]
+    if not items:
+        return None
+    if status:
+        status(t("st_credits"), 0.72)
+    songs = get_songs()
+    ids = {s["id"] for it in items for s in it["streams"]}
+    found = credits.match(songs, ids)
+    if status:
+        status(t("st_names"), 0.8)
+    try:
+        cfg_names = gamecfg.read_names(rpf, ids)[0]
+    except (OSError, ValueError):
+        cfg_names = {}
+    # streams whose game name only resembles a title of the credits list ("IM_IN_LUV" ~ "I'm N Luv (Wit a Stripper)")
+    similar = credits.match_names(songs, found, {i: n for i, n in cfg_names.items() if i not in found})
+    found.update(similar)
+    if status:
+        status(t("st_build"), 0.88)
+    stations = build_stations(items, found, cfg_names)
+    stations.update(build_mixes(items, found))
+    stations = dict(sorted(stations.items(), key=lambda kv: sort_key(kv[0])))
+    used = {}
+    for st in stations.values():
+        for tr_ in st["songs"] + st["jingles"]:
+            used[tr_["base"]] = None
+    by_base = {it["base"]: it for it in items}
+    idx = {"fp": fingerprint(rpf, pool), "stations": stations, "items": {str(b): by_base[b] for b in used}}
+    with open(index_path(), "w", encoding="utf-8") as f:
+        json.dump(idx, f)
+    return idx
 
 
 DAY = 86400.0
@@ -571,34 +644,19 @@ class RadioApp(tk.Tk):
     def _setup_worker(self, rpf, pool, allow_dl, html_path):
         q = self.q
         try:
-            res = core.scan_files([rpf], progress=lambda f, n, nt: q.put(("setup_prog", f * 0.7)))
-            items = [it for c in res for it in c["items"]]
-            if not items:
+            songs = []
+
+            def status(text, frac):
+                q.put(("setup_status", text, frac))
+                if frac == 0.72:                              # the credits are loaded between scan and name matching
+                    songs[:] = self._load_credits(html_path)
+            idx = make_index(rpf, pool, lambda: songs, status, lambda f: q.put(("setup_prog", f)))
+            if idx is None:
                 q.put(("setup_fail", t("err_scan")))
                 return
-            q.put(("setup_status", t("st_credits"), 0.72))
-            songs = self._load_credits(html_path)
-            ids = {s["id"] for it in items for s in it["streams"]}
-            found = credits.match(songs, ids)
-            q.put(("setup_status", t("st_names"), 0.8))
-            try:
-                cfg_names = gamecfg.read_names(rpf, ids)[0]
-            except (OSError, ValueError):
-                cfg_names = {}
-            q.put(("setup_status", t("st_build"), 0.88))
-            stations = build_stations(items, found, cfg_names)
-            if not stations:
+            if not idx["stations"]:
                 q.put(("setup_fail", t("err_nostations")))
                 return
-            used = {}
-            for st in stations.values():
-                for tr_ in st["songs"] + st["jingles"]:
-                    used[tr_["base"]] = None
-            by_base = {it["base"]: it for it in items}
-            idx = {"fp": fingerprint(rpf, pool), "stations": stations,
-                   "items": {str(b): by_base[b] for b in used}}
-            with open(index_path(), "w", encoding="utf-8") as f:
-                json.dump(idx, f)
             q.put(("setup_status", t("st_icons"), 0.94))
             self._make_icons(pool, allow_dl)
             q.put(("setup_done", idx, pool))
@@ -971,6 +1029,14 @@ class RadioApp(tk.Tk):
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "--build-index":           # no window: rebuild the station index from the saved settings
+        cfg = load_settings()
+        with open(credits_cache_path(), "r", encoding="utf-8") as f:
+            songs = json.load(f)
+        idx = make_index(cfg["rpf"], cfg.get("pool", ""), lambda: songs, lambda text, frac: print("%3d%% %s" % (frac * 100, text), flush=True),
+                         lambda f: print("scan %3d%%" % (f * 100 / 0.7), flush=True) if int(f * 1000) % 50 == 0 else None)
+        print("stations:", len(idx["stations"]) if idx else 0)
+        return
     if len(sys.argv) > 1 and sys.argv[1] == "--export-pack":           # no window: python awc_radio.py --export-pack out.dat [...]
         import awc_android  # noqa: PLC0415
         awc_android.main(sys.argv[2:])
