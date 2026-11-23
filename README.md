@@ -158,6 +158,9 @@ On Windows you can also double-click `Start AWC-Tool.bat`.
      in the sample archive; most of the stations are matched almost completely). The station is stored per track
      and used for tags, playlists and as the suggestion in **Rename group…**. If the download fails you can pick
      the page saved from your browser instead. The list is not shipped with the tool and stays on your PC.
+     The groups are then **named after their station** automatically (the stations lie in the archive one after the
+     other; a group that spans two stations is called `A + B`). Names you set yourself are never overwritten, and
+     tracks without a title inherit the station of their neighbours for tags and playlists.
    * **Import names…** reads a CSV/TXT/JSON list (by stream ID or by internal name), **Export name list…** writes
      a template to fill in, and right-click → **Set title / artist…** names a single stream.
    * Named streams get `Artist - Title` file names and Opus/FLAC/MP3 tags on export, plus optional `.m3u8`

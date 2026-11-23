@@ -149,6 +149,9 @@ Unter Windows geht auch ein Doppelklick auf `Start AWC-Tool.bat`.
      Musik-Streams; die meisten Sender werden fast vollständig getroffen). Der Sender wird pro Track gespeichert
      und für Tags, Playlists und als Vorschlag bei **Gruppe umbenennen…** genutzt. Schlägt der Download fehl, kann
      die im Browser gespeicherte Seite gewählt werden. Die Liste wird nicht mitgeliefert und bleibt auf deinem PC.
+     Die Gruppen werden danach automatisch **nach ihrem Sender benannt** (die Sender liegen im Archiv hintereinander;
+     eine Gruppe über zwei Sender heißt `A + B`). Selbst vergebene Namen werden nie überschrieben, und Tracks ohne
+     Titel übernehmen für Tags und Playlists den Sender ihrer Nachbarn.
    * **Namen importieren…** liest eine CSV/TXT/JSON-Liste (nach Stream-ID oder internem Namen), **Namensliste
      exportieren…** schreibt eine Vorlage zum Ausfüllen, Rechtsklick → **Titel / Interpret setzen…** benennt einen
      einzelnen Stream.

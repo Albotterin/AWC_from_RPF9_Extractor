@@ -7,6 +7,7 @@ The user interface language can be switched at runtime (English / Deutsch).
 Requires Python 3 (tkinter) and ffmpeg/ffplay in the PATH (or next to the program).
 Run:  python awc_tool.py [--lang=en|de] [folder | file.awc | file.rpf ...]
 """
+import bisect
 import os
 import queue
 import shutil
@@ -112,6 +113,7 @@ class App(tk.Tk):
         self.group_names = load_group_names()
         self.names = names.NameStore()   # known titles/artists per stream ID
         self.stations = names.load_stations()   # station names found in the game config
+        self._runs = None          # cache of _station_runs()
         self.cue_info = {}         # ref.key -> [(standalone AWC name, stream id) or None] per cue of a mix
         self.cache = {}            # (ref.key, stream_idx) -> (opus_path, seconds)  (playback/extract cache)
         self.busy = False
@@ -192,7 +194,14 @@ class App(tk.Tk):
 
     def _station(self, ref, s):
         rec = self.names.get(s.id) or {}
-        return rec.get("station") or (self._gname(ref.path, ref.group) if ref.in_rpf and ref.group else "")
+        st = rec.get("station")
+        if st:
+            return st
+        st = self._inferred_station(ref)
+        if st:
+            return st
+        name = self._gname(ref.path, ref.group) if ref.in_rpf and ref.group else ""
+        return "" if " + " in name else name
 
     def _cue_label(self, ref, k):
         """Name of the track that starts at marker k of a mix: its title if known, else its number."""
@@ -535,13 +544,15 @@ class App(tk.Tk):
         if clear:
             name = ""
         else:
-            guess = self._suggest_station(cpath, g)
+            guess = self._group_station_name(cpath, g)
             choices = ([guess] if guess else []) + [x for x in self.stations if x != guess]
             name = self._ask_name(tr("dlg_rename_title"), tr("dlg_rename_prompt", g=g),
                                   self._gname(cpath, g) or guess, choices)
             if name is None:
                 return
         d = self.group_names.setdefault(self._gkey(cpath), {})
+        if g in d.get("~auto", []):
+            d["~auto"].remove(g)          # a name chosen by the user is never replaced automatically
         if name.strip():
             d[str(g)] = name.strip()
         else:
@@ -637,22 +648,87 @@ class App(tk.Tk):
         if stations:
             self.stations = sorted(set(self.stations) | stations)
             names.save_stations(self.stations)
+        self._runs = None
         self._refresh_names()
+        gn = self._auto_name_groups()
         self.set_status("st_credits_read", k=k)
         total = len(self._all_streams())
         unnamed = sum(1 for _r, st in self._all_streams() if not self.names.get(st.id))
         messagebox.showinfo(tr("dlg_names_title"), tr("dlg_credits_result", k=k, kept=kept, s=n_songs,
-                                                      m=len(found), st=len(stations), n=unnamed, t=total))
+                                                      m=len(found), st=len(stations), gn=gn, n=unnamed, t=total))
 
-    def _suggest_station(self, cpath, g):
-        """Station that most tracks of a group belong to (from the per-track station names)."""
-        count = {}
-        for _iid, (kind, obj) in self.nodes.items():
-            if kind == "stream" and obj[0].in_rpf and obj[0].path == cpath and obj[0].group == g:
-                st = (self.names.get(obj[1].id) or {}).get("station")
-                if st:
-                    count[st] = count.get(st, 0) + 1
-        return max(count, key=count.get) if count else ""
+    def _station_of(self, sid):
+        st = (self.names.get(sid) or {}).get("station")
+        return st if st and credits.is_radio(st) else ""
+
+    def _station_runs(self):
+        """{archive path: [(base offset, station)]} for the AWCs whose tracks carry a station, in archive order.
+        The stations lie in the archive one after the other, so an unnamed AWC between two AWCs of the same station
+        belongs to that station."""
+        if self._runs is None:
+            runs = {}
+            for ref in self.refs.values():
+                if not ref.in_rpf:
+                    continue
+                count = {}
+                for s in ref.streams:
+                    st = self._station_of(s.id)
+                    if st:
+                        count[st] = count.get(st, 0) + 1
+                if count:
+                    runs.setdefault(ref.path, []).append((ref.base, max(count, key=count.get)))
+            for v in runs.values():
+                v.sort()
+            self._runs = runs
+        return self._runs
+
+    def _inferred_station(self, ref):
+        run = self._station_runs().get(ref.path) if ref.in_rpf else None
+        if not run:
+            return ""
+        i = bisect.bisect_left([b for b, _s in run], ref.base)
+        before = run[i - 1][1] if i > 0 else None
+        after = run[i][1] if i < len(run) else None
+        return before if before and before == after else ""
+
+    def _group_station_name(self, cpath, g):
+        """Station name(s) of a group from its tracks, in archive order ('A + B' if the group spans two)."""
+        count, first = {}, {}
+        for ref in self.refs.values():
+            if ref.in_rpf and ref.path == cpath and ref.group == g:
+                for s in ref.streams:
+                    st = self._station_of(s.id)
+                    if st:
+                        count[st] = count.get(st, 0) + 1
+                        first[st] = min(first.get(st, ref.base), ref.base)
+        if not count:
+            return ""
+        total = sum(count.values())
+        keep = [st for st, n in count.items() if n >= 2 and n >= 0.2 * total] or [max(count, key=count.get)]
+        return " + ".join(sorted(keep, key=first.get))
+
+    def _auto_name_groups(self):
+        """Name every group after the station(s) of its tracks, unless the user named it. Returns how many."""
+        done = 0
+        seen = sorted({(ref.path, ref.group) for ref in self.refs.values() if ref.in_rpf and ref.group})
+        for cpath, g in seen:
+            d = self.group_names.setdefault(self._gkey(cpath), {})
+            auto = d.setdefault("~auto", [])
+            cur = d.get(str(g), "")
+            if cur and g not in auto:
+                continue
+            name = self._group_station_name(cpath, g)
+            if name:
+                if name != cur:
+                    done += 1
+                d[str(g)] = name
+                if g not in auto:
+                    auto.append(g)
+        save_group_names(self.group_names)
+        for iid, (kind, obj) in self.nodes.items():
+            if kind == "group":
+                self.tree.item(iid, text=self._group_text(obj[0], obj[1]))
+        return done
 
     # ------------------------------------------------------------------ names
     def read_game_names(self):
@@ -704,6 +780,7 @@ class App(tk.Tk):
                                                       n=missing, t=total))
 
     def _refresh_names(self):
+        self._runs = None
         known = 0
         for iid, (kind, obj) in self.nodes.items():
             if kind == "stream":

@@ -17,6 +17,14 @@ URL = "https://www.rockstargames.com/VI/credits"
 TOKEN = re.compile(r"<(h[1-6]|q|p)\b[^>]*>(.*?)</\1>", re.S)
 TAGS = re.compile(r"<[^>]+>")
 UPPER_WORDS = {"fm", "dj", "tv", "vc", "usa", "uk", "us"}
+# headings of the page that are not a radio station (score, TV, games ...): never used to name a group
+NOT_RADIO = {"main score", "additional score", "supplemental score", "additional music", "tv shows", "tv media",
+             "video games", "podcasts", "tv news", "rusty anchor cover band", "radio idents & imaging",
+             "radio ads", "clearance", "a very special thanks"}
+
+
+def is_radio(station):
+    return station.lower() not in NOT_RADIO
 
 
 def download(url=URL, timeout=60):
