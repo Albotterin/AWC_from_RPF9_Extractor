@@ -179,6 +179,17 @@ On Windows you can also double-click `Start AWC-Tool.bat`.
    markers** to also write every chapter as its own file in a `... (tracks)` folder (needs ffmpeg; the cut is a
    stream copy, accurate to the marker). The marker meaning is inferred, see `docs/FORMAT.md`.
 
+### AWC Radio (companion app)
+
+`awc_radio.py` (or `Start AWC-Radio.bat` / `AWC-Radio.exe`) is a small web-radio style player on top of the same
+code. On the first start you pick the game's `audio.rpf` and its texture file (`data\ttdb\ui\ttdb_ui.ttpf`). The app
+reads the archive once (the same scan cache as the main tool; several minutes the first time), loads the song list
+of the public credits page, and then lists every station it found songs for, with its logo. Click a station to tune
+in: its songs play one after the other in random order, and after every 2-4 songs a short jingle is played. Switching
+stations joins the current song in the middle, like a real radio (can be turned off). Later starts are instant.
+Songs come from the credits list; **jingles** are the short unnamed streams that lie in the archive among the
+station's tracks (an educated guess - some may be station voice-overs or similar). Needs `ffplay` like the main tool.
+
 ### Player controls
 
 | Control | Action |
@@ -327,6 +338,7 @@ awc_names.py       Track/station name store, import/export, tags, playlists
 awc_config.py      Reads internal names from the game's audio config
 awc_credits.py     Parses the public credits page and matches its songs to stream IDs
 awc_icons.py       Optional: downloads the Leonida texture decoder and cuts the station logos out of the game
+awc_radio.py       AWC Radio: web-radio style player for the game's stations (separate program)
 Start AWC-Tool.bat Launcher
 build_exe.bat      Builds dist\AWC-Tool.exe with PyInstaller
 docs/FORMAT.md     Technical notes on the AWC/RPF9 layout

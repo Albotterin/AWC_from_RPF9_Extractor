@@ -173,6 +173,18 @@ Unter Windows geht auch ein Doppelklick auf `Start AWC-Tool.bat`.
    geschrieben (braucht ffmpeg; der Schnitt ist eine Stream-Kopie, markergenau). Die Bedeutung der Marker ist
    erschlossen, siehe `docs/FORMAT.md`.
 
+### AWC Radio (Zusatzprogramm)
+
+`awc_radio.py` (oder `Start AWC-Radio.bat` / `AWC-Radio.exe`) ist ein kleiner Webradio-Player auf Basis desselben
+Codes. Beim ersten Start wählst du die `audio.rpf` des Spiels und die Textur-Datei (`data\ttdb\ui\ttdb_ui.ttpf`).
+Die App liest das Archiv einmal ein (derselbe Scan-Cache wie das Hauptprogramm; beim ersten Mal mehrere Minuten),
+lädt die Songliste der öffentlichen Credits-Seite und zeigt dann jeden Sender, zu dem Songs gefunden wurden, mit
+seinem Logo. Ein Klick auf einen Sender schaltet ihn ein: seine Songs laufen in zufälliger Reihenfolge nacheinander,
+nach jeweils 2-4 Songs kommt ein kurzer Jingle. Beim Senderwechsel steigt man mitten im laufenden Song ein, wie bei
+einem echten Radio (abschaltbar). Spätere Starts gehen sofort. Die Songs kommen aus der Credits-Liste; als **Jingles**
+dienen die kurzen unbenannten Streams, die im Archiv zwischen den Tracks des Senders liegen (eine begründete
+Vermutung - manche können Sprecher-Ansagen o. Ä. sein). Braucht wie das Hauptprogramm `ffplay`.
+
 Kommandozeile: `python awc_tool.py [--lang=en|de] [Ordner | datei.awc | datei.rpf ...]`
 
 ## Ausgabeformate und Dateinamen
