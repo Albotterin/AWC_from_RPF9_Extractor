@@ -25,6 +25,7 @@ import awc_core as core  # noqa: E402
 import awc_i18n  # noqa: E402
 import awc_config as gamecfg  # noqa: E402
 import awc_credits as credits  # noqa: E402
+import awc_icons as icons  # noqa: E402
 import awc_names as names  # noqa: E402
 from awc_core import AwcError, AwcFile, AwcRef  # noqa: E402
 from awc_i18n import LANGUAGES, tr  # noqa: E402
@@ -114,6 +115,8 @@ class App(tk.Tk):
         self.names = names.NameStore()   # known titles/artists per stream ID
         self.stations = names.load_stations()   # station names found in the game config
         self._runs = None          # cache of _station_runs()
+        self.icons_busy = False
+        self._icon_img = None
         self.cue_info = {}         # ref.key -> [(standalone AWC name, stream id) or None] per cue of a mix
         self.cache = {}            # (ref.key, stream_idx) -> (opus_path, seconds)  (playback/extract cache)
         self.busy = False
@@ -141,6 +144,7 @@ class App(tk.Tk):
             messagebox.showwarning(tr("dlg_ffmpeg_title"), tr("dlg_ffmpeg_body"))
         if paths:
             self.after(300, lambda: self.start_scan(paths))
+        self.after(900, self._maybe_icon_prompt)
 
     # ------------------------------------------------------------ i18n helpers
     def _reg(self, widget, option, key):
@@ -294,6 +298,7 @@ class App(tk.Tk):
         nrow2.pack(fill="x", padx=8, pady=(0, 6))
         self._reg(ttk.Button(nrow2, command=self.read_game_names), "text", "btn_names_game").pack(side="left")
         self._reg(ttk.Button(nrow2, command=self.read_credits), "text", "btn_names_credits").pack(side="left", padx=(6, 0))
+        self._reg(ttk.Button(nrow2, command=self.icons_button), "text", "btn_icons").pack(side="left", padx=(6, 0))
         self.split_mixes = tk.BooleanVar(value=False)
         self._reg(ttk.Checkbutton(nrow2, variable=self.split_mixes), "text", "chk_split").pack(side="left", padx=14)
 
@@ -315,8 +320,11 @@ class App(tk.Tk):
         self.vol.set(80)
         self.vol.pack(side="left")
         self.vol.bind("<ButtonRelease-1>", self._vol_release)
-        self.lbl_now = ttk.Label(pl, foreground="gray40")
-        self.lbl_now.pack(anchor="w", padx=10, pady=(0, 6))
+        info = ttk.Frame(pl)
+        info.pack(fill="x", padx=10, pady=(0, 6))
+        self.lbl_icon = ttk.Label(info)
+        self.lbl_now = ttk.Label(info, foreground="gray40")
+        self.lbl_now.pack(side="left")
 
         ex = self._reg(ttk.LabelFrame(self), "text", "lf_extract")
         ex.pack(fill="x", **pad)
@@ -474,6 +482,8 @@ class App(tk.Tk):
             self.set_status("st_scan_none", n=len(files))
         else:
             self.set_status("st_scan_done", c=len(res), a=n_awc, s=n_str)
+            if icons.installed() and icons.missing_stations() and self._icons_pools():
+                self._icons_start(quiet=True)
 
     def _update_count(self):
         streams = [v[1][1] for v in self.nodes.values() if v[0] == "stream"]
@@ -488,6 +498,7 @@ class App(tk.Tk):
         self.stop()
         self.cur = None
         self.lbl_now.config(text=tr("lbl_no_track"))
+        self.lbl_icon.pack_forget()
         self.tree.delete(*self.tree.get_children())
         self.nodes.clear()
         self.refs.clear()
@@ -588,6 +599,109 @@ class App(tk.Tk):
         dlg.grab_set()
         self.wait_window(dlg)
         return res[0] if res else None
+
+    # ------------------------------------------------------------------ station logos
+    def _maybe_icon_prompt(self):
+        """First start: offer to download the texture decoder (once; 'Not now' asks again next time)."""
+        if icons.installed() or awc_i18n.get_setting("icons_prompt") == "never":
+            return
+        self._icon_dialog(first=True)
+
+    def _icon_dialog(self, first=False):
+        dlg = tk.Toplevel(self)
+        dlg.title(tr("dlg_icons_title"))
+        dlg.transient(self)
+        dlg.resizable(False, False)
+        ttk.Label(dlg, text=tr("dlg_icons_text", folder=icons.decoder_dir()), wraplength=480, justify="left"
+                  ).pack(padx=16, pady=(14, 8))
+        row = ttk.Frame(dlg)
+        row.pack(fill="x", padx=16, pady=(0, 14))
+
+        def close(choice):
+            if choice == "never" and first:
+                awc_i18n.set_setting("icons_prompt", "never")
+            dlg.destroy()
+            if choice == "go":
+                self._icons_start()
+
+        ttk.Button(row, text=tr("btn_icons_download"), command=lambda: close("go")).pack(side="left")
+        ttk.Button(row, text=tr("btn_icons_later"), command=lambda: close("later")).pack(side="left", padx=6)
+        if first:
+            ttk.Button(row, text=tr("btn_icons_never"), command=lambda: close("never")).pack(side="left")
+        dlg.protocol("WM_DELETE_WINDOW", lambda: close("later"))
+        dlg.update_idletasks()
+        x = self.winfo_rootx() + max(0, (self.winfo_width() - dlg.winfo_width()) // 2)
+        y = self.winfo_rooty() + 80
+        dlg.geometry("+%d+%d" % (x, y))
+        dlg.grab_set()
+
+    def icons_button(self):
+        if self.busy:
+            messagebox.showinfo(tr("dlg_busy_title"), tr("dlg_busy"))
+        elif not icons.installed():
+            self._icon_dialog()
+        else:
+            self._icons_start(report=True)
+
+    def _icons_pools(self):
+        pools = {}
+        for ref in self.refs.values():
+            if ref.in_rpf and ref.path not in pools:
+                pools[ref.path] = icons.find_pool(ref.path)
+        return [p for p in pools.values() if p]
+
+    def _icons_start(self, report=False, quiet=False):
+        """Download the decoder if needed, then cut the logos out of the game's texture pool (background thread)."""
+        if self.icons_busy:
+            return
+        self.icons_busy = True
+        if not quiet:
+            self.set_status("st_icons_downloading" if not icons.installed() else "st_icons_extracting")
+        threading.Thread(target=self._icons_worker, args=(self._icons_pools(), report), daemon=True).start()
+
+    def _icons_worker(self, pools, report):
+        n, err = 0, ""
+        try:
+            if not icons.installed():
+                icons.download()
+            for p in pools:
+                if icons.missing_stations():
+                    n += icons.extract(p)
+        except ImportError:
+            err = tr("dlg_icons_pillow")
+        except Exception as e:  # noqa: BLE001
+            err = str(e)
+        self.q.put(("icons", n, err, report, bool(pools)))
+
+    def _icons_done(self, n, err, report, had_pool):
+        self.icons_busy = False
+        if n or report:
+            self.set_status("st_icons_done", n=n)
+        if err:
+            messagebox.showerror(tr("dlg_icons_title"), tr("dlg_icons_error", e=err))
+        elif report or n:
+            if not had_pool and not n:
+                messagebox.showinfo(tr("dlg_icons_title"), tr("dlg_icons_nopool"))
+            else:
+                total = len(icons.STATION_KEYS)
+                messagebox.showinfo(tr("dlg_icons_title"), tr("dlg_icons_result", n=n,
+                                                              t=total - len(icons.missing_stations()), all=total))
+        if self.cur:
+            self._set_icon(*self.cur)
+
+    def _set_icon(self, ref, s):
+        path = icons.icon_path(self._station(ref, s)) if ref.in_rpf else ""
+        if not path:
+            self.lbl_icon.pack_forget()
+            return
+        try:
+            img = tk.PhotoImage(file=path)
+            self._icon_img = img.subsample(2, 2)
+        except tk.TclError:
+            self.lbl_icon.pack_forget()
+            return
+        self.lbl_icon.config(image=self._icon_img)
+        self.lbl_icon.pack(side="left", padx=(0, 8), before=self.lbl_now)
 
     # ------------------------------------------------------------------ credits page
     def read_credits(self):
@@ -1072,6 +1186,7 @@ class App(tk.Tk):
         self.duration = s.est_seconds
         self.pos = start
         self.lbl_now.config(text="%s  –  %s" % (ref.name, self._stream_text(s)))
+        self._set_icon(ref, s)
         c = self.cache.get((ref.key, s.index))
         if c and os.path.isfile(c[0]):
             self.cur_path = c[0]
@@ -1215,6 +1330,8 @@ class App(tk.Tk):
                     self._apply_credits(msg[1], msg[2])
                 elif kind == "credits_fail":
                     self._credits_failed(msg[1], msg[2], msg[3])
+                elif kind == "icons":
+                    self._icons_done(msg[1], msg[2], msg[3], msg[4])
                 elif kind == "done":
                     cancelled = msg[1] in ("st_cancelled", "st_scan_cancelled", "st_scan_error")
                     self.bar["value"] = 0 if cancelled else 1.0

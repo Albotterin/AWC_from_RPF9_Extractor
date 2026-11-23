@@ -113,7 +113,7 @@ instantly.
 ## Requirements & installation
 
 * **Windows** (the GUI and the packaged `.exe` target Windows; the core modules are plain Python and portable).
-* **Python 3 with tkinter** (included in the standard python.org installer; developed and tested with 3.14). No `pip` packages are needed.
+* **Python 3 with tkinter** (included in the standard python.org installer; developed and tested with 3.14). No `pip` packages are needed, except **Pillow** (`pip install pillow`) for the optional station logos.
 * **ffmpeg + ffplay** – only needed for *playback* and for *FLAC/WAV/MP3* export.
   Opus extraction works without them. Get ffmpeg from <https://ffmpeg.org/download.html> (for example the
   "full build" from gyan.dev) and either put `ffmpeg.exe` and `ffplay.exe` **next to the program** or into your `PATH`.
@@ -165,7 +165,14 @@ On Windows you can also double-click `Start AWC-Tool.bat`.
      a template to fill in, and right-click → **Set title / artist…** names a single stream.
    * Named streams get `Artist - Title` file names and Opus/FLAC/MP3 tags on export, plus optional `.m3u8`
      playlists. Names stay on your PC (`%APPDATA%\AWC-Tool\track_names.json`); nothing is shipped with the tool.
-8. **Station mixes** (optional): a few very long streams (40-120 min) are whole radio mixes. The game stores a
+8. **Station logos** (optional): while a track plays, the logo of its radio station is shown. The logos are stored in
+   the game's texture pool (`data\ttdb\ui\ttdb_ui.ttpf`, next to `audio.rpf`) in a format this tool does not decode.
+   On the first start a dialog offers to download the decoder of the [Leonida](https://github.com/ItsNotRexed/Leonida)
+   project (a few files from GitHub, GPL-3, saved with its LICENSE to `%APPDATA%\AWC-Tool\leonida\`; they are not part
+   of this tool). Afterwards the logos are cut out of your own game files into `%APPDATA%\AWC-Tool\icons\`. The
+   button **Station logos…** repeats the step. 22 stations are known; the station comes from the credits list
+   (see step 7). Nothing from the game is shipped with the tool.
+9. **Station mixes** (optional): a few very long streams (40-120 min) are whole radio mixes. The game stores a
    `trackid` marker for every track it plays; the tool shows them as chapters under the stream (double-click to play
    from there) and names them when the matching standalone track has a title. Tick **Split station mixes at track
    markers** to also write every chapter as its own file in a `... (tracks)` folder (needs ffmpeg; the cut is a
@@ -318,6 +325,7 @@ awc_i18n.py        Translations (English, Deutsch) + settings
 awc_names.py       Track/station name store, import/export, tags, playlists
 awc_config.py      Reads internal names from the game's audio config
 awc_credits.py     Parses the public credits page and matches its songs to stream IDs
+awc_icons.py       Optional: downloads the Leonida texture decoder and cuts the station logos out of the game
 Start AWC-Tool.bat Launcher
 build_exe.bat      Builds dist\AWC-Tool.exe with PyInstaller
 docs/FORMAT.md     Technical notes on the AWC/RPF9 layout

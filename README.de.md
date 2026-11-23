@@ -108,7 +108,7 @@ deinem PC gespeichert und für den Export-Ordner verwendet):
 ## Voraussetzungen & Installation
 
 * **Windows** (GUI und `.exe` zielen auf Windows; die Kernmodule sind reines, portables Python).
-* **Python 3 mit tkinter** (im Standard-Installer von python.org enthalten; entwickelt und getestet mit 3.14). Keine `pip`-Pakete nötig.
+* **Python 3 mit tkinter** (im Standard-Installer von python.org enthalten; entwickelt und getestet mit 3.14). Keine `pip`-Pakete nötig, außer **Pillow** (`pip install pillow`) für die optionalen Sender-Logos.
 * **ffmpeg + ffplay** – nur für *Abspielen* und den Export nach *FLAC/WAV/MP3*. Opus-Extraktion geht auch ohne.
   ffmpeg gibt es unter <https://ffmpeg.org/download.html>; `ffmpeg.exe` und `ffplay.exe` **neben das Programm** oder in den `PATH` legen.
 
@@ -158,7 +158,15 @@ Unter Windows geht auch ein Doppelklick auf `Start AWC-Tool.bat`.
    * Benannte Streams bekommen beim Export `Interpret - Titel` als Dateinamen und Opus/FLAC/MP3-Tags, optional
      `.m3u8`-Playlists. Die Namen bleiben auf deinem PC (`%APPDATA%\AWC-Tool\track_names.json`), das Tool liefert
      keine mit.
-8. **Sender-Mixe** (optional): ein paar sehr lange Streams (40-120 Min.) sind komplette Radio-Mixe. Das Spiel legt
+8. **Sender-Logos** (optional): beim Abspielen wird das Logo des Radiosenders angezeigt. Die Logos liegen im Textur-Pool
+   des Spiels (`data\ttdb\ui\ttdb_ui.ttpf`, neben der `audio.rpf`) in einem Format, das dieses Tool nicht selbst
+   dekodiert. Beim ersten Start bietet ein Dialog an, den Decoder des Projekts
+   [Leonida](https://github.com/ItsNotRexed/Leonida) herunterzuladen (ein paar Dateien von GitHub, GPL-3, mit seiner
+   LICENSE nach `%APPDATA%\AWC-Tool\leonida\`; sie sind nicht Teil dieses Tools). Danach werden die Logos aus deinen
+   eigenen Spieldateien nach `%APPDATA%\AWC-Tool\icons\` geschnitten. Der Knopf **Sender-Logos…** wiederholt den
+   Schritt. Bekannt sind 22 Sender; den Sender liefert die Credits-Liste (siehe Punkt 7). Vom Spiel wird nichts
+   mitgeliefert.
+9. **Sender-Mixe** (optional): ein paar sehr lange Streams (40-120 Min.) sind komplette Radio-Mixe. Das Spiel legt
    für jeden gespielten Track einen `trackid`-Marker ab; das Tool zeigt sie als Kapitel unter dem Stream (Doppelklick
    spielt ab dort) und benennt sie, wenn der passende Einzel-Track einen Titel hat. Mit **Sender-Mixe an
    Track-Markern teilen** wird jedes Kapitel zusätzlich als eigene Datei in einem Ordner `... (tracks)`

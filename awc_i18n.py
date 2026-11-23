@@ -144,6 +144,19 @@ STRINGS = {
         "dlg_gamenames_none": "Scan an RPF archive first (e.g. audio.rpf).",
         "dlg_gamenames_result": "{k} title(s) filled in from the game config ({kept} already had a name and were kept).\n{n} of {t} streams were not found in the config's name list.\n\n{st} station name(s) are now offered in 'Rename group…'.\n\nThe names are internal titles only - there is no artist information; edit them via right click > Set title / artist.",
         "dlg_gamenames_error": "Could not read the config of:\n{paths}",
+        "btn_icons": "Station logos…",
+        "dlg_icons_title": "Station logos (optional)",
+        "dlg_icons_text": "The tool can show the logo of the radio station while a track plays.\n\nThe logos are stored in a texture format that this tool cannot read itself. The decoder of the open-source project Leonida (github.com/ItsNotRexed/Leonida, GPL-3) can. On your request the few files that are needed (about 230 KB) are downloaded from GitHub into\n{folder}\nand used from there. They are not part of this tool.\n\nThe logos are cut out of your own game files and stay on your PC.",
+        "btn_icons_download": "Download now",
+        "btn_icons_later": "Not now",
+        "btn_icons_never": "Don't ask again",
+        "st_icons_downloading": "Downloading the decoder …",
+        "st_icons_extracting": "Reading the station logos …",
+        "st_icons_done": "Station logos: {n} new.",
+        "dlg_icons_error": "Station logos could not be set up:\n{e}",
+        "dlg_icons_nopool": "No texture file found. Scan the game's audio.rpf first; the file data\\ttdb\\ui\\ttdb_ui.ttpf has to be in the same game folder.",
+        "dlg_icons_result": "{n} station logo(s) read; {t} of {all} are available now.\n\nThey are shown while a track of that station plays (needs station names: use 'Songs from the credits page').",
+        "dlg_icons_pillow": "The image library (Pillow) is missing. Install it with: pip install pillow",
         "btn_names_credits": "Songs from the credits page",
         "st_reading_credits": "Downloading the credits page …",
         "st_credits_read": "Credits: {k} stream(s) identified.",
@@ -288,6 +301,19 @@ STRINGS = {
         "dlg_gamenames_none": "Bitte zuerst ein RPF-Archiv scannen (z. B. audio.rpf).",
         "dlg_gamenames_result": "{k} Titel aus der Spiel-Konfiguration eingetragen ({kept} hatten schon einen Namen und blieben unverändert).\n{n} von {t} Streams stehen nicht in der Namensliste der Konfiguration.\n\n{st} Stationsname(n) werden jetzt bei 'Gruppe umbenennen…' vorgeschlagen.\n\nEs sind nur interne Titel, ohne Interpreten - per Rechtsklick > Titel / Interpret setzen lassen sie sich ändern.",
         "dlg_gamenames_error": "Konnte die Konfiguration nicht lesen:\n{paths}",
+        "btn_icons": "Sender-Logos…",
+        "dlg_icons_title": "Sender-Logos (optional)",
+        "dlg_icons_text": "Das Tool kann beim Abspielen das Logo des Radiosenders anzeigen.\n\nDie Logos liegen in einem Texturformat, das dieses Tool nicht selbst lesen kann. Der Decoder des Open-Source-Projekts Leonida (github.com/ItsNotRexed/Leonida, GPL-3) kann es. Auf Wunsch werden die paar nötigen Dateien (etwa 230 KB) von GitHub nach\n{folder}\nheruntergeladen und von dort benutzt. Sie sind nicht Teil dieses Tools.\n\nDie Logos werden aus deinen eigenen Spieldateien geschnitten und bleiben auf deinem PC.",
+        "btn_icons_download": "Jetzt herunterladen",
+        "btn_icons_later": "Nicht jetzt",
+        "btn_icons_never": "Nicht mehr fragen",
+        "st_icons_downloading": "Lade den Decoder …",
+        "st_icons_extracting": "Lese die Sender-Logos …",
+        "st_icons_done": "Sender-Logos: {n} neu.",
+        "dlg_icons_error": "Die Sender-Logos konnten nicht eingerichtet werden:\n{e}",
+        "dlg_icons_nopool": "Keine Textur-Datei gefunden. Zuerst die audio.rpf des Spiels scannen; die Datei data\\ttdb\\ui\\ttdb_ui.ttpf muss im selben Spielordner liegen.",
+        "dlg_icons_result": "{n} Sender-Logo(s) gelesen; {t} von {all} sind jetzt verfügbar.\n\nSie erscheinen, solange ein Track dieses Senders läuft (braucht Sendernamen: 'Songs von der Credits-Seite' benutzen).",
+        "dlg_icons_pillow": "Die Bildbibliothek (Pillow) fehlt. Installation: pip install pillow",
         "btn_names_credits": "Songs von der Credits-Seite",
         "st_reading_credits": "Lade die Credits-Seite …",
         "st_credits_read": "Credits: {k} Stream(s) erkannt.",
@@ -323,14 +349,35 @@ def load_saved_lang():
     return DEFAULT_LANG
 
 
-def save_lang(code):
+def get_setting(key, default=None):
+    try:
+        with open(_settings_path(), "r", encoding="utf-8") as f:
+            return json.load(f).get(key, default)
+    except (OSError, ValueError, AttributeError):
+        return default
+
+
+def set_setting(key, value):
+    """Store one value in settings.json without touching the others."""
     try:
         p = _settings_path()
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                d = json.load(f)
+            if not isinstance(d, dict):
+                d = {}
+        except (OSError, ValueError):
+            d = {}
+        d[key] = value
         os.makedirs(os.path.dirname(p), exist_ok=True)
         with open(p, "w", encoding="utf-8") as f:
-            json.dump({"lang": code}, f)
+            json.dump(d, f)
     except OSError:
         pass
+
+
+def save_lang(code):
+    set_setting("lang", code)
 
 
 def set_lang(code):
