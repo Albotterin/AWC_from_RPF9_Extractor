@@ -7,3 +7,4 @@ python -m PyInstaller --noconfirm --onefile --windowed --name AWC-Tool --paths "
 python -m PyInstaller --noconfirm --onefile --windowed --name AWC-Radio --paths "%~dp0" awc_radio.py
 echo.
 echo Done: dist\AWC-Tool.exe and dist\AWC-Radio.exe
+rem The Android app is built separately: python android\build_apk.py (needs the Android SDK and a JDK)

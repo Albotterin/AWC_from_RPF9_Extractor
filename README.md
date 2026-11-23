@@ -81,6 +81,7 @@ every `.rpf` and `.awc` file and lists all music streams it finds.
 | 🛡 **Safety checks** | Estimates output size, warns when the disk is too small, asks before big jobs. |
 | ⚡ **Fast** | Pure-Python Ogg muxer with a zlib-based CRC: ~100 MB of Opus in about a second. |
 | 🧠 **Scan cache** | Scan results are cached in `%APPDATA%\AWC-Tool\cache` (can be disabled). |
+| 📻 **AWC Radio + Android app** | A web-radio style player for the game's stations that runs live by the UTC clock, and an Android app that plays the same programme from a station pack file. |
 | 🌍 **Multilingual UI** | English and Deutsch, switchable at runtime; easy to add more. |
 | ❌ **Cancelable** | Scans and extractions can be cancelled; partial files are removed. |
 
@@ -211,6 +212,22 @@ for everybody. There is no skip button - like on a real radio; after a pause, pl
 Later starts are instant.
 Songs come from the credits list; **jingles** are the short unnamed streams that lie in the archive among the
 station's tracks (an educated guess - some may be station voice-overs or similar). Needs `ffplay` like the main tool.
+
+### AWC Radio for Android
+
+The phone app plays the same live programme as the PC: same UTC clock, same order, same crossfades. It is two files:
+
+* **`AWC-Radio.apk`** - the app, from the [release page](../../releases/latest). The same file for everybody, no game data
+  inside. Android 7.0 or newer, English and German. It keeps playing in the background with a media notification,
+  lock-screen and headset buttons (previous / next station, pause) and has a sleep timer.
+* **A station pack (`.dat`)** - made on the PC: in AWC Radio click **Android pack...**, tick the stations and save. It holds
+  the songs of those stations in the game's own quality (about 128 kbit/s, not re-encoded; about 2.5 GB for all 20 stations),
+  their logos and the programme. Copy it to the phone, start the app and pick the file once; the songs are played straight
+  out of it.
+
+The pack contains game audio: for your own use only, do not share it. Without a pack the app is empty.
+`python awc_radio.py --export-pack out.dat [--stations "Name" ...]` writes a pack without opening a window.
+The source and the build scripts of the app are in `android/`.
 
 ### Player controls
 
@@ -361,6 +378,8 @@ awc_config.py      Reads internal names from the game's audio config
 awc_credits.py     Parses the public credits page and matches its songs to stream IDs
 awc_icons.py       Optional: downloads the Leonida texture decoder and cuts the station logos out of the game
 awc_radio.py       AWC Radio: web-radio style player for the game's stations (separate program)
+awc_android.py     Station pack (.dat) writer for the Android app, and its dialog in AWC Radio
+android/           The Android app: Java source, build_apk.py, make_logo.py, tests
 Start AWC-Tool.bat Launcher
 build_exe.bat      Builds dist\AWC-Tool.exe with PyInstaller
 docs/FORMAT.md     Technical notes on the AWC/RPF9 layout
@@ -378,6 +397,8 @@ files; general AWC/RPF knowledge comes from the community, notably
 The layout of the game's audio config (the name list, the 29-bit stream IDs as `joaat` hashes) follows the notes of
 [**Leonida**](https://github.com/ItsNotRexed/Leonida) (`docs/audio_config.md`, `docs/audio.md`). The `0xBD` marker
 findings in `docs/FORMAT.md` were reported back there.
+
+The Android app's launcher icon was drawn with the fan-made typeface *GTA Art Deco* (not part of this repository).
 
 ## License
 

@@ -39,7 +39,7 @@ STR = {
         "setup_intro": "Select the game's audio.rpf and its texture file (data\\ttdb\\ui\\ttdb_ui.ttpf). The first start reads the "
                        "archive once; later starts are instant.",
         "lbl_rpf": "audio.rpf", "lbl_pool": "Texture file (ttdb_ui.ttpf)", "btn_browse": "Browse…", "btn_start": "Start radio",
-        "btn_settings": "Files…", "btn_rescan": "Re-read", "st_scan": "Reading the archive … (the first time takes several minutes)",
+        "btn_settings": "Files…", "btn_rescan": "Re-read", "btn_android": "Android pack…", "st_scan": "Reading the archive … (the first time takes several minutes)",
         "st_credits": "Loading the song list …", "st_names": "Reading names from the game config …",
         "st_build": "Building the stations …", "st_icons": "Reading the station logos …", "st_ready": "{n} stations",
         "err_rpf": "Please choose an existing audio.rpf.", "err_scan": "No music streams found in that file.",
@@ -56,7 +56,7 @@ STR = {
         "setup_intro": "Wähle die audio.rpf des Spiels und seine Textur-Datei (data\\ttdb\\ui\\ttdb_ui.ttpf). Beim ersten Start wird "
                        "das Archiv einmal eingelesen; spätere Starts gehen sofort.",
         "lbl_rpf": "audio.rpf", "lbl_pool": "Textur-Datei (ttdb_ui.ttpf)", "btn_browse": "Durchsuchen…", "btn_start": "Radio starten",
-        "btn_settings": "Dateien…", "btn_rescan": "Neu einlesen", "st_scan": "Lese das Archiv … (beim ersten Mal dauert das mehrere Minuten)",
+        "btn_settings": "Dateien…", "btn_rescan": "Neu einlesen", "btn_android": "Android-Pack…", "st_scan": "Lese das Archiv … (beim ersten Mal dauert das mehrere Minuten)",
         "st_credits": "Lade die Songliste …", "st_names": "Lese Namen aus der Spiel-Konfiguration …",
         "st_build": "Baue die Sender …", "st_icons": "Lese die Sender-Logos …", "st_ready": "{n} Sender",
         "err_rpf": "Bitte eine vorhandene audio.rpf wählen.", "err_scan": "In dieser Datei wurden keine Musik-Streams gefunden.",
@@ -424,6 +424,7 @@ class RadioApp(tk.Tk):
         tk.Label(top, text=t("title"), bg=PANEL, fg=ACCENT, font=("Segoe UI", 15, "bold")).pack(side="left", padx=14, pady=8)
         ttk.Button(top, text=t("btn_settings"), command=self._show_setup).pack(side="right", padx=8, pady=6)
         ttk.Button(top, text=t("btn_rescan"), command=lambda: self._start_clicked(force=True)).pack(side="right")
+        ttk.Button(top, text=t("btn_android"), command=self._android).pack(side="right", padx=8)
         body = tk.Frame(self.radio, bg=BG)
         body.pack(fill="both", expand=True)
         left = tk.Frame(body, bg=BG, width=390)
@@ -474,6 +475,17 @@ class RadioApp(tk.Tk):
         self.lbl_next.pack(fill="x", pady=(18, 0))
         self.status = tk.Label(self.radio, text="", bg=PANEL, fg=DIM, anchor="w")
         self.status.pack(fill="x", side="bottom")
+
+    def _android(self):
+        """Dialog that writes a station pack (.dat) for the Android app."""
+        if not self.stations or not self.index:
+            return
+        try:
+            import awc_android  # noqa: PLC0415
+        except ImportError as e:
+            messagebox.showerror(t("title"), t("err_generic", e=e))
+            return
+        awc_android.open_dialog(self)
 
     def _show_setup(self):
         self._stop()
@@ -959,6 +971,10 @@ class RadioApp(tk.Tk):
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "--export-pack":           # no window: python awc_radio.py --export-pack out.dat [...]
+        import awc_android  # noqa: PLC0415
+        awc_android.main(sys.argv[2:])
+        return
     RadioApp().mainloop()
 
 

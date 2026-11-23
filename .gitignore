@@ -26,3 +26,12 @@ __pycache__/
 .venv/
 .vscode/
 .idea/
+
+# --- Android: station packs and APKs made from game data stay local; signing keys never go online ---
+*.dat
+*.apk
+*.idsig
+*.p12
+android/keys/
+android/build/
+android/test/build/

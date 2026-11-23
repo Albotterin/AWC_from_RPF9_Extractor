@@ -78,6 +78,7 @@ Du kannst eine einzelne `.awc`, eine `.rpf` oder einen **ganzen Ordner** angeben
 * 🛡 **Sicherheitsnetz**: geschätzte Ausgabegröße, Warnung bei zu wenig Speicher, Rückfrage bei großen Jobs.
 * ⚡ **Schnell**: Ogg-Muxer in reinem Python mit zlib-basierter Prüfsumme (~100 MB Opus in etwa einer Sekunde).
 * 🧠 **Scan-Cache** in `%APPDATA%\AWC-Tool\cache` (abschaltbar).
+* 📻 **AWC Radio + Android-App**: ein Webradio-Player für die Sender des Spiels, der live nach der UTC-Uhr läuft, und eine Android-App, die dasselbe Programm aus einer Sender-Pack-Datei spielt.
 * 🌍 **Mehrsprachige Oberfläche** (Englisch/Deutsch), zur Laufzeit umschaltbar und leicht erweiterbar.
 * ❌ Scans und Extraktionen sind **abbrechbar**; angefangene Dateien werden entfernt.
 
@@ -207,6 +208,23 @@ Spätere Starts gehen sofort. Die Songs kommen aus der Credits-Liste; als **Jing
 dienen die kurzen unbenannten Streams, die im Archiv zwischen den Tracks des Senders liegen (eine begründete
 Vermutung - manche können Sprecher-Ansagen o. Ä. sein). Braucht wie das Hauptprogramm `ffplay`.
 
+### AWC Radio für Android
+
+Die Handy-App spielt dasselbe Live-Programm wie der PC: gleiche UTC-Uhr, gleiche Reihenfolge, gleiche Überblendungen.
+Es sind zwei Dateien:
+
+* **`AWC-Radio.apk`** - die App, von der [Release-Seite](../../releases/latest). Für alle dieselbe Datei, ohne Spieldaten.
+  Android 7.0 oder neuer, Deutsch und Englisch. Sie spielt im Hintergrund weiter, mit Medien-Benachrichtigung,
+  Sperrbildschirm- und Kopfhörertasten (voriger / nächster Sender, Pause) und hat einen Einschlaftimer.
+* **Ein Sender-Pack (`.dat`)** - wird am PC erzeugt: in AWC Radio auf **Android-Pack...** klicken, Sender ankreuzen und
+  speichern. Darin liegen die Songs dieser Sender in der Originalqualität des Spiels (ca. 128 kbit/s, nicht neu kodiert;
+  etwa 2,5 GB für alle 20 Sender), ihre Logos und das Programm. Aufs Handy kopieren, die App starten und die Datei
+  einmal auswählen; die Songs werden direkt daraus abgespielt.
+
+Das Pack enthält Spiel-Audio: nur für den eigenen Gebrauch, bitte nicht weitergeben. Ohne Pack ist die App leer.
+`python awc_radio.py --export-pack out.dat [--stations "Name" ...]` schreibt ein Pack ohne Fenster. Quelltext und
+Build-Skripte der App liegen in `android/`.
+
 Kommandozeile: `python awc_tool.py [--lang=en|de] [Ordner | datei.awc | datei.rpf ...]`
 
 ## Ausgabeformate und Dateinamen
@@ -323,3 +341,5 @@ Abspielen und Konvertieren übernimmt [FFmpeg](https://ffmpeg.org/).
 Das Layout der Audio-Konfiguration des Spiels (Namensliste, die 29-Bit-Stream-IDs als `joaat`-Hashes) folgt den Notizen
 von [Leonida](https://github.com/ItsNotRexed/Leonida) (`docs/audio_config.md`, `docs/audio.md`). Die Funde zu den
 `0xBD`-Markern in `docs/FORMAT.md` wurden dort zurückgemeldet.
+
+Das Startbild-Symbol der Android-App wurde mit der Fan-Schrift *GTA Art Deco* gezeichnet (nicht Teil dieses Repositorys).
