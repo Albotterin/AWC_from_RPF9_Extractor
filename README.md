@@ -171,7 +171,8 @@ On Windows you can also double-click `Start AWC-Tool.bat`.
    project (a few files from GitHub, GPL-3, saved with its LICENSE to `%APPDATA%\AWC-Tool\leonida\`; they are not part
    of this tool). Afterwards the logos are cut out of your own game files into `%APPDATA%\AWC-Tool\icons\`. The
    button **Station logos…** repeats the step. 22 stations are known; the station comes from the credits list
-   (see step 7). Nothing from the game is shipped with the tool.
+   (see step 7). Group rows get a small logo, and FLAC/MP3 exports carry the logo as cover picture. Nothing from the
+   game is shipped with the tool.
 9. **Station mixes** (optional): a few very long streams (40-120 min) are whole radio mixes. The game stores a
    `trackid` marker for every track it plays; the tool shows them as chapters under the stream (double-click to play
    from there) and names them when the matching standalone track has a title. Tick **Split station mixes at track

@@ -71,7 +71,7 @@ def installed():
     return all(os.path.isfile(os.path.join(decoder_dir(), os.path.basename(f))) for f in FILES)
 
 
-def download(progress=None, timeout=60):
+def download(progress=None, timeout=20):
     """Download the decoder files (about 230 KB). Raises OSError on a network problem."""
     os.makedirs(decoder_dir(), exist_ok=True)
     for n, f in enumerate(FILES):

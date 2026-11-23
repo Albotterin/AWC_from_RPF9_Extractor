@@ -164,8 +164,8 @@ Unter Windows geht auch ein Doppelklick auf `Start AWC-Tool.bat`.
    [Leonida](https://github.com/ItsNotRexed/Leonida) herunterzuladen (ein paar Dateien von GitHub, GPL-3, mit seiner
    LICENSE nach `%APPDATA%\AWC-Tool\leonida\`; sie sind nicht Teil dieses Tools). Danach werden die Logos aus deinen
    eigenen Spieldateien nach `%APPDATA%\AWC-Tool\icons\` geschnitten. Der Knopf **Sender-Logos…** wiederholt den
-   Schritt. Bekannt sind 22 Sender; den Sender liefert die Credits-Liste (siehe Punkt 7). Vom Spiel wird nichts
-   mitgeliefert.
+   Schritt. Bekannt sind 22 Sender; den Sender liefert die Credits-Liste (siehe Punkt 7). Gruppen-Zeilen bekommen ein kleines Logo, und FLAC/MP3-Exporte tragen das Logo als Cover-Bild.
+   Vom Spiel wird nichts mitgeliefert.
 9. **Sender-Mixe** (optional): ein paar sehr lange Streams (40-120 Min.) sind komplette Radio-Mixe. Das Spiel legt
    für jeden gespielten Track einen `trackid`-Marker ab; das Tool zeigt sie als Kapitel unter dem Stream (Doppelklick
    spielt ab dort) und benennt sie, wenn der passende Einzel-Track einen Titel hat. Mit **Sender-Mixe an

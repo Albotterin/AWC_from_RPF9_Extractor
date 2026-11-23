@@ -117,6 +117,7 @@ class App(tk.Tk):
         self._runs = None          # cache of _station_runs()
         self.icons_busy = False
         self._icon_img = None
+        self._small_icons = {}     # logo path -> small PhotoImage for the tree
         self.cue_info = {}         # ref.key -> [(standalone AWC name, stream id) or None] per cue of a mix
         self.cache = {}            # (ref.key, stream_idx) -> (opus_path, seconds)  (playback/extract cache)
         self.busy = False
@@ -272,6 +273,7 @@ class App(tk.Tk):
         mid = ttk.Frame(self)
         mid.pack(fill="both", expand=True, **pad)
         cols = ("id", "codec", "ch", "dur", "size")
+        ttk.Style(self).configure("Treeview", rowheight=24)     # room for the small station logos
         self.tree = ttk.Treeview(mid, columns=cols, selectmode="extended")
         for c, w in (("id", 90), ("codec", 70), ("ch", 70), ("dur", 90), ("size", 90)):
             self.tree.column(c, width=w, anchor="center")
@@ -478,6 +480,7 @@ class App(tk.Tk):
                             self.tree.item(cid2, text=self._cue_text(ref, k))
         self._update_count()
         self._refresh_names()
+        self._group_icons()
         if not res:
             self.set_status("st_scan_none", n=len(files))
         else:
@@ -660,10 +663,12 @@ class App(tk.Tk):
         threading.Thread(target=self._icons_worker, args=(self._icons_pools(), report), daemon=True).start()
 
     def _icons_worker(self, pools, report):
-        n, err = 0, ""
+        n, err, fresh = 0, "", False
         try:
             if not icons.installed():
-                icons.download()
+                fresh = True
+                icons.download(progress=lambda f: self.q.put(("statuskey", "st_icons_dl_progress", {"p": int(f * 100)})))
+            self.q.put(("statuskey", "st_icons_extracting", {}))
             for p in pools:
                 if icons.missing_stations():
                     n += icons.extract(p)
@@ -671,21 +676,26 @@ class App(tk.Tk):
             err = tr("dlg_icons_pillow")
         except Exception as e:  # noqa: BLE001
             err = str(e)
-        self.q.put(("icons", n, err, report, bool(pools)))
+        self.q.put(("icons", n, err, report, bool(pools), fresh))
 
-    def _icons_done(self, n, err, report, had_pool):
+    def _icons_done(self, n, err, report, had_pool, fresh=False):
         self.icons_busy = False
-        if n or report:
-            self.set_status("st_icons_done", n=n)
+        # always leave the "downloading ..." status, whatever happened
         if err:
+            self.set_status("st_ready")
             messagebox.showerror(tr("dlg_icons_title"), tr("dlg_icons_error", e=err))
-        elif report or n:
-            if not had_pool and not n:
-                messagebox.showinfo(tr("dlg_icons_title"), tr("dlg_icons_nopool"))
-            else:
+        elif not had_pool and not n:
+            self.set_status("st_icons_wait")
+            if fresh or report:
+                messagebox.showinfo(tr("dlg_icons_title"), tr("dlg_icons_installed" if fresh else "dlg_icons_nopool"))
+        else:
+            self.set_status("st_icons_done", n=n)
+            if report or n:
                 total = len(icons.STATION_KEYS)
                 messagebox.showinfo(tr("dlg_icons_title"), tr("dlg_icons_result", n=n,
                                                               t=total - len(icons.missing_stations()), all=total))
+        if n:
+            self._group_icons()
         if self.cur:
             self._set_icon(*self.cur)
 
@@ -842,7 +852,24 @@ class App(tk.Tk):
         for iid, (kind, obj) in self.nodes.items():
             if kind == "group":
                 self.tree.item(iid, text=self._group_text(obj[0], obj[1]))
+        self._group_icons()
         return done
+
+    def _group_icons(self):
+        """Small station logo in front of every group row (the first station of the group)."""
+        for iid, (kind, obj) in self.nodes.items():
+            if kind != "group":
+                continue
+            first = self._group_station_name(obj[0], obj[1]).split(" + ")[0]
+            path = icons.icon_path(first)
+            if not path:
+                continue
+            if path not in self._small_icons:
+                try:
+                    self._small_icons[path] = tk.PhotoImage(file=path).subsample(6, 6)      # 128 -> 21 px
+                except tk.TclError:
+                    continue
+            self.tree.item(iid, image=self._small_icons[path])
 
     # ------------------------------------------------------------------ names
     def read_game_names(self):
@@ -1103,9 +1130,10 @@ class App(tk.Tk):
                                 cancel=lambda: self.cancel_flag, tags=tags)
                 if ext != "opus":
                     for s in streams:
+                        cover = icons.icon_path(self._station(ref, s)) if ext in ("flac", "mp3") and ref.in_rpf else ""
                         self._ffmpeg_convert(jobs[s.index], final[s.index],
                                              ff_args + names.ffmpeg_meta_args(tags.get(s.index)), s.est_seconds,
-                                             done + share, w * 0.5 / len(streams))
+                                             done + share, w * 0.5 / len(streams), cover=cover)
                         if os.path.basename(jobs[s.index]).startswith("x_"):
                             try:
                                 os.remove(jobs[s.index])
@@ -1145,8 +1173,13 @@ class App(tk.Tk):
             if r.returncode != 0:
                 raise RuntimeError(tr("err_ffmpeg", e=r.stderr[-800:]))
 
-    def _ffmpeg_convert(self, src, dst, ff_args, dur, lo, span):
-        cmd = [self.ffmpeg, "-y", "-v", "error", "-nostats", "-progress", "pipe:1", "-i", src] + ff_args + [dst]
+    def _ffmpeg_convert(self, src, dst, ff_args, dur, lo, span, cover=""):
+        cmd = [self.ffmpeg, "-y", "-v", "error", "-nostats", "-progress", "pipe:1", "-i", src]
+        if cover:      # station logo as cover picture (FLAC / MP3)
+            cmd += ["-i", cover, "-map", "0:a", "-map", "1:v", "-c:v", "copy", "-disposition:v", "attached_pic"]
+            if dst.lower().endswith(".mp3"):
+                cmd += ["-id3v2_version", "3"]
+        cmd += ff_args + [dst]
         p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
                              creationflags=NO_WINDOW)
         for line in p.stdout:
@@ -1331,7 +1364,7 @@ class App(tk.Tk):
                 elif kind == "credits_fail":
                     self._credits_failed(msg[1], msg[2], msg[3])
                 elif kind == "icons":
-                    self._icons_done(msg[1], msg[2], msg[3], msg[4])
+                    self._icons_done(*msg[1:])
                 elif kind == "done":
                     cancelled = msg[1] in ("st_cancelled", "st_scan_cancelled", "st_scan_error")
                     self.bar["value"] = 0 if cancelled else 1.0
