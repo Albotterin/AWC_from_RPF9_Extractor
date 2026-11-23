@@ -201,7 +201,8 @@ kommt ein kurzer Jingle. Das Programm wird aus der **UTC-Uhrzeit** berechnet (je
 Jingles inklusive), jeder Sender „läuft“ also im Hintergrund weiter: Wer zu einem anderen Sender und zurück wechselt,
 landet dort, wo der erste Sender inzwischen ist. Alle mit denselben Spieldateien und derselben Uhrzeit hören denselben
 Song zur selben Sekunde (auf etwa eine Sekunde genau; der Song, der über Mitternacht UTC laufen würde, wird
-abgeschnitten). Es gibt keinen Überspringen-Knopf – wie bei einem echten Radio; nach einer Pause geht es live weiter.
+abgeschnitten). Aufeinanderfolgende Songs und Jingles werden 3 Sekunden lang **überblendet** (um kurze Jingles herum kürzer), für alle
+im selben Moment. Es gibt keinen Überspringen-Knopf – wie bei einem echten Radio; nach einer Pause geht es live weiter.
 Spätere Starts gehen sofort. Die Songs kommen aus der Credits-Liste; als **Jingles**
 dienen die kurzen unbenannten Streams, die im Archiv zwischen den Tracks des Senders liegen (eine begründete
 Vermutung - manche können Sprecher-Ansagen o. Ä. sein). Braucht wie das Hauptprogramm `ffplay`.

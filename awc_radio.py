@@ -228,6 +228,8 @@ def build_stations(items, found, cfg_names):
 
 
 DAY = 86400.0
+FADE = 3.0                                 # seconds of crossfade between two items (shorter around short jingles)
+LEAD = 0.4                                 # ffplay needs about this long to start; its start position is moved on by it
 
 
 def _tkey(tr_):
@@ -245,7 +247,10 @@ class Schedule:
     Every UTC day gets its own order: the songs are 'shuffled' by hashing (station, day, pass, song), one jingle is
     placed after every 2-4 songs, and the day is filled from 00:00:00 UTC onwards. Nothing random and nothing stored,
     so everybody with the same game files and the same clock hears the same song at the same second. The one song that
-    would cross midnight UTC is cut there."""
+    would cross midnight UTC is cut there.
+
+    Neighbouring items overlap by a few seconds (a crossfade like on a real radio): the next one starts while the
+    previous one fades out. The overlap only depends on the two tracks, so it is the same for everybody as well."""
 
     def __init__(self, name, station):
         self.name = name
@@ -254,14 +259,15 @@ class Schedule:
         self.days = {}
 
     def _day(self, d):
-        """-> ([start offsets], [(kind, track)]) of UTC day number d."""
+        """-> ([start offsets], [[kind, track, fade_in, fade_out]]) of UTC day number d."""
         if d in self.days:
             return self.days[d]
         name = self.name
         starts, entries = [], []
-        t_, deck, npass, last_song, last_jingle, jn = 0.0, [], 0, None, None, 0
+        deck, npass, last_song, last_jingle, jn = [], 0, None, None, 0
+        prev_start, prev_sec = 0.0, 0.0
         count, target = 0, 2 + _h(name, d, "target", 0) % 3
-        while t_ < DAY:
+        while True:
             if self.jingles and count >= target:
                 jn += 1
                 count, target = 0, 2 + _h(name, d, "target", jn) % 3
@@ -277,16 +283,27 @@ class Schedule:
                 last_song = tr_ = deck.pop()
                 count += 1
                 kind = "song"
-            starts.append(t_)
-            entries.append((kind, tr_))
-            t_ += max(1.0, tr_["sec"])
+            sec = max(1.0, tr_["sec"])
+            if entries:
+                ov = min(FADE, 0.25 * prev_sec, 0.25 * sec)       # crossfade with the previous item
+                start = prev_start + prev_sec - ov
+                if start >= DAY:
+                    break
+                entries[-1][3] = ov
+            else:
+                ov, start = 0.0, 0.0
+            starts.append(start)
+            entries.append([kind, tr_, ov, 0.0])
+            prev_start, prev_sec = start, sec
         if len(self.days) > 4:
             self.days.clear()
         self.days[d] = (starts, entries)
         return self.days[d]
 
     def items_from(self, now, n):
-        """The item that is on air at UNIX time `now` and the n-1 after it: [(start, end, kind, track)]."""
+        """The item that started last at UNIX time `now` and the n-1 after it:
+        [(start, end, kind, track, fade_in, fade_out)]. end is when its audio ends (the item that crosses midnight
+        UTC ends there); the next item starts fade_out seconds before that."""
         import bisect
         d = int(now // DAY)
         starts, entries = self._day(d)
@@ -296,8 +313,9 @@ class Schedule:
             if i >= len(entries):
                 d, i = d + 1, 0
                 starts, entries = self._day(d)
-            end = starts[i + 1] if i + 1 < len(starts) else DAY
-            out.append((d * DAY + starts[i], d * DAY + end, entries[i][0], entries[i][1]))
+            kind, tr_, fin, fout = entries[i]
+            end = min(starts[i] + max(1.0, tr_["sec"]), DAY)
+            out.append((d * DAY + starts[i], d * DAY + end, kind, tr_, fin, fout))
             i += 1
         return out
 
@@ -331,7 +349,9 @@ class RadioApp(tk.Tk):
         self.sched = None
         self.upcoming = []              # [(kind, track)] that follow the current item
         self.cur = None                 # (kind, track)
-        self.cur_start = 0.0            # UNIX times of the scheduled start / end of the current item
+        self.cur_item = None            # the same as a schedule item (start, end, kind, track, fade_in, fade_out)
+        self.old = []                   # [(proc, end)]: earlier items that are still fading out
+        self.cur_start = 0.0           # UNIX times of the scheduled start / end of the current item
         self.cur_end = 0.0
         self.started = 0.0              # when ffplay was last launched
         self.proc = None
@@ -708,9 +728,24 @@ class RadioApp(tk.Tk):
 
     def _show_next(self):
         if self.upcoming:
-            kind, tr_ = self.upcoming[0]
+            _s, _e, kind, tr_, _fi, _fo = self.upcoming[0]
             label = t("kind_jingle") if kind == "jingle" else "%s - %s" % (tr_["artist"], tr_["title"]) if tr_["artist"] else tr_["title"]
             self.lbl_next.config(text="%s %s" % (t("lbl_next"), label))
+
+    def _set_cur(self, item):
+        """Make `item` (start, end, kind, track, fade_in, fade_out) the current one and show it."""
+        self.cur_item = item
+        self.cur_start, self.cur_end, kind, tr_, _fi, _fo = item
+        self.cur = (kind, tr_)
+        self.lbl_kind.config(text=t("kind_jingle") if kind == "jingle" else t("kind_song"))
+        self.lbl_title.config(text=("♪ " + t("kind_jingle")) if kind == "jingle" else tr_["title"])
+        self.lbl_artist.config(text=tr_["artist"] if kind == "song" else self.station or "")
+        self.lbl_len.config(text=fmt_time(tr_["sec"]))
+
+    def _queue_tracks(self):
+        for item in [self.cur_item] + self.upcoming:             # extract in playing order
+            if self._track_key(item[3]) not in self.ready:
+                self.want.put(item[3])
 
     def _sync(self, skip_current=False):
         """Jump to whatever the station has on air right now (the same for everybody with the same clock).
@@ -719,41 +754,49 @@ class RadioApp(tk.Tk):
         self._kill()
         if not self.sched:
             return
-        items = self.sched.items_from(time.time(), 4)
+        items = self.sched.items_from(time.time() + LEAD, 5)
         if skip_current and self.cur and _tkey(items[0][3]) == _tkey(self.cur[1]):
             items = items[1:]
-        self.cur_start, self.cur_end = items[0][0], items[0][1]
-        self.cur = (items[0][2], items[0][3])
-        self.upcoming = [(k, tr_) for _s, _e, k, tr_ in items[1:3]]
-        for _kind, tr_ in [self.cur] + self.upcoming:            # extract in playing order
-            if self._track_key(tr_) not in self.ready:
-                self.want.put(tr_)
+        self._set_cur(items[0])
+        self.upcoming = items[1:3]
+        self._queue_tracks()
         self._show_next()
-        kind, tr_ = self.cur
-        self.lbl_kind.config(text=t("kind_jingle") if kind == "jingle" else t("kind_song"))
-        self.lbl_title.config(text=("♪ " + t("kind_jingle")) if kind == "jingle" else tr_["title"])
-        self.lbl_artist.config(text=tr_["artist"] if kind == "song" else self.station or "")
-        self.lbl_len.config(text=fmt_time(self.cur_end - self.cur_start))
         self.state = "loading"
         self.status.config(text=t("st_loading"))
 
-    def _start_proc(self):
-        kind, tr_ = self.cur
+    def _spawn(self, item):
+        """Start ffplay for `item` at the position the station has reached by now, with its crossfade in/out."""
+        start, end, _kind, tr_, fin, fout = item
         path = self.ready.get(self._track_key(tr_))
         if not path or not os.path.isfile(path):
-            return False
-        self.pos = max(0.0, time.time() - self.cur_start)         # where the station is by now
+            return None
+        pos = max(0.0, time.time() + LEAD - start)               # where the station is by the time ffplay is up
+        pos = pos if pos > 0.5 else 0.0
+        sec = max(1.0, tr_["sec"])
         cmd = [self.ffplay, "-nodisp", "-autoexit", "-loglevel", "quiet", "-volume", str(int(self.vol.get()))]
-        if self.pos > 0.5:
-            cmd += ["-ss", "%.2f" % self.pos]
+        if pos:
+            cmd += ["-ss", "%.2f" % pos]
+        fades = []
+        if fin > 0 and pos < fin:
+            fades.append("afade=t=in:st=0:d=%.3f:curve=qsin" % fin)
+        if fout > 0:
+            fades.append("afade=t=out:st=%.3f:d=%.3f:curve=qsin" % (max(0.0, sec - fout), fout))
+        if fades:                                                # asetpts: the filters see the position within the track
+            cmd += ["-af", ",".join(["asetpts=N/SR/TB+%.3f/TB" % pos] + fades)]
         cmd.append(path)
         try:
-            self.proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                                         stderr=subprocess.DEVNULL, creationflags=NO_WINDOW)
+            return subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL, creationflags=NO_WINDOW)
         except OSError as e:
             messagebox.showerror(t("title"), t("err_generic", e=e))
             self.state = "idle"
+            return None
+
+    def _start_proc(self):
+        proc = self._spawn(self.cur_item)
+        if proc is None:
             return False
+        self.proc = proc
         self.started = time.time()
         self.state = "playing"
         self.btn_play.config(text=t("btn_pause"))
@@ -761,13 +804,30 @@ class RadioApp(tk.Tk):
         return True
 
     def _kill(self):
-        if self.proc and self.proc.poll() is None:
-            try:
-                self.proc.kill()
-                self.proc.wait(timeout=2)
-            except (OSError, subprocess.TimeoutExpired):
-                pass
+        for p in [self.proc] + [p for p, _end in self.old]:
+            if p and p.poll() is None:
+                try:
+                    p.kill()
+                    p.wait(timeout=2)
+                except (OSError, subprocess.TimeoutExpired):
+                    pass
         self.proc = None
+        self.old = []
+
+    def _reap(self, now):
+        """Stop the faded-out processes of earlier items once their audio is over."""
+        keep = []
+        for p, end in self.old:
+            if p.poll() is not None:
+                continue
+            if now >= end:
+                try:
+                    p.kill()
+                except OSError:
+                    pass
+            else:
+                keep.append((p, end))
+        self.old = keep
 
     def _stop(self):
         self._kill()
@@ -790,8 +850,7 @@ class RadioApp(tk.Tk):
     def _vol_changed(self, _e=None):
         self._save_prefs()
         if self.state == "playing":           # ffplay cannot change its volume from outside: restart at the live position
-            self._kill()
-            self._start_proc()
+            self._sync()
 
     def _prepare_loop(self):
         """Background thread: cut the tracks out of the archive into small Opus files that ffplay can play."""
@@ -828,14 +887,29 @@ class RadioApp(tk.Tk):
                 sec = max(1.0, self.cur_end - self.cur_start)
                 self.bar["value"] = min(1.0, pos / sec)
                 self.lbl_pos.config(text=fmt_time(pos))
-                if now >= self.cur_end:           # the schedule moves on (also cuts a file that runs long)
-                    self.fail_count = 0
-                    self._sync()
-                elif self.proc is not None and self.proc.poll() is not None and now - self.started < 2.0 \
-                        and self.cur_end - now > 3.0:
+                self._reap(now)
+                nxt = self.upcoming[0] if self.upcoming else None
+                if nxt and now + LEAD >= nxt[0]:  # time for the next item: it fades in while this one fades out
+                    key = self._track_key(nxt[3])
+                    if self.ready.get(key):
+                        proc = self._spawn(nxt)
+                        if proc is not None:
+                            if self.proc is not None:
+                                self.old.append((self.proc, self.cur_end))
+                            self.proc, self.started, self.fail_count = proc, now, 0
+                            self._set_cur(nxt)
+                            self.upcoming = self.sched.items_from(nxt[0] + 0.001, 4)[1:3]
+                            self._queue_tracks()
+                            self._show_next()
+                    elif key in self.ready:       # extraction failed
+                        self._sync()
+                if self.state == "playing" and now >= self.cur_end:
+                    self._sync()                  # nothing followed (next file not ready): wait for it
+                elif self.state == "playing" and self.proc is not None and self.proc.poll() is not None \
+                        and now - self.started < 2.0 and self.cur_end - now > 3.0:
                     self._count_failure()         # ended right away: probably broken
         finally:
-            self.after(250, self._tick)
+            self.after(100, self._tick)
 
     def _count_failure(self):
         self.fail_count += 1

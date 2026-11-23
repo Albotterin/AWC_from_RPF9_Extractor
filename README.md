@@ -206,7 +206,8 @@ in: its songs play one after the other, and after every 2-4 songs a short jingle
 calculated from the **UTC clock** (a new order every UTC day, jingles included), so every station keeps "running" in
 the background: switch to another station and back and you land where the first one is by now. Everybody with the same
 game files and the same clock hears the same song at the same second (accurate to about a second; the one song that
-would cross midnight UTC is cut). There is no skip button - like on a real radio; after a pause, play resumes live.
+would cross midnight UTC is cut). Neighbouring songs and jingles are **crossfaded** for 3 seconds (shorter around short jingles), at the same moment
+for everybody. There is no skip button - like on a real radio; after a pause, play resumes live.
 Later starts are instant.
 Songs come from the credits list; **jingles** are the short unnamed streams that lie in the archive among the
 station's tracks (an educated guess - some may be station voice-overs or similar). Needs `ffplay` like the main tool.
