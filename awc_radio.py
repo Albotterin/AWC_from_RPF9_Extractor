@@ -2,14 +2,14 @@
 
 Pick the game's audio.rpf and its texture pool once; the app finds the stations (names come from the public credits
 list, see awc_credits.py), shows them with their logos and plays their songs one after the other, with a short
-jingle after every 2-4 songs. Switching stations drops you into the middle of a song, like tuning a real radio.
+jingle after every 2-4 songs. The programme is calculated from the UTC clock, so every station keeps "running" in the
+background: switching away and back, or a second person with the same clock, lands on the same song at the same second.
 
 It uses the same scan cache as awc_tool.py and needs ffplay (next to the program or in PATH).
 """
 import json
 import os
 import queue
-import random
 import subprocess
 import sys
 import threading
@@ -47,8 +47,8 @@ STR = {
         "err_credits": "The credits page could not be downloaded:\n{e}\n\nPick the page saved from your browser instead?",
         "err_html": "HTML page", "err_generic": "Something went wrong:\n{e}", "err_nostations": "No station with songs was found.",
         "ask_decoder": "Station logos need the Leonida texture decoder (a few files from GitHub, GPL-3; they are saved to\n{folder}\nand are not part of this program). Download it now?",
-        "kind_song": "SONG", "kind_jingle": "JINGLE", "btn_next": "Next ⏭", "btn_play": "▶ Play", "btn_pause": "⏸ Pause",
-        "chk_mid": "Join songs in the middle", "lbl_volume": "Volume", "n_songs": "{n} songs", "st_loading": "Loading …",
+        "kind_song": "SONG", "kind_jingle": "JINGLE", "btn_play": "▶ Play (live)", "btn_pause": "⏸ Pause",
+        "sync_hint": "Live: the stations run by the UTC clock, everyone with the same time hears the same song.", "lbl_volume": "Volume", "n_songs": "{n} songs", "st_loading": "Loading …",
         "lbl_next": "Up next:", "tune": "Tune in to a station on the left", "no_logo_hint": "",
     },
     "de": {
@@ -64,8 +64,8 @@ STR = {
         "err_credits": "Die Credits-Seite konnte nicht geladen werden:\n{e}\n\nStattdessen die im Browser gespeicherte Seite wählen?",
         "err_html": "HTML-Seite", "err_generic": "Es ist ein Fehler aufgetreten:\n{e}", "err_nostations": "Es wurde kein Sender mit Songs gefunden.",
         "ask_decoder": "Für die Sender-Logos wird der Leonida-Texturdecoder gebraucht (ein paar Dateien von GitHub, GPL-3; sie werden nach\n{folder}\ngespeichert und sind nicht Teil dieses Programms). Jetzt herunterladen?",
-        "kind_song": "SONG", "kind_jingle": "JINGLE", "btn_next": "Weiter ⏭", "btn_play": "▶ Abspielen", "btn_pause": "⏸ Pause",
-        "chk_mid": "Mitten im Song einsteigen", "lbl_volume": "Lautstärke", "n_songs": "{n} Songs", "st_loading": "Lade …",
+        "kind_song": "SONG", "kind_jingle": "JINGLE", "btn_play": "▶ Abspielen (live)", "btn_pause": "⏸ Pause",
+        "sync_hint": "Live: Die Sender laufen nach der UTC-Uhrzeit, alle mit derselben Zeit hören denselben Song.", "lbl_volume": "Lautstärke", "n_songs": "{n} Songs", "st_loading": "Lade …",
         "lbl_next": "Als Nächstes:", "tune": "Links einen Sender wählen", "no_logo_hint": "",
     },
 }
@@ -227,32 +227,79 @@ def build_stations(items, found, cfg_names):
     return {k: v for k, v in sorted(out.items(), key=lambda kv: sort_key(kv[0])) if len(v["songs"]) >= MIN_SONGS}
 
 
-class Programme:
-    """What a station plays: shuffled songs, one jingle after every 2-4 songs."""
+DAY = 86400.0
 
-    def __init__(self, station):
-        self.station = station
-        self.songs = list(station["songs"])
-        self.jingles = list(station["jingles"])
-        self.deck = []
-        self.last_jingle = None
-        self.count = 0
-        self.target = random.randint(2, 4)
 
-    def _song(self):
-        if not self.deck:
-            self.deck = self.songs[:]
-            random.shuffle(self.deck)
-        return self.deck.pop()
+def _tkey(tr_):
+    return "%s_%s" % (tr_["base"], tr_["idx"])
 
-    def next(self):
-        if self.jingles and self.count >= self.target:
-            self.count, self.target = 0, random.randint(2, 4)
-            pool = [j for j in self.jingles if j is not self.last_jingle] or self.jingles
-            self.last_jingle = random.choice(pool)
-            return "jingle", self.last_jingle
-        self.count += 1
-        return "song", self._song()
+
+def _h(*parts):
+    """Stable hash (identical on every machine and Python version, unlike random.shuffle)."""
+    return zlib.crc32("|".join(str(p) for p in parts).encode("utf-8"))
+
+
+class Schedule:
+    """The programme of one station, a pure function of the station and the UTC clock.
+
+    Every UTC day gets its own order: the songs are 'shuffled' by hashing (station, day, pass, song), one jingle is
+    placed after every 2-4 songs, and the day is filled from 00:00:00 UTC onwards. Nothing random and nothing stored,
+    so everybody with the same game files and the same clock hears the same song at the same second. The one song that
+    would cross midnight UTC is cut there."""
+
+    def __init__(self, name, station):
+        self.name = name
+        self.songs = sorted(station["songs"], key=_tkey)
+        self.jingles = sorted(station["jingles"], key=_tkey)
+        self.days = {}
+
+    def _day(self, d):
+        """-> ([start offsets], [(kind, track)]) of UTC day number d."""
+        if d in self.days:
+            return self.days[d]
+        name = self.name
+        starts, entries = [], []
+        t_, deck, npass, last_song, last_jingle, jn = 0.0, [], 0, None, None, 0
+        count, target = 0, 2 + _h(name, d, "target", 0) % 3
+        while t_ < DAY:
+            if self.jingles and count >= target:
+                jn += 1
+                count, target = 0, 2 + _h(name, d, "target", jn) % 3
+                pool = [j for j in self.jingles if j is not last_jingle] or self.jingles
+                last_jingle = tr_ = pool[_h(name, d, "jingle", jn) % len(pool)]
+                kind = "jingle"
+            else:
+                if not deck:
+                    npass += 1
+                    deck = sorted(self.songs, key=lambda s: _h(name, d, npass, _tkey(s)), reverse=True)
+                    if len(deck) > 1 and deck[-1] is last_song:         # no repeat across two passes
+                        deck[-1], deck[0] = deck[0], deck[-1]
+                last_song = tr_ = deck.pop()
+                count += 1
+                kind = "song"
+            starts.append(t_)
+            entries.append((kind, tr_))
+            t_ += max(1.0, tr_["sec"])
+        if len(self.days) > 4:
+            self.days.clear()
+        self.days[d] = (starts, entries)
+        return self.days[d]
+
+    def items_from(self, now, n):
+        """The item that is on air at UNIX time `now` and the n-1 after it: [(start, end, kind, track)]."""
+        import bisect
+        d = int(now // DAY)
+        starts, entries = self._day(d)
+        i = max(0, bisect.bisect_right(starts, now - d * DAY) - 1)
+        out = []
+        while len(out) < n:
+            if i >= len(entries):
+                d, i = d + 1, 0
+                starts, entries = self._day(d)
+            end = starts[i + 1] if i + 1 < len(starts) else DAY
+            out.append((d * DAY + starts[i], d * DAY + end, entries[i][0], entries[i][1]))
+            i += 1
+        return out
 
 
 # ------------------------------------------------------------------------------------------------ app
@@ -281,14 +328,15 @@ class RadioApp(tk.Tk):
         self.cards = {}
         self.logo_refs = []
         self.station = None
-        self.prog = None
-        self.upcoming = []              # [(kind, track)] already chosen
+        self.sched = None
+        self.upcoming = []              # [(kind, track)] that follow the current item
         self.cur = None                 # (kind, track)
+        self.cur_start = 0.0            # UNIX times of the scheduled start / end of the current item
+        self.cur_end = 0.0
+        self.started = 0.0              # when ffplay was last launched
         self.proc = None
         self.state = "idle"             # idle | loading | playing | paused
         self.pos = 0.0
-        self.t0 = 0.0
-        self.first_after_tune = False
         self.fail_count = 0
         self.want = queue.Queue()       # tracks to extract
         self.ready = {}                 # key -> path
@@ -396,14 +444,12 @@ class RadioApp(tk.Tk):
         ctl.pack(fill="x", pady=8)
         self.btn_play = ttk.Button(ctl, text=t("btn_pause"), command=self._toggle)
         self.btn_play.pack(side="left")
-        ttk.Button(ctl, text=t("btn_next"), command=self._skip).pack(side="left", padx=8)
         ttk.Label(ctl, text=t("lbl_volume"), style="Dim.TLabel").pack(side="left", padx=(20, 6))
         self.vol = ttk.Scale(ctl, from_=0, to=100, orient="horizontal", length=140)
         self.vol.set(self.cfg.get("vol", 80))
         self.vol.pack(side="left")
         self.vol.bind("<ButtonRelease-1>", self._vol_changed)
-        self.var_mid = tk.BooleanVar(value=self.cfg.get("mid", True))
-        ttk.Checkbutton(right, text=t("chk_mid"), variable=self.var_mid, command=self._save_prefs).pack(anchor="w", pady=(4, 0))
+        tk.Label(right, text=t("sync_hint"), bg=BG, fg=DIM, anchor="w", wraplength=520, justify="left").pack(fill="x", pady=(4, 0))
         self.lbl_next = tk.Label(right, text="", bg=BG, fg=DIM, anchor="w")
         self.lbl_next.pack(fill="x", pady=(18, 0))
         self.status = tk.Label(self.radio, text="", bg=PANEL, fg=DIM, anchor="w")
@@ -637,7 +683,6 @@ class RadioApp(tk.Tk):
     # -------------------------------------------------------------------------------- playback
     def _save_prefs(self):
         self.cfg["vol"] = int(self.vol.get())
-        self.cfg["mid"] = bool(self.var_mid.get())
         save_settings(self.cfg)
 
     def _tune(self, name):
@@ -648,26 +693,18 @@ class RadioApp(tk.Tk):
         self.station = name
         with self.want.mutex:               # drop work for the previous station
             self.want.queue.clear()
-        self.prog = Programme(self.stations[name])
         self.upcoming = []
         self.fail_count = 0
-        self.first_after_tune = True
+        self.sched = Schedule(name, self.stations[name])
+        self.cur = None
         self._mark_selected()
         self._see_card(name)
         self._draw_logo(self.big, name, 150, 1)
         self.lbl_station.config(text=name)
-        self._advance()
+        self._sync()
 
     def _track_key(self, tr_):
-        return "%s_%s" % (tr_["base"], tr_["idx"])
-
-    def _fill_upcoming(self):
-        while len(self.upcoming) < 2 and self.prog:
-            self.upcoming.append(self.prog.next())
-        for _kind, tr_ in self.upcoming:
-            if self._track_key(tr_) not in self.ready:
-                self.want.put(tr_)
-        self._show_next()
+        return _tkey(tr_)
 
     def _show_next(self):
         if self.upcoming:
@@ -675,23 +712,28 @@ class RadioApp(tk.Tk):
             label = t("kind_jingle") if kind == "jingle" else "%s - %s" % (tr_["artist"], tr_["title"]) if tr_["artist"] else tr_["title"]
             self.lbl_next.config(text="%s %s" % (t("lbl_next"), label))
 
-    def _advance(self):
-        """Move on to the next item of the programme (waits until its file is ready)."""
+    def _sync(self, skip_current=False):
+        """Jump to whatever the station has on air right now (the same for everybody with the same clock).
+
+        skip_current: the current item is broken, take the one after it."""
         self._kill()
-        self._fill_upcoming()
-        if not self.upcoming:
+        if not self.sched:
             return
-        self.cur = self.upcoming.pop(0)
-        self._fill_upcoming()
+        items = self.sched.items_from(time.time(), 4)
+        if skip_current and self.cur and _tkey(items[0][3]) == _tkey(self.cur[1]):
+            items = items[1:]
+        self.cur_start, self.cur_end = items[0][0], items[0][1]
+        self.cur = (items[0][2], items[0][3])
+        self.upcoming = [(k, tr_) for _s, _e, k, tr_ in items[1:3]]
+        for _kind, tr_ in [self.cur] + self.upcoming:            # extract in playing order
+            if self._track_key(tr_) not in self.ready:
+                self.want.put(tr_)
+        self._show_next()
         kind, tr_ = self.cur
         self.lbl_kind.config(text=t("kind_jingle") if kind == "jingle" else t("kind_song"))
         self.lbl_title.config(text=("♪ " + t("kind_jingle")) if kind == "jingle" else tr_["title"])
         self.lbl_artist.config(text=tr_["artist"] if kind == "song" else self.station or "")
-        self.lbl_len.config(text=fmt_time(tr_["sec"]))
-        self.pos = 0.0
-        if self.first_after_tune and kind == "song" and self.var_mid.get():
-            self.pos = random.uniform(0.1, 0.55) * tr_["sec"]
-        self.first_after_tune = False
+        self.lbl_len.config(text=fmt_time(self.cur_end - self.cur_start))
         self.state = "loading"
         self.status.config(text=t("st_loading"))
 
@@ -700,6 +742,7 @@ class RadioApp(tk.Tk):
         path = self.ready.get(self._track_key(tr_))
         if not path or not os.path.isfile(path):
             return False
+        self.pos = max(0.0, time.time() - self.cur_start)         # where the station is by now
         cmd = [self.ffplay, "-nodisp", "-autoexit", "-loglevel", "quiet", "-volume", str(int(self.vol.get()))]
         if self.pos > 0.5:
             cmd += ["-ss", "%.2f" % self.pos]
@@ -711,7 +754,7 @@ class RadioApp(tk.Tk):
             messagebox.showerror(t("title"), t("err_generic", e=e))
             self.state = "idle"
             return False
-        self.t0 = time.time() - self.pos
+        self.started = time.time()
         self.state = "playing"
         self.btn_play.config(text=t("btn_pause"))
         self.status.config(text=t("st_ready", n=len(self.stations)))
@@ -730,29 +773,23 @@ class RadioApp(tk.Tk):
         self._kill()
         self.state = "idle"
         self.cur = None
-        self.prog = None
+        self.sched = None
         self.upcoming = []
         self.bar["value"] = 0
 
     def _toggle(self):
-        if self.state == "playing":
-            self.pos = time.time() - self.t0
+        if self.state in ("playing", "loading"):
             self._kill()
             self.state = "paused"
             self.btn_play.config(text=t("btn_play"))
         elif self.state == "paused":
-            self._start_proc()
+            self._sync()                      # a radio keeps running while paused: resume live
         elif self.state == "idle" and self.station:
             self._tune(self.station)
 
-    def _skip(self):
-        if self.cur and self.prog:
-            self._advance()
-
     def _vol_changed(self, _e=None):
         self._save_prefs()
-        if self.state == "playing":           # ffplay cannot change its volume from outside: restart at this position
-            self.pos = time.time() - self.t0
+        if self.state == "playing":           # ffplay cannot change its volume from outside: restart at the live position
             self._kill()
             self._start_proc()
 
@@ -776,24 +813,27 @@ class RadioApp(tk.Tk):
 
     def _tick(self):
         try:
+            now = time.time()
             if self.state == "loading" and self.cur:
                 key = self._track_key(self.cur[1])
-                if key in self.ready:
+                if now >= self.cur_end:           # extraction took so long that the item is over: catch up
+                    self._sync()
+                elif key in self.ready:
                     if self.ready[key]:
                         self._start_proc()
                     else:                         # extraction failed: skip this one
                         self._count_failure()
             elif self.state == "playing" and self.cur:
-                pos = time.time() - self.t0
-                sec = max(1.0, self.cur[1]["sec"])
+                pos = max(0.0, now - self.cur_start)
+                sec = max(1.0, self.cur_end - self.cur_start)
                 self.bar["value"] = min(1.0, pos / sec)
                 self.lbl_pos.config(text=fmt_time(pos))
-                if self.proc is not None and self.proc.poll() is not None:
-                    if pos < min(3.0, sec * 0.5) and self.pos < 1:       # ended right away: probably broken
-                        self._count_failure()
-                    else:
-                        self.fail_count = 0
-                        self._advance()
+                if now >= self.cur_end:           # the schedule moves on (also cuts a file that runs long)
+                    self.fail_count = 0
+                    self._sync()
+                elif self.proc is not None and self.proc.poll() is not None and now - self.started < 2.0 \
+                        and self.cur_end - now > 3.0:
+                    self._count_failure()         # ended right away: probably broken
         finally:
             self.after(250, self._tick)
 
@@ -803,7 +843,7 @@ class RadioApp(tk.Tk):
             self._stop()
             self.status.config(text=t("err_generic", e="playback failed"))
             return
-        self._advance()
+        self._sync(skip_current=True)
 
     # -------------------------------------------------------------------------------- messages
     def _poll(self):
