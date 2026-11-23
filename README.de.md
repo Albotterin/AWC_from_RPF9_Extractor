@@ -208,8 +208,8 @@ Spätere Starts gehen sofort. Die Songs kommen aus der Credits-Liste; als **Jing
 dienen die kurzen unbenannten Streams, die im Archiv zwischen den Tracks des Senders liegen (eine begründete
 Vermutung - manche können Sprecher-Ansagen o. Ä. sein). Braucht wie das Hauptprogramm `ffplay`.
 
-**Fortschritt:** 754 von 837 gelisteten Songs (90,1 %) wurden als Dateien gefunden; alle Sender in [Fortschritt der Sender](docs/RADIO-PROGRESS.de.md).
-Drei lange DJ-Mixe (Radio On-U, Worldwide FM, The Sniper Of La Perle) laufen zusätzlich als eigene „(Mix)“-Sender.
+**Fortschritt:** 766 von 837 gelisteten Songs (91,5 %) wurden als Dateien gefunden; alle Sender in [Fortschritt der Sender](docs/RADIO-PROGRESS.de.md).
+Lange DJ-Mixe laufen auch als Sender: **The Vault Radio**, zusätzliche „(Mix)“-Sender für Radio On-U, Worldwide FM und The Sniper Of La Perle sowie **Clubmixes** (die Club- und DJ-Mixe, die noch keinem Sender zugeordnet werden können). Während ein Mix läuft, wird der Titel des aktuellen Abschnitts angezeigt (aus den Markern im Mix; ein Abschnitt hat nur dann einen Namen, wenn der Marker auf einen bekannten Song zeigt).
 
 ### AWC Radio für Android
 
@@ -221,7 +221,7 @@ Es sind zwei Dateien:
   Sperrbildschirm- und Kopfhörertasten (voriger / nächster Sender, Pause) und hat einen Einschlaftimer.
 * **Ein Sender-Pack (`.dat`)** - wird am PC erzeugt: in AWC Radio auf **Android-Pack...** klicken, Sender ankreuzen und
   speichern. Darin liegen die Songs dieser Sender in der Originalqualität des Spiels (ca. 128 kbit/s, nicht neu kodiert;
-  etwa 3 GB für alle 26 Sender), ihre Logos und das Programm. Aufs Handy kopieren, die App starten und die Datei
+  etwa 3,6 GB für alle 28 Sender), ihre Logos und das Programm. Aufs Handy kopieren, die App starten und die Datei
   einmal auswählen; die Songs werden direkt daraus abgespielt.
 
 Das Pack enthält Spiel-Audio: nur für den eigenen Gebrauch, bitte nicht weitergeben. Ohne Pack ist die App leer.

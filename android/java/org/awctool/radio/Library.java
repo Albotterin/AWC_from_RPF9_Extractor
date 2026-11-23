@@ -28,7 +28,20 @@ final class Library {
             JSONArray songs = o.getJSONArray("songs");
             for (int j = 0; j < songs.length(); j++) {
                 JSONObject s = songs.getJSONObject(j);
-                st.songs.add(new Schedule.Track(s.getString("k"), s.optString("t", ""), s.optString("a", ""), s.getDouble("s")));
+                JSONArray m = s.optJSONArray("m");               // parts of a mix: [[start, title, artist], ...]
+                if (m != null && m.length() > 0) {
+                    double[] ps = new double[m.length()];
+                    String[] pt = new String[m.length()], pa = new String[m.length()];
+                    for (int k = 0; k < m.length(); k++) {
+                        JSONArray e = m.getJSONArray(k);
+                        ps[k] = e.getDouble(0);
+                        pt[k] = e.optString(1, "");
+                        pa[k] = e.optString(2, "");
+                    }
+                    st.songs.add(new Schedule.Track(s.getString("k"), s.optString("t", ""), s.optString("a", ""), s.getDouble("s"), ps, pt, pa));
+                } else {
+                    st.songs.add(new Schedule.Track(s.getString("k"), s.optString("t", ""), s.optString("a", ""), s.getDouble("s")));
+                }
             }
             JSONArray jingles = o.optJSONArray("jingles");
             if (jingles != null) {

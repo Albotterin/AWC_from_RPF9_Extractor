@@ -88,6 +88,7 @@ public class RadioService extends Service {
                 if (engine != null && state == PLAYING) {
                     delay = engine.tick();
                     if (engine.takeChanged()) onItemChanged();
+                    updatePart();
                     checkSleepTimer();
                 }
             } catch (RuntimeException e) {
@@ -385,11 +386,27 @@ public class RadioService extends Service {
 
     // ------------------------------------------------------------------------------------------ what is on air
     private Schedule.Item lastItemShown;
+    private int partShown = -2;
+
+    /** A long mix shows the title of the part that is playing now (from the markers in the pack). */
+    private void updatePart() {
+        Schedule.Item it = engine.current();
+        if (it == null || it.jingle || it.track.partStart == null || it != lastItemShown) return;
+        int k = it.track.partAt(System.currentTimeMillis() / 1000.0 - it.start);
+        if (k == partShown) return;
+        partShown = k;
+        boolean named = k >= 0 && !it.track.partTitle[k].isEmpty();
+        title = named ? it.track.partTitle[k] : it.track.title;
+        artist = named ? it.track.partArtist[k] : it.track.artist;
+        updateSession();
+        updateNotification();
+    }
 
     private void onItemChanged() {
         Schedule.Item it = engine.current();
         if (it == null || it == lastItemShown) return;
         lastItemShown = it;
+        partShown = -2;
         jingle = it.jingle;
         title = jingle ? getString(R.string.jingle) : it.track.title;
         artist = jingle ? "" : it.track.artist;

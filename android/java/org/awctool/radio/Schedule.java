@@ -25,12 +25,38 @@ public final class Schedule {
         public final String title;
         public final String artist;
         public final double sec;
+        /** Parts of a long mix (start second, title, artist), or null. The title is empty for a part without a name. */
+        public final double[] partStart;
+        public final String[] partTitle, partArtist;
 
         public Track(String key, String title, String artist, double sec) {
+            this(key, title, artist, sec, null, null, null);
+        }
+
+        public Track(String key, String title, String artist, double sec, double[] partStart, String[] partTitle, String[] partArtist) {
             this.key = key;
             this.title = title;
             this.artist = artist;
             this.sec = sec;
+            this.partStart = partStart;
+            this.partTitle = partTitle;
+            this.partArtist = partArtist;
+        }
+
+        /** Index of the part that plays at `pos` seconds into the track, -1 before the first part or without parts. */
+        public int partAt(double pos) {
+            if (partStart == null) return -1;
+            int lo = 0, hi = partStart.length - 1, found = -1;
+            while (lo <= hi) {
+                int mid = (lo + hi) >>> 1;
+                if (partStart[mid] <= pos) {
+                    found = mid;
+                    lo = mid + 1;
+                } else {
+                    hi = mid - 1;
+                }
+            }
+            return found;
         }
     }
 

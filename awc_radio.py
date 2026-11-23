@@ -7,9 +7,11 @@ background: switching away and back, or a second person with the same clock, lan
 
 It uses the same scan cache as awc_tool.py and needs ffplay (next to the program or in PATH).
 """
+import bisect
 import json
 import os
 import queue
+import re
 import subprocess
 import sys
 import threading
@@ -29,7 +31,7 @@ NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 SONG_MIN, SONG_MAX = 60.0, 1500.0          # seconds: shorter is not a song, longer is a mix
 JINGLE_MIN, JINGLE_MAX = 2.0, 25.0         # unnamed short streams of a station are used as jingles
 MIN_SONGS = 5                              # a station needs at least this many songs to be listed
-INDEX_VERSION = 2
+INDEX_VERSION = 3
 
 BG, PANEL, CARD, CARD_SEL, FG, DIM, ACCENT = "#14161c", "#1c1f27", "#232733", "#2f3550", "#eceef4", "#8b91a3", "#ff5a36"
 
@@ -153,16 +155,19 @@ def load_index(rpf, pool):
 
 # ------------------------------------------------------------------------------------------------ model
 def sort_key(name):
+    if name == CLUB_STATION:
+        return "￿"                      # the collection of club mixes goes last
     n = name.lower()
     return n[4:] if n.startswith("the ") else n
 
 
-def build_stations(items, found, cfg_names):
+def build_stations(items, found, cfg_names, unnamed_out=None):
     """-> {station: {"songs": [track], "jingles": [track]}}.
 
     items      scan items (dicts with "base", "streams", optional "cues")
     found      {stream id: (title, artist, station)} from the credits list
     cfg_names  {stream id: title} from the game config (no artist, no station)
+    unnamed_out  optional dict that collects {station: [track]} of song-length streams that have no name at all
 
     A track is {"base", "idx", "sid", "title", "artist", "sec"}. The stations lie in the archive one after the
     other: an AWC without a station inherits it when the nearest AWCs before and after it agree."""
@@ -214,32 +219,80 @@ def build_stations(items, found, cfg_names):
                 if SONG_MIN <= sec <= SONG_MAX:
                     add(hit[2], "songs", it, s, hit[0], hit[1])
                 continue
-            if sid in found or not (JINGLE_MIN <= sec <= JINGLE_MAX or (sid in cfg_names and SONG_MIN <= sec <= SONG_MAX)):
+            is_song, is_jingle = SONG_MIN <= sec <= SONG_MAX, JINGLE_MIN <= sec <= JINGLE_MAX
+            if sid in found or not (is_song or is_jingle):
                 continue
             if st_inf is None:
                 st_inf = inferred(it) or ""
             if not st_inf:
                 continue
-            if sid in cfg_names:
+            if sid in cfg_names and is_song:
                 add(st_inf, "songs", it, s, cfg_names[sid], "")
-            elif JINGLE_MIN <= sec <= JINGLE_MAX:
+            elif is_jingle:
+                if sid in cfg_names:                         # a short stream that has a config name is a sound effect
+                    continue                                 # ("zombieb_vehicle_effect_chain..."), station jingles have none
                 add(st_inf, "jingles", it, s)
+            elif unnamed_out is not None:                    # song-length stream without any name
+                unnamed_out.setdefault(st_inf, []).append(
+                    {"base": it["base"], "idx": s["i"], "sid": sid, "title": "", "artist": "", "sec": sec})
     return {k: v for k, v in sorted(out.items(), key=lambda kv: sort_key(kv[0])) if len(v["songs"]) >= MIN_SONGS}
 
 
-def build_mixes(items, found):
-    """-> {"<station> (Mix)": {"songs": [track], "jingles": []}} for the long continuous mixes of the archive.
+def _name_key(name):
+    return re.sub(r"[^a-z0-9]+", " ", name.lower()).strip()
 
-    A mix is a stream far longer than a song whose bank carries `trackid` markers. The markers hold the track numbers of
-    single songs of the same station, so the station of a mix is the one that owns most of the songs it links to (at
-    least 5 links, at least 70 % one station); a mix without such links is left out because its station is unknown.
+
+CLUB_STATION = "Clubmixes"
+
+
+def build_mixes(items, found, songs=()):
+    """-> {station: {"songs": [track], "jingles": []}} for the long continuous mixes of the archive.
+
+    A mix is a stream far longer than a song whose bank carries `trackid` markers. Its station is found in two ways:
+    1. The markers hold the track numbers of single songs of the same station: the station that owns most of the songs it
+       links to (at least 5 links, at least 70 % one station). It is listed as "<station> (Mix)" next to its songs.
+    2. Without such links: the archive stores the folders of the stations in the alphabetical order of their internal names,
+       so a mix that lies between the songs of station A and the songs of station B belongs to the station without any
+       single song whose name sorts between A and B (there must be exactly one). That station IS the mix and keeps its name.
+       A mix whose neighbours leave no such station (club music, DJ sets of venues) is not a radio station: all of these
+       are played together as the station "Clubmixes" (to be removed again when they can be assigned).
     The mix is played like a one-song station: the programme just plays it over and over."""
     by_tid = {}
     for it in items:
         if it.get("tid") is not None and not it.get("cues"):
             by_tid.setdefault(it["tid"], []).append(it)
+    ordered = sorted(items, key=lambda x: x["base"])
+    owner = {}                                           # base -> station of the single songs found in that bank
+    for it in ordered:
+        for s in it["streams"]:
+            if s["id"] in found and credits.is_radio(found[s["id"]][2]):
+                owner[it["base"]] = found[s["id"]][2]
+                break
+    singles = {}
+    for st in owner.values():
+        singles[st] = singles.get(st, 0) + 1
+    music = {}                                           # stations whose credits list real songs (talk radio lists shows)
+    for s in songs:
+        if credits.is_radio(s["station"]) and s["section"].upper() == "SONGS":
+            music[s["station"]] = music.get(s["station"], 0) + 1
+    no_songs = sorted(st for st, n in music.items() if n >= 5 and singles.get(st, 0) < 3)
     out = {}
-    for it in sorted(items, key=lambda x: x["base"]):
+
+    def add(name, it, s, title="Mix"):
+        tr_ = {"base": it["base"], "idx": s["i"], "sid": s["id"], "title": title, "artist": "", "sec": s["sec"]}
+        segs = []                                        # [[start second, title, artist]] from the markers of the mix
+        for t_, v in it.get("cues") or ():
+            hit = None
+            for o in by_tid.get(v, ()):
+                hit = next((found[x["id"]] for x in o["streams"] if x["id"] in found), None)
+                if hit:
+                    break
+            segs.append([round(t_, 1), hit[0] if hit else "", hit[1] if hit else ""])
+        if any(x[1] for x in segs):
+            tr_["m"] = segs
+        out.setdefault(name, {"songs": [], "jingles": []})["songs"].append(tr_)
+
+    for pos, it in enumerate(ordered):
         if not it.get("cues"):
             continue
         votes = {}
@@ -250,16 +303,53 @@ def build_mixes(items, found):
                     votes[hit[2]] = votes.get(hit[2], 0) + 1
                     break
         total = sum(votes.values())
-        if total < 5:
-            continue
-        station = max(votes, key=votes.get)
-        if votes[station] < 0.7 * total:
+        name = None
+        if total >= 5 and max(votes.values()) >= 0.7 * total:
+            name = max(votes, key=votes.get) + " (Mix)"
+        else:
+            before = next((owner[o["base"]] for o in reversed(ordered[:pos]) if o["base"] in owner), None)
+            after = next((owner[o["base"]] for o in ordered[pos + 1:] if o["base"] in owner), None)
+            if before and after:
+                lo, hi = sorted((_name_key(before), _name_key(after)))
+                between = [st for st in no_songs if lo < _name_key(st) < hi]
+                if len(between) == 1:
+                    name = between[0]
+        if not name:
             continue
         for s in it["streams"]:
             if s["sec"] > SONG_MAX:
-                out.setdefault(station + " (Mix)", {"songs": [], "jingles": []})["songs"].append(
-                    {"base": it["base"], "idx": s["i"], "sid": s["id"], "title": "Mix", "artist": "", "sec": s["sec"]})
-    return {k: v for k, v in out.items() if len(v["songs"]) == 1}     # several candidates for one station: unclear, leave out
+                add(name, it, s)
+    out = {k: v for k, v in out.items() if len(v["songs"]) == 1}     # several candidates for one station: unclear, leave out
+    kept = {tr_["base"] for v in out.values() for tr_ in v["songs"]}
+    n = 0
+    for it in ordered:                                   # every other long mix: club and DJ-venue music, played as one station
+        longs = [s for s in it["streams"] if s["sec"] > SONG_MAX]
+        if longs and it["base"] not in kept:
+            n += 1                                       # (a bank with several long streams: the others are quiet crowd layers)
+            add(CLUB_STATION, it, longs[0], "Club mix %d" % n)
+    if CLUB_STATION in out:
+        out[CLUB_STATION]["songs"].sort(key=lambda x: x["base"])
+    return out
+
+
+UNKNOWN_TRACK = "Unknown track"
+
+
+def fill_unnamed(stations, unnamed, songs, found):
+    """A station whose credits list more songs than were found may hold song-length streams without any name. When there are no
+    more of them than songs still missing, they are very probably those songs: add them as "Unknown track". (With more
+    candidates than missing songs some of them are something else, so none is added.)"""
+    taken = {(v[0], v[1], v[2]) for v in found.values()}
+    added = {}
+    for name, st in stations.items():
+        cand = unnamed.get(name, [])
+        missing = sum(1 for s in songs if s["station"] == name and s["section"].upper() == "SONGS"
+                      and (credits.display_title(s["title"]), s["artist"], s["station"]) not in taken)
+        if cand and len(cand) <= missing:
+            for tr_ in cand:
+                st["songs"].append(dict(tr_, title=UNKNOWN_TRACK))
+            added[name] = len(cand)
+    return added
 
 
 def make_index(rpf, pool, get_songs, status=None, progress=None):
@@ -286,8 +376,10 @@ def make_index(rpf, pool, get_songs, status=None, progress=None):
     found.update(similar)
     if status:
         status(t("st_build"), 0.88)
-    stations = build_stations(items, found, cfg_names)
-    stations.update(build_mixes(items, found))
+    unnamed = {}
+    stations = build_stations(items, found, cfg_names, unnamed)
+    fill_unnamed(stations, unnamed, songs, found)
+    stations.update(build_mixes(items, found, songs))
     stations = dict(sorted(stations.items(), key=lambda kv: sort_key(kv[0])))
     used = {}
     for st in stations.values():
@@ -303,6 +395,15 @@ def make_index(rpf, pool, get_songs, status=None, progress=None):
 DAY = 86400.0
 FADE = 3.0                                 # seconds of crossfade between two items (shorter around short jingles)
 LEAD = 0.4                                 # ffplay needs about this long to start; its start position is moved on by it
+
+
+def segment_at(tr_, pos):
+    """[start, title, artist] of the part of a mix that is playing at `pos` seconds (tr_["m"] holds the parts), or None."""
+    m = tr_.get("m")
+    if not m:
+        return None
+    k = bisect.bisect_right([x[0] for x in m], pos) - 1
+    return m[k] if k >= 0 else None
 
 
 def _tkey(tr_):
@@ -811,6 +912,19 @@ class RadioApp(tk.Tk):
         self.lbl_title.config(text=("♪ " + t("kind_jingle")) if kind == "jingle" else tr_["title"])
         self.lbl_artist.config(text=tr_["artist"] if kind == "song" else self.station or "")
         self.lbl_len.config(text=fmt_time(tr_["sec"]))
+        self.seg_shown = None
+
+    def _show_segment(self, pos):
+        """A mix shows the title of the part that is playing (from its markers)."""
+        if not self.cur or self.cur[0] != "song" or not self.cur[1].get("m"):
+            return
+        seg = segment_at(self.cur[1], pos)
+        key = seg[0] if seg else None
+        if key == self.seg_shown:
+            return
+        self.seg_shown = key
+        self.lbl_title.config(text=(seg[1] if seg and seg[1] else self.cur[1]["title"]))
+        self.lbl_artist.config(text=seg[2] if seg and seg[1] else self.cur[1]["artist"])
 
     def _queue_tracks(self):
         for item in [self.cur_item] + self.upcoming:             # extract in playing order
@@ -957,6 +1071,7 @@ class RadioApp(tk.Tk):
                 sec = max(1.0, self.cur_end - self.cur_start)
                 self.bar["value"] = min(1.0, pos / sec)
                 self.lbl_pos.config(text=fmt_time(pos))
+                self._show_segment(pos)
                 self._reap(now)
                 nxt = self.upcoming[0] if self.upcoming else None
                 if nxt and now + LEAD >= nxt[0]:  # time for the next item: it fades in while this one fades out

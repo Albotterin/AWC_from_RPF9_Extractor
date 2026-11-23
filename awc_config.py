@@ -80,6 +80,8 @@ def resolve(strings, wanted):
         variants = [s, normalized_name(s)]
         if "." in s:
             variants.append(s.rsplit(".", 1)[-1])
+        if len(s) >= 14:                     # the config stores a length byte or two in front of a name: "d&SymphonyFM_Prokofiev_..."
+            variants += [s[1:], s[2:]]
         for v in variants:
             if len(v) < 4:
                 continue

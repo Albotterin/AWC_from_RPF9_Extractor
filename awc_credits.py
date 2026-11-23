@@ -102,8 +102,20 @@ def match(songs, wanted):
     return found
 
 
+_FOLD = str.maketrans({"ł": "l", "Ł": "L", "ø": "o", "Ø": "O", "đ": "d", "Đ": "D", "ß": "ss", "æ": "ae", "Æ": "AE", "œ": "oe"})
+
+
+def _fold(text):
+    """Lower-case ASCII; letters without a decomposition (ł, ø ...) become their plain letter ('Lutosławski' -> 'lutoslawski')."""
+    return unicodedata.normalize("NFKD", text.translate(_FOLD)).encode("ascii", "ignore").decode().lower().replace("'", "")
+
+
+def _fwords(text):
+    return re.findall(r"[a-z0-9]+", _fold(text))
+
+
 def _name_tokens(name):
-    return [t for t in re.split(r"[_\s]+", unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().lower().replace("'", "")) if t]
+    return [t for t in re.split(r"[_\s]+", _fold(name)) if t]
 
 
 def _score(title_words, artist_words, name_words):
@@ -129,11 +141,14 @@ def _score(title_words, artist_words, name_words):
         for w in sorted(set(title_words) | set(artist_words), key=len, reverse=True):
             if len(w) < 3 and not w.isdigit():
                 continue
-            i = comp.find(w)
-            if i >= 0 and not all(covered[i:i + len(w)]):
-                for k in range(i, i + len(w)):
-                    covered[k] = True
-                hits += len(w) >= 4
+            i, new = comp.find(w), False
+            while i >= 0:                                        # every occurrence ("nocturnes...nocturnes") counts
+                if not all(covered[i:i + len(w)]):
+                    for k in range(i, i + len(w)):
+                        covered[k] = True
+                    new = True
+                i = comp.find(w, i + len(w))
+            hits += new and len(w) >= 4
         if hits >= needed:
             r = max(r, 0.97 * sum(covered) / len(comp))
     return r
@@ -150,8 +165,8 @@ def match_names(songs, found, names, min_score=0.75, margin=0.03):
     for s in songs:
         if not is_radio(s["station"]) or (display_title(s["title"]), s["artist"], s["station"]) in taken:
             continue
-        tw = _words(re.sub(r"\(.*?\)|\[.*?\]", " ", s["title"]))
-        aw = _words(s["artist"])
+        tw = _fwords(re.sub(r"\(.*?\)|\[.*?\]", " ", s["title"]))
+        aw = _fwords(s["artist"])
         for sid, name in names.items():
             if sid in found:
                 continue

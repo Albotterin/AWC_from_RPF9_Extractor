@@ -213,8 +213,8 @@ Later starts are instant.
 Songs come from the credits list; **jingles** are the short unnamed streams that lie in the archive among the
 station's tracks (an educated guess - some may be station voice-overs or similar). Needs `ffplay` like the main tool.
 
-**Progress:** 754 of 837 credited songs (90.1 %) are found as files; see [station progress](docs/RADIO-PROGRESS.md) for every station.
-Three long DJ mixes (Radio On-U, Worldwide FM, The Sniper Of La Perle) are also played as extra "(Mix)" stations.
+**Progress:** 766 of 837 credited songs (91.5 %) are found as files; see [station progress](docs/RADIO-PROGRESS.md) for every station.
+Long DJ mixes are played as stations too: **The Vault Radio**, extra "(Mix)" stations for Radio On-U, Worldwide FM and The Sniper Of La Perle, and **Clubmixes** (the club and DJ-venue mixes that cannot be assigned to a station yet). While a mix plays, the title of the current part is shown (from the markers in the mix; the part is only named where the marker points to a known song).
 
 ### AWC Radio for Android
 
@@ -224,7 +224,7 @@ The phone app plays the same live programme as the PC: same UTC clock, same orde
   inside. Android 7.0 or newer, English and German. It keeps playing in the background with a media notification,
   lock-screen and headset buttons (previous / next station, pause) and has a sleep timer.
 * **A station pack (`.dat`)** - made on the PC: in AWC Radio click **Android pack...**, tick the stations and save. It holds
-  the songs of those stations in the game's own quality (about 128 kbit/s, not re-encoded; about 3 GB for all 26 stations),
+  the songs of those stations in the game's own quality (about 128 kbit/s, not re-encoded; about 3.6 GB for all 28 stations),
   their logos and the programme. Copy it to the phone, start the app and pick the file once; the songs are played straight
   out of it.
 

@@ -4,7 +4,7 @@
 
 How many of the songs that the public credits page lists for each station could be found as files in the game's `audio.rpf`.
 
-**Status: 2026-11-23** · 754 / 837 (90.1 %)
+**Status: 2026-11-24** · 766 / 837 (91.5 %)
 
 🟢 90 % or more · 🟡 70–89 % · 🟠 30–69 % · 🔴 below 30 %
 
@@ -23,24 +23,24 @@ How many of the songs that the public credits page lists for each station could 
 | 🟢 The Chamber 106.6 | 22 / 22 | 100.0 % |
 | 🟢 V-Rock | 70 / 70 | 100.0 % |
 | 🟢 Vice City FM | 70 / 71 | 98.6 % |
+| 🟢 Flash FM | 78 / 80 | 97.5 % |
 | 🟢 Cocoteo FM | 29 / 30 | 96.7 % |
-| 🟢 Flash FM | 77 / 80 | 96.2 % |
+| 🟢 Dirty South Classics | 37 / 39 | 94.9 % |
 | 🟢 Stockyard FM | 35 / 37 | 94.6 % |
+| 🟢 Kaleidoscope FM | 17 / 18 | 94.4 % |
 | 🟢 Honey FM | 49 / 52 | 94.2 % |
 | 🟢 Radio On-U | 15 / 16 | 93.8 % |
-| 🟢 Dirty South Classics | 36 / 39 | 92.3 % |
+| 🟢 Emotion 98.3 | 35 / 38 | 92.1 % |
 | 🟢 Vice City Rap Radio | 23 / 25 | 92.0 % |
 | 🟢 Gloriana Blues Radio | 21 / 23 | 91.3 % |
 | 🟢 The Sniper Of La Perle | 20 / 22 | 90.9 % |
-| 🟡 Emotion 98.3 | 34 / 38 | 89.5 % |
-| 🟡 Kaleidoscope FM | 16 / 18 | 88.9 % |
 | 🟡 Leonida Jazz Radio | 32 / 36 | 88.9 % |
-| 🟡 Worldwide FM | 34 / 41 | 82.9 % |
+| 🟡 Symphony FM | 15 / 17 | 88.2 % |
+| 🟡 Worldwide FM | 36 / 41 | 87.8 % |
 | 🟡 Bodega The DJ | 36 / 45 | 80.0 % |
 | 🟡 DJ Stevie J | 19 / 24 | 79.2 % |
-| 🟠 Symphony FM | 9 / 17 | 52.9 % |
 | 🔴 The Vault Radio | 0 / 24 | 0.0 % |
-| **Total** | **754 / 837** | **90.1 %** |
+| **Total** | **766 / 837** | **91.5 %** |
 
 </details>
 
@@ -56,9 +56,9 @@ The credits list speakers and shows here, not songs, so these numbers say little
 
 ## Reading the gaps
 
-- **The Vault Radio** (0 %) is a single long DJ mix without per-song files, so none of its 24 listed songs exist as files. **Symphony FM** is 9 of 17: the other pieces have no name in the game's config, so they cannot be matched to the list.
-- Titles are matched by their hash first, then by how similar the game's internal name is ("IM_IN_LUV" for "I'm N Luv (Wit a Stripper)"); 52 songs are found this way.
-- Three long mixes are also played as extra stations (Radio On-U, Worldwide FM, The Sniper Of La Perle): the station of a mix is known from the song markers inside it. Three more long mixes have no such link and are not used yet.
+- **The Vault Radio** (0 %) is a single long DJ mix without per-song files, so none of its 24 listed songs exist as files. The mix itself is played as the station. **Symphony FM** is 15 of 17: its names sit in the game's config with a length byte in front, which is now cut off; the Beethoven piece has no file of its own.
+- Titles are matched by their hash first, then by how similar the game's internal name is ("IM_IN_LUV" for "I'm N Luv (Wit a Stripper)"); 64 songs are found this way.
+- Long DJ mixes are played as stations: The Vault Radio, and extra "(Mix)" stations for Radio On-U, Worldwide FM and The Sniper Of La Perle. The station of a mix comes from the song markers inside it, or (The Vault) from the folder order in the archive. While a mix plays, the title of the current part is shown (20 of 22, 27 of 41 and 10 of 24 parts have a name). The remaining long mixes (club and DJ-venue music) are played together as the station "Clubmixes" until they can be assigned to a station.
 - The other stations lack a few songs each (different spelling or no file of their own).
 
 ## How it is measured

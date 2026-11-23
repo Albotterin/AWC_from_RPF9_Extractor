@@ -14,6 +14,8 @@ Pack layout (little endian), read by android/java/org/awctool/radio/Pack.java:
     24  u64      length of the index
     32  ...      files back to back: Ogg Opus songs and PNG logos
     idx          UTF-8 JSON {"v":1,"created":..,"stations":[..],"files":{"t/<key>":[offset,length],"logos/<n>.png":[..]}}
+                 a song of a station may carry "m": [[start second, title, artist], ...], the parts of a long DJ mix (optional,
+                 older apps ignore it)
 
 The pack contains game audio: for personal use only, do not share it.
 """
@@ -262,7 +264,8 @@ def export_pack(stations, index, rpf, out_path, progress=None, cancel=None, cach
                     writer.add_bytes(logo, fh.read())
             meta["stations"].append({
                 "name": name, "logo": logo,
-                "songs": [{"k": track_key(s), "t": s["title"], "a": s["artist"], "s": s["sec"]} for s in st["songs"]],
+                "songs": [dict({"k": track_key(s), "t": s["title"], "a": s["artist"], "s": s["sec"]}, **({"m": s["m"]} if s.get("m") else {}))
+                          for s in st["songs"]],
                 "jingles": [{"k": track_key(j), "s": j["sec"]} for j in st["jingles"]]})
         writer.finish(meta)
         os.replace(tmp, out_path)
