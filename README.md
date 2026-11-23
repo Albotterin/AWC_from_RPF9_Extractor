@@ -213,6 +213,8 @@ Later starts are instant.
 Songs come from the credits list; **jingles** are the short unnamed streams that lie in the archive among the
 station's tracks (an educated guess - some may be station voice-overs or similar). Needs `ffplay` like the main tool.
 
+**Progress:** 658 of 837 credited songs (78.6 %) are found as files; see [station progress](docs/RADIO-PROGRESS.md) for every station.
+
 ### AWC Radio for Android
 
 The phone app plays the same live programme as the PC: same UTC clock, same order, same crossfades. It is two files:
@@ -383,6 +385,7 @@ android/           The Android app: Java source, build_apk.py, make_logo.py, tes
 Start AWC-Tool.bat Launcher
 build_exe.bat      Builds dist\AWC-Tool.exe with PyInstaller
 docs/FORMAT.md     Technical notes on the AWC/RPF9 layout
+docs/RADIO-PROGRESS.md  How many credited songs were found per station (also in German)
 docs/screenshots/  Images used in this README
 ```
 

@@ -208,6 +208,8 @@ Spätere Starts gehen sofort. Die Songs kommen aus der Credits-Liste; als **Jing
 dienen die kurzen unbenannten Streams, die im Archiv zwischen den Tracks des Senders liegen (eine begründete
 Vermutung - manche können Sprecher-Ansagen o. Ä. sein). Braucht wie das Hauptprogramm `ffplay`.
 
+**Fortschritt:** 658 von 837 gelisteten Songs (78,6 %) wurden als Dateien gefunden; alle Sender in [Fortschritt der Sender](docs/RADIO-PROGRESS.de.md).
+
 ### AWC Radio für Android
 
 Die Handy-App spielt dasselbe Live-Programm wie der PC: gleiche UTC-Uhr, gleiche Reihenfolge, gleiche Überblendungen.
