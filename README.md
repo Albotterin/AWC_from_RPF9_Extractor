@@ -110,6 +110,23 @@ instantly.
 
 ![German UI](docs/screenshots/04-german.png)
 
+**Named stations.** After *Songs from the credits page* every group is named after its radio station and gets its
+logo (rows and player); titles, artists and stations are filled in for the streams the list recognises.
+
+![Stations, titles and logos](docs/screenshots/08-main-stations.png)
+
+**AWC Radio** (companion app): the stations with their logos on the left; the selected one plays its songs with a
+jingle after every 2-4 songs.
+
+![AWC Radio](docs/screenshots/06-radio.png)
+
+On the first start the radio asks for the game's `audio.rpf` and its texture file:
+
+![AWC Radio setup](docs/screenshots/07-radio-setup.png)
+
+*The screenshots show station logos and song titles from the game; they are only illustrations of what the tool
+reads from your own game files. Nothing from the game is shipped with the tool.*
+
 ## Requirements & installation
 
 * **Windows** (the GUI and the packaged `.exe` target Windows; the core modules are plain Python and portable).

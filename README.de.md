@@ -105,6 +105,23 @@ deinem PC gespeichert und für den Export-Ordner verwendet):
 
 ![Deutsche Oberfläche](docs/screenshots/04-german.png)
 
+**Benannte Sender** – nach *Songs von der Credits-Seite* heißt jede Gruppe wie ihr Radiosender und bekommt dessen Logo
+(Zeilen und Player); Titel, Interpreten und Sender sind für die erkannten Streams eingetragen.
+
+![Sender, Titel und Logos](docs/screenshots/08-main-stations.png)
+
+**AWC Radio** (Zusatzprogramm) – links die Sender mit Logos; der gewählte spielt seine Songs, nach jeweils 2-4 Songs
+kommt ein Jingle.
+
+![AWC Radio](docs/screenshots/06-radio.png)
+
+Beim ersten Start fragt das Radio nach der `audio.rpf` und der Textur-Datei des Spiels:
+
+![AWC Radio Einrichtung](docs/screenshots/07-radio-setup.png)
+
+*Die Screenshots zeigen Senderlogos und Songtitel aus dem Spiel; sie illustrieren nur, was das Tool aus deinen eigenen
+Spieldateien liest. Vom Spiel wird nichts mitgeliefert.*
+
 ## Voraussetzungen & Installation
 
 * **Windows** (GUI und `.exe` zielen auf Windows; die Kernmodule sind reines, portables Python).

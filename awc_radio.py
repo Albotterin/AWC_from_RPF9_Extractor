@@ -358,7 +358,7 @@ class RadioApp(tk.Tk):
         ttk.Button(top, text=t("btn_rescan"), command=lambda: self._start_clicked(force=True)).pack(side="right")
         body = tk.Frame(self.radio, bg=BG)
         body.pack(fill="both", expand=True)
-        left = tk.Frame(body, bg=BG, width=330)
+        left = tk.Frame(body, bg=BG, width=390)
         left.pack(side="left", fill="y")
         left.pack_propagate(False)
         self.canvas = tk.Canvas(left, bg=BG, highlightthickness=0)
@@ -614,6 +614,19 @@ class RadioApp(tk.Tk):
             for w in widgets:
                 w.config(bg=col)
 
+    def _see_card(self, name):
+        """Scroll the station list so that the chosen card is visible."""
+        card = self.cards.get(name, (None,))[0]
+        if card is None:
+            return
+        self.update_idletasks()
+        total = max(1, self.list_frame.winfo_height())
+        top, bottom = card.winfo_y(), card.winfo_y() + card.winfo_height()
+        view_top = self.canvas.yview()[0] * total
+        view_bottom = self.canvas.yview()[1] * total
+        if top < view_top or bottom > view_bottom:
+            self.canvas.yview_moveto(max(0.0, (top - 12) / total))
+
     def _refresh_logos(self):
         self.logo_refs.clear()
         for name, widgets in self.cards.items():
@@ -640,6 +653,7 @@ class RadioApp(tk.Tk):
         self.fail_count = 0
         self.first_after_tune = True
         self._mark_selected()
+        self._see_card(name)
         self._draw_logo(self.big, name, 150, 1)
         self.lbl_station.config(text=name)
         self._advance()
