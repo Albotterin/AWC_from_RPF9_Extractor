@@ -152,6 +152,12 @@ On Windows you can also double-click `Start AWC-Tool.bat`.
      start of `audio.rpf`) and fills in titles for the streams it recognises (roughly a third of the music streams
      in the sample archive; internal titles only, no artists). It also remembers the station names found there and
      offers them in **Rename group…**.
+   * **Songs from the credits page** downloads the soundtrack list of the publisher's public credits page
+     (`rockstargames.com/VI/credits`: every station with its songs and artists), hashes the titles the same way the
+     game does and sets **title, artist and station** for every stream it recognises (about 660 of the music streams
+     in the sample archive; most of the stations are matched almost completely). The station is stored per track
+     and used for tags, playlists and as the suggestion in **Rename group…**. If the download fails you can pick
+     the page saved from your browser instead. The list is not shipped with the tool and stays on your PC.
    * **Import names…** reads a CSV/TXT/JSON list (by stream ID or by internal name), **Export name list…** writes
      a template to fill in, and right-click → **Set title / artist…** names a single stream.
    * Named streams get `Artist - Title` file names and Opus/FLAC/MP3 tags on export, plus optional `.m3u8`
@@ -308,6 +314,7 @@ awc_core.py        AWC parser, RPF scanner, Ogg Opus writer (no GUI dependencies
 awc_i18n.py        Translations (English, Deutsch) + settings
 awc_names.py       Track/station name store, import/export, tags, playlists
 awc_config.py      Reads internal names from the game's audio config
+awc_credits.py     Parses the public credits page and matches its songs to stream IDs
 Start AWC-Tool.bat Launcher
 build_exe.bat      Builds dist\AWC-Tool.exe with PyInstaller
 docs/FORMAT.md     Technical notes on the AWC/RPF9 layout

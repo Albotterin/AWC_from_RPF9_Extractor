@@ -23,6 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import awc_core as core  # noqa: E402
 import awc_i18n  # noqa: E402
 import awc_config as gamecfg  # noqa: E402
+import awc_credits as credits  # noqa: E402
 import awc_names as names  # noqa: E402
 from awc_core import AwcError, AwcFile, AwcRef  # noqa: E402
 from awc_i18n import LANGUAGES, tr  # noqa: E402
@@ -283,6 +284,7 @@ class App(tk.Tk):
         nrow2 = ttk.Frame(nf)
         nrow2.pack(fill="x", padx=8, pady=(0, 6))
         self._reg(ttk.Button(nrow2, command=self.read_game_names), "text", "btn_names_game").pack(side="left")
+        self._reg(ttk.Button(nrow2, command=self.read_credits), "text", "btn_names_credits").pack(side="left", padx=(6, 0))
         self.split_mixes = tk.BooleanVar(value=False)
         self._reg(ttk.Checkbutton(nrow2, variable=self.split_mixes), "text", "chk_split").pack(side="left", padx=14)
 
@@ -533,8 +535,10 @@ class App(tk.Tk):
         if clear:
             name = ""
         else:
+            guess = self._suggest_station(cpath, g)
+            choices = ([guess] if guess else []) + [x for x in self.stations if x != guess]
             name = self._ask_name(tr("dlg_rename_title"), tr("dlg_rename_prompt", g=g),
-                                  self._gname(cpath, g), self.stations)
+                                  self._gname(cpath, g) or guess, choices)
             if name is None:
                 return
         d = self.group_names.setdefault(self._gkey(cpath), {})
@@ -573,6 +577,82 @@ class App(tk.Tk):
         dlg.grab_set()
         self.wait_window(dlg)
         return res[0] if res else None
+
+    # ------------------------------------------------------------------ credits page
+    def read_credits(self):
+        if self.busy:
+            messagebox.showinfo(tr("dlg_busy_title"), tr("dlg_busy"))
+            return
+        ids = {st.id for _r, st in self._all_streams()}
+        if not ids:
+            messagebox.showinfo(tr("dlg_names_title"), tr("dlg_credits_none"))
+            return
+        self._set_busy(True)
+        self.set_status("st_reading_credits")
+        threading.Thread(target=self._credits_worker, args=(ids, None), daemon=True).start()
+
+    def _credits_worker(self, ids, path):
+        try:
+            if path:
+                with open(path, "r", encoding="utf-8", errors="replace") as f:
+                    text = f.read()
+            else:
+                text = credits.download()
+        except (OSError, ValueError) as e:
+            self.q.put(("credits_fail", ids, str(e), path is not None))
+            return
+        songs = credits.parse(text)
+        if not songs:
+            self.q.put(("credits_fail", ids, "no songs found in the page", True))
+            return
+        self.q.put(("credits", credits.match(songs, ids), len(songs)))
+
+    def _credits_failed(self, ids, err, from_file):
+        self._set_busy(False)
+        self.set_status("st_ready")
+        if from_file:
+            messagebox.showerror(tr("dlg_names_title"), tr("dlg_credits_error", e=err))
+            return
+        if not messagebox.askyesno(tr("dlg_names_title"), tr("dlg_credits_fail", e=err)):
+            return
+        path = filedialog.askopenfilename(title=tr("dlg_credits_pick"),
+                                          filetypes=[("HTML", "*.html *.htm"), ("*", "*.*")])
+        if path:
+            self._set_busy(True)
+            self.set_status("st_reading_credits")
+            threading.Thread(target=self._credits_worker, args=(ids, path), daemon=True).start()
+
+    def _apply_credits(self, found, n_songs):
+        k = kept = 0
+        stations = set()
+        for sid, (title, artist, station) in found.items():
+            cur = self.names.get(sid)
+            if cur and (cur.get("artist") or cur.get("station")):
+                kept += 1
+                continue
+            self.names.set(sid, title, artist, station)
+            stations.add(station)
+            k += 1
+        self.names.save()
+        if stations:
+            self.stations = sorted(set(self.stations) | stations)
+            names.save_stations(self.stations)
+        self._refresh_names()
+        self.set_status("st_credits_read", k=k)
+        total = len(self._all_streams())
+        unnamed = sum(1 for _r, st in self._all_streams() if not self.names.get(st.id))
+        messagebox.showinfo(tr("dlg_names_title"), tr("dlg_credits_result", k=k, kept=kept, s=n_songs,
+                                                      m=len(found), st=len(stations), n=unnamed, t=total))
+
+    def _suggest_station(self, cpath, g):
+        """Station that most tracks of a group belong to (from the per-track station names)."""
+        count = {}
+        for _iid, (kind, obj) in self.nodes.items():
+            if kind == "stream" and obj[0].in_rpf and obj[0].path == cpath and obj[0].group == g:
+                st = (self.names.get(obj[1].id) or {}).get("station")
+                if st:
+                    count[st] = count.get(st, 0) + 1
+        return max(count, key=count.get) if count else ""
 
     # ------------------------------------------------------------------ names
     def read_game_names(self):
@@ -1053,6 +1133,11 @@ class App(tk.Tk):
                 elif kind == "gamenames":
                     self._set_busy(False)
                     self._apply_game_names(msg[1], msg[2], msg[3])
+                elif kind == "credits":
+                    self._set_busy(False)
+                    self._apply_credits(msg[1], msg[2])
+                elif kind == "credits_fail":
+                    self._credits_failed(msg[1], msg[2], msg[3])
                 elif kind == "done":
                     cancelled = msg[1] in ("st_cancelled", "st_scan_cancelled", "st_scan_error")
                     self.bar["value"] = 0 if cancelled else 1.0

@@ -143,6 +143,12 @@ Unter Windows geht auch ein Doppelklick auf `Start AWC-Tool.bat`.
      zlib-Teil am Anfang der `audio.rpf`) und trägt Titel für die erkannten Streams ein (im Beispielarchiv etwa ein
      Drittel der Musik-Streams; nur interne Titel, keine Interpreten). Die dort gefundenen Stationsnamen werden
      bei **Gruppe umbenennen…** vorgeschlagen.
+   * **Songs von der Credits-Seite** lädt die Soundtrack-Liste der öffentlichen Credits-Seite des Herausgebers
+     (`rockstargames.com/VI/credits`: jeder Sender mit seinen Songs und Interpreten), hasht die Titel wie das Spiel
+     und setzt für jeden erkannten Stream **Titel, Interpret und Sender** (im Beispielarchiv etwa 660 der
+     Musik-Streams; die meisten Sender werden fast vollständig getroffen). Der Sender wird pro Track gespeichert
+     und für Tags, Playlists und als Vorschlag bei **Gruppe umbenennen…** genutzt. Schlägt der Download fehl, kann
+     die im Browser gespeicherte Seite gewählt werden. Die Liste wird nicht mitgeliefert und bleibt auf deinem PC.
    * **Namen importieren…** liest eine CSV/TXT/JSON-Liste (nach Stream-ID oder internem Namen), **Namensliste
      exportieren…** schreibt eine Vorlage zum Ausfüllen, Rechtsklick → **Titel / Interpret setzen…** benennt einen
      einzelnen Stream.
