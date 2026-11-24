@@ -96,14 +96,21 @@ block header
   per stream, 0x18 bytes:
     +0x00  s32  start entry     (-1)
     +0x04  s32  entry count N    -> N units of 0x800 bytes for this stream in this block
-    +0x08  s32  samples to skip  (0)
-    +0x0C  s32  samples in this block for this stream (interleaved count)
+    +0x08  s32  samples to skip  (interleaved; repeated prefix from previous block, or deficit-continued)
+    +0x0C  s32  samples in this block for this stream (interleaved chunk budget; trims trailing padding packets)
     +0x10  8 bytes (zero)
   per stream: u32 x N           seek table – cumulative sample counts
   zero padding up to the next 0x800 boundary
 audio, stream after stream:
   N units of 0x800 bytes each
 ```
+
+Both `+0x08` (`samples to skip`) and `+0x0C` (`block_samples`) are interleaved sample counts across the stream's
+Opus channel count (2× per-channel frames for stereo). In multi-stem and multi-block banks, a block can carry
+trailing subblock padding packets past `block_samples / opus_channels`, or repeat leading packets from the end of
+the previous block (`skip > 0`); when the preceding block stopped short of its `block_samples` budget, the deficit
+carries into the next block's skip offset. `AwcFile.extract()` trims each block to `block_samples` and drops
+verified repeated/skipped prefix packets so multi-block stems export without duplicate or padding audio.
 
 ### Units and Opus packets
 
@@ -177,7 +184,30 @@ The `value` of a marker in a mix equals the `value` of the standalone track with
 of that standalone track, so a segment is the part of the track that the mix plays, or the marker is not the start.
 The tool shows the markers as chapters under a mix and can split the exported mix at them (`ffmpeg -c copy`).
 
-## 8. Not covered
+## 8. Audio metadata (`GAME.DAT` / `SOUNDS.DAT`, `awc_metadata.py`)
+
+The plain zlib streams at the start of `audio.rpf` (before the first `ADAT` bank) group into contiguous
+RAGE `audMetadataFile` payloads identified by magic `0x045A88EA` at `+0x08` (after `u32 version`, `u32 meta_size`):
+
+1. **`GAME.DAT`** (identified by `joaat("RADIO_STATIONS_01")`, object type `0x0E`):
+   * `RADIO_STATIONS_01..16` (`type 0x0E`, count at `+0x05`, `u32` ref indices at `+0x08`) list
+     `RadioStationSettings` (`type 0x10`) objects.
+   * Each `RadioStationSettings` carries `u32 flags` at `+0x01`, `u32 name_hash` at `+0x08`, `u32 wheel_position`
+     at `+0x0C`, and `u32 tracklist_count` at `+0x3C` followed by 12-byte tracklist entries starting at `+0x40`.
+     Entries with `(flags & 0x30) == 0x10` are static world emitters; player wheel entries with
+     `(flags & 0x0C) == 0x04` are hidden wheel stations.
+   * Each `RadioStationTrackList` (`type 0x11`) links an optional external `ObjectList` (`type 0x02`) ref at `+0x44`
+     plus `u16 inline_count` at `+0x48` and `u32` refs at `+0x4C`, each resolving to a `RadioTrackSettings`
+     (`type 0x0F`, sound ref at `+0x0C`).
+2. **`SOUNDS.DAT`**:
+   * Each `StreamingSound` (`type 0x08`) carries its `u32 duration_ms` immediately before
+     `0x0C <channel_count> <u32 child_ids...>`, followed sequentially by `<channel_count>` `SimpleSound`
+     (`type 0x0C`) objects holding `(u32 bank_hash, u32 wave_hash)` at `+0x02` (`wave_hash & 0x1FFFFFFF` = AWC
+     stream ID), including multi-channel club/venue mixes with `channel_count > 1`.
+
+`awc_metadata.py` parses these tables deterministically without hardcoded archive offsets or shipped game names.
+
+## 9. Not covered
 
 * Non-music AWCs (chunk `0xFA` "sfx header", Vorbis `0x76`/`0x7F`, MIDI `0x68`, …).
 * Codecs other than `0x0B`: PCM, IMA/MS-ADPCM, XMA2, MPEG, Vorbis, ATRAC9, DSP, other Opus variants.

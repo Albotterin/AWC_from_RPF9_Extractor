@@ -274,6 +274,8 @@ class AwcFile:
                 raise AwcError(tr("err_codec", c=self.streams[idx].codec_name))
         writers = {i: OggOpusWriter(p, 0x4157 + i, self.streams[i].sample_rate, tags.get(i))
                    for i, p in jobs.items()}
+        prev_kept = {i: [] for i in writers}
+        prev_deficit = {i: 0 for i in writers}
         ok = False
         try:
             with open(self.path, "rb") as f:
@@ -285,13 +287,16 @@ class AwcFile:
                     blk = f.read(min(self.block_size, self.data_off + self.data_size - off))
                     if len(blk) < 0x18 * nch:
                         break
-                    ents = [struct.unpack_from("<i", blk, 0x18 * c + 4)[0] for c in range(nch)]
+                    recs = [struct.unpack_from("<iii", blk, 0x18 * c + 4) for c in range(nch)]
+                    ents = [r[0] for r in recs]
                     if any(e < 0 or e > 4096 for e in ents):
                         break  # corrupt block (e.g. truncated file)
                     pos = ((0x18 * nch + 4 * sum(ents)) + 0x7FF) & ~0x7FF
                     for c in range(nch):
                         if c in writers:
                             w = writers[c]
+                            _, skip_samples, block_samples = recs[c]
+                            pkts = []
                             for e in range(ents[c]):
                                 ent = blk[pos + e * 0x800: pos + (e + 1) * 0x800]
                                 p = 0
@@ -299,8 +304,57 @@ class AwcFile:
                                     n = struct.unpack_from("<H", ent, p)[0]
                                     if n == 0 or p + 2 + n > len(ent):
                                         break
-                                    w.add(ent[p + 2:p + 2 + n])
+                                    pkts.append(ent[p + 2:p + 2 + n])
                                     p += 2 + n
+                            if pkts:
+                                pch = max(1, self.streams[c].opus_channels)
+                                kept = pkts
+                                deficit = 0
+                                if block_samples > 0:
+                                    target_f = block_samples // pch
+                                    tot_f = sum(opus_packet_samples(pkt) for pkt in pkts)
+                                    if tot_f > target_f:
+                                        acc = 0
+                                        trim = len(pkts)
+                                        for idx, pkt in enumerate(pkts):
+                                            acc += opus_packet_samples(pkt)
+                                            if acc >= target_f:
+                                                trim = idx + 1
+                                                break
+                                        kept = pkts[:trim]
+                                    else:
+                                        deficit = target_f - tot_f
+                                drop = 0
+                                if skip_samples > 0:
+                                    skip_f = skip_samples // pch
+                                    matched = False
+                                    for cand in ((skip_f, skip_samples) if pch > 1 else (skip_samples,)):
+                                        if cand <= 0:
+                                            continue
+                                        acc = 0
+                                        for idx, pkt in enumerate(kept, 1):
+                                            acc += opus_packet_samples(pkt)
+                                            if acc == cand and kept[:idx] == prev_kept[c][-idx:]:
+                                                drop = idx
+                                                matched = True
+                                                break
+                                            if acc >= cand:
+                                                break
+                                        if matched:
+                                            break
+                                    if not matched:
+                                        net_skip = max(0, skip_f - prev_deficit[c])
+                                        if net_skip > 0:
+                                            acc = 0
+                                            for idx, pkt in enumerate(kept, 1):
+                                                acc += opus_packet_samples(pkt)
+                                                if acc >= net_skip:
+                                                    drop = idx
+                                                    break
+                                for pkt in (kept[drop:] if drop else kept):
+                                    w.add(pkt)
+                                prev_kept[c] = kept
+                                prev_deficit[c] = deficit
                         pos += ents[c] * 0x800
                     if progress:
                         progress((b + 1) / float(self.n_blocks))
