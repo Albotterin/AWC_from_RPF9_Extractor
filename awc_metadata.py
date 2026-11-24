@@ -1,10 +1,11 @@
 """Deterministic parser for RAGE 9 GAME.DAT and SOUNDS.DAT audMetadataFile (0x045A88EA) containers.
 
-The inflated zlib stream groups at the start of audio.rpf (before the first ADAT bank) hold
-self-describing audMetadataFile tables:
+The file groups at the start of audio.rpf (before the first ADAT bank) hold
+self-describing audMetadataFile tables. Pass complete containers, including any
+uncompressed chunks left out by a zlib-only carve:
   - GAME.DAT (identified by RADIO_STATIONS_01, type 0x0E): wheel radio stations, static world
     emitters ((flags & 0x30) == 0x10), hidden wheel stations ((flags & 0x0C) == 0x04),
-    RadioStationTrackList (0x11) with external ObjectList (0x02) + inline refs, and
+    RadioStationTrackList (0x11) with external ObjectList (0x02) or inline refs, and
     RadioTrackSettings (0x0F) pointing to SOUNDS.DAT sound hashes.
   - SOUNDS.DAT: StreamingSound (0x08) duration and adjacent SimpleSound (0x0C) channel groups
     holding (bank_hash, wave_hash) -> 29-bit AWC stream IDs.
@@ -37,7 +38,10 @@ WHEEL_STATION_HIDDEN_VALUE = 0x04
 
 
 def group_inflated_streams(streams, chunk_size=AUD_METADATA_CHUNK_SIZE):
-    """Group consecutive inflated zlib streams (ending on any stream whose size != chunk_size)."""
+    """Group consecutive chunks, ending on any chunk whose size != chunk_size.
+
+    Callers must supply both inflated and stored chunks in archive order.
+    """
     groups = []
     current = []
     for blob in streams:
@@ -114,7 +118,7 @@ def parse_aud_refs(meta):
 
 
 def parse_sounds_streaming_index(sounds_meta):
-    """Index StreamingSound (0x08) objects and their adjacent SimpleSound (0x0C) channel groups."""
+    """Index StreamingSound (0x08) objects with a complete adjacent SimpleSound (0x0C) group."""
     blob = sounds_meta["blob"]
     meta_size = sounds_meta["meta_size"]
     sorted_offsets = sorted(sounds_meta["by_offset"])
@@ -144,12 +148,13 @@ def parse_sounds_streaming_index(sounds_meta):
                                 "wave_hash": wave_hash,
                                 "stream_id": wave_hash & STREAM_ID_MASK,
                             })
-                parsed[sound_hash] = {
-                    "sound_hash": sound_hash,
-                    "duration_ms": duration_ms,
-                    "channel_count": cnt,
-                    "channels": channels,
-                }
+                if len(channels) == cnt:
+                    parsed[sound_hash] = {
+                        "sound_hash": sound_hash,
+                        "duration_ms": duration_ms,
+                        "channel_count": cnt,
+                        "channels": channels,
+                    }
                 break
     return parsed
 
@@ -166,11 +171,10 @@ def walk_tracklist_tracks(tl_hash, game_meta, game_refs):
     tl_pos = 8 + tl_off
     obj_list_ref, = struct.unpack_from("<I", blob, tl_pos + 0x44)
     inline_count, = struct.unpack_from("<H", blob, tl_pos + 0x48)
-    if tl_off + 0x4C + inline_count * 4 > meta_size:
-        raise ValueError(f"tracklist 0x{tl_hash:08x} inline reference array truncated")
-
     track_refs = []
-    if obj_list_ref != OBJECT_REF_NONE and obj_list_ref < len(game_refs):
+    if obj_list_ref != OBJECT_REF_NONE:
+        if obj_list_ref >= len(game_refs):
+            return []
         ol_hash = game_refs[obj_list_ref]
         ol_off = by_hash.get(ol_hash)
         if ol_off is not None and ol_off + 12 <= meta_size and blob[8 + ol_off] == TYPE_OBJECT_LIST:
@@ -178,7 +182,9 @@ def walk_tracklist_tracks(tl_hash, game_meta, game_refs):
             if ol_off + 12 + ol_count * 4 > meta_size:
                 raise ValueError(f"object list 0x{ol_hash:08x} truncated")
             track_refs.extend(struct.unpack_from(f"<{ol_count}I", blob, 8 + ol_off + 12))
-    if inline_count:
+    elif inline_count:
+        if tl_off + 0x4C + inline_count * 4 > meta_size:
+            raise ValueError(f"tracklist 0x{tl_hash:08x} inline reference array truncated")
         track_refs.extend(struct.unpack_from(f"<{inline_count}I", blob, tl_pos + 0x4C))
 
     out = []

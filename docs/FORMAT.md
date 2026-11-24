@@ -24,7 +24,7 @@ starting with the magic `ADAT`. So the archive can be scanned for AWC headers.
 3. Locate the chunk table (see below) to compute the AWC's length (`max(offset + size)` over its chunks; used for grouping).
    Every `ADAT` hit is tested, also those inside the computed range of an earlier AWC: payload bytes fail the header
    check or open as nothing, but skipping the range wrongly skipped 284 real music containers (found by comparing with
-   an unskipped scan; the cache version was raised to 5 for that).
+   an unskipped scan).
 4. Try to open the candidate as a **music container**. If that fails (other AWC kind, damaged) it is only counted.
 5. Results (`offset`, `length`, streams, estimated durations) are cached as JSON in
    `%APPDATA%\AWC-Tool\cache\<sha1 of path>.json`, keyed by file size and mtime.
@@ -37,10 +37,12 @@ Example: a 28.5 GB archive → 6,636 valid AWC headers, 2,968 music containers, 
 ```
 0x00  char[4]  "ADAT"
 0x04  u16      version            (1)
-0x06  u16      flags              (high byte 0xFF = per-stream chunk indices are present)
+0x06  u16      flags
 0x08  u32      stream count
 0x0C  u32      info offset        (size of the header; data/chunks start at or after this)
-0x10  u16[stream count]           chunk start index per stream (when flags >> 8 == 0xFF)
+0x10  u32                        extra word (when flags & 0x40)
+...   u16[stream count]           chunk start index per stream (when flags & 0x01)
+...   u32[stream count + 1]       additional table (when flags & 0x20)
 ...   u32[stream count]           stream info: bits 0-28 stream ID, bits 29-31 chunk count
 ...   u64[]                       chunk table
 ```
@@ -64,9 +66,9 @@ Tags seen in music containers:
 | `0xA3` | block-to-sample seek table (one `u32` per block) |
 | `0xBD` | events / markers (4 × `u32` per event: type hash, params hash, timestamp, flags) |
 
-The tool does not interpret the stream-info/chunk-index arrays exactly; it **scans the header (4-byte aligned) for
-`u64` values with a known tag and an offset behind the header**. That is enough for the layouts seen so far, and it
-is what makes the format detection cheap. A file without both `0x48` and `0x55` is not treated as a music container.
+The scanner and reader locate the chunk table after the optional tables and stream records. With an odd
+number of chunk indices, the table can start on a 2-byte boundary. Version 6 of the scan cache rebuilds
+inventories made by the former 4-byte scan. A music container must have both `0x48` and `0x55`.
 
 ## 3. Stream format chunk (`0x48`)
 
@@ -96,8 +98,8 @@ block header
   per stream, 0x18 bytes:
     +0x00  s32  start entry     (-1)
     +0x04  s32  entry count N    -> N units of 0x800 bytes for this stream in this block
-    +0x08  s32  samples to skip  (interleaved; repeated prefix from previous block, or deficit-continued)
-    +0x0C  s32  samples in this block for this stream (interleaved chunk budget; trims trailing padding packets)
+    +0x08  u32  samples to skip
+    +0x0C  u32  interleaved sample budget for this block
     +0x10  8 bytes (zero)
   per stream: u32 x N           seek table – cumulative sample counts
   zero padding up to the next 0x800 boundary
@@ -105,12 +107,16 @@ audio, stream after stream:
   N units of 0x800 bytes each
 ```
 
-Both `+0x08` (`samples to skip`) and `+0x0C` (`block_samples`) are interleaved sample counts across the stream's
-Opus channel count (2× per-channel frames for stereo). In multi-stem and multi-block banks, a block can carry
-trailing subblock padding packets past `block_samples / opus_channels`, or repeat leading packets from the end of
-the previous block (`skip > 0`); when the preceding block stopped short of its `block_samples` budget, the deficit
-carries into the next block's skip offset. `AwcFile.extract()` trims each block to `block_samples` and drops
-verified repeated/skipped prefix packets so multi-block stems export without duplicate or padding audio.
+Divide the interleaved counts by the stream's Opus channel count to get frames. For a positive block budget,
+`AwcFile.extract()` keeps the packet that reaches or crosses the budget and drops later packets in that block.
+For a nonzero skip it first checks for a byte-for-byte overlap, also allowing a per-channel count if that gives
+an exact match. If the previous block fell short, the extractor can subtract the shortfall from the interleaved
+skip converted to frames. The result must be nonnegative and land on a packet boundary.
+A skip that cannot be reconciled aborts the export before replacing any output files.
+
+The Ogg writer still uses complete packets for the final granule. For example, both stems at `audio.rpf`
+offset `0x690542000` in Xbox Series 1.0.2.1 decode to 943,368 frames after pre-skip, versus 942,545 declared
+frames per channel. Exact end trimming is separate from block assembly.
 
 ### Units and Opus packets
 
@@ -186,8 +192,10 @@ The tool shows the markers as chapters under a mix and can split the exported mi
 
 ## 8. Audio metadata (`GAME.DAT` / `SOUNDS.DAT`, `awc_metadata.py`)
 
-The plain zlib streams at the start of `audio.rpf` (before the first `ADAT` bank) group into contiguous
-RAGE `audMetadataFile` payloads identified by magic `0x045A88EA` at `+0x08` (after `u32 version`, `u32 meta_size`):
+The file groups at the start of `audio.rpf` (before the first `ADAT` bank) contain RAGE `audMetadataFile`
+payloads identified by magic `0x045A88EA` at `+0x08` (after `u32 version` and `u32 meta_size`).
+Pass complete containers to `awc_metadata.py`, including stored chunks in archive order. A zlib-only carve
+of Xbox Series 1.0.2.1 omits three 64 KiB stored chunks from section 2 of `SOUNDS.DAT`.
 
 1. **`GAME.DAT`** (identified by `joaat("RADIO_STATIONS_01")`, object type `0x0E`):
    * `RADIO_STATIONS_01..16` (`type 0x0E`, count at `+0x05`, `u32` ref indices at `+0x08`) list
@@ -196,14 +204,16 @@ RAGE `audMetadataFile` payloads identified by magic `0x045A88EA` at `+0x08` (aft
      at `+0x0C`, and `u32 tracklist_count` at `+0x3C` followed by 12-byte tracklist entries starting at `+0x40`.
      Entries with `(flags & 0x30) == 0x10` are static world emitters; player wheel entries with
      `(flags & 0x0C) == 0x04` are hidden wheel stations.
-   * Each `RadioStationTrackList` (`type 0x11`) links an optional external `ObjectList` (`type 0x02`) ref at `+0x44`
-     plus `u16 inline_count` at `+0x48` and `u32` refs at `+0x4C`, each resolving to a `RadioTrackSettings`
-     (`type 0x0F`, sound ref at `+0x0C`).
+   * Each `RadioStationTrackList` (`type 0x11`) uses an external `ObjectList` (`type 0x02`) ref at `+0x44` or,
+     when that field is `0xFFFFFFFF`, an inline count at `+0x48` (`u16`) and refs at `+0x4C` (`u32`).
+     Both forms resolve to `RadioTrackSettings` (`type 0x0F`, sound ref at `+0x0C`).
 2. **`SOUNDS.DAT`**:
    * Each `StreamingSound` (`type 0x08`) carries its `u32 duration_ms` immediately before
-     `0x0C <channel_count> <u32 child_ids...>`, followed sequentially by `<channel_count>` `SimpleSound`
-     (`type 0x0C`) objects holding `(u32 bank_hash, u32 wave_hash)` at `+0x02` (`wave_hash & 0x1FFFFFFF` = AWC
-     stream ID), including multi-channel club/venue mixes with `channel_count > 1`.
+     `0x0C <channel_count> <u32 child_refs...>` in the layout used here. The parser checks the adjacent
+     objects in metadata offset order for `SimpleSound` (`type 0x0C`) children. They hold
+     `(u32 bank_hash, u32 wave_hash)` at `+0x02` (`wave_hash & 0x1FFFFFFF` = AWC stream ID).
+     This layout was observed in the multi-stem club/venue mixes. The parser omits sound records without
+     a complete adjacent group.
 
 `awc_metadata.py` parses these tables deterministically without hardcoded archive offsets or shipped game names.
 

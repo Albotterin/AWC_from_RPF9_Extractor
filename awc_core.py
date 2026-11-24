@@ -2,8 +2,10 @@
 
 The Opus packets are written unchanged (no re-encoding) into Ogg Opus files.
 """
+from contextlib import ExitStack
 import os
 import struct
+import tempfile
 import zlib
 
 from awc_i18n import tr
@@ -139,6 +141,27 @@ class OggOpusWriter:
 
 
 # --------------------------------------------------------------------------- AWC
+def _awc_tags(head, flags, stream_count, info_off):
+    """Read the stream records and the chunk tags that follow them."""
+    records = 0x10
+    if flags & 0x40:
+        records += 4
+    if flags & 0x01:
+        records += 2 * stream_count
+    if flags & 0x20:
+        records += 4 * (stream_count + 1)
+    tags = records + 4 * stream_count
+    if tags > min(info_off, len(head)):
+        return
+    tag_count = sum(struct.unpack_from("<I", head, at)[0] >> 29
+                    for at in range(records, tags, 4))
+    if tags + 8 * tag_count > min(info_off, len(head)):
+        return
+    for at in range(tags, tags + 8 * tag_count, 8):
+        value, = struct.unpack_from("<Q", head, at)
+        yield value >> 56, value & 0xFFFFFFF, (value >> 28) & 0xFFFFFFF
+
+
 class AwcStream:
     def __init__(self, index, sid, sample_rate, codec):
         self.index = index
@@ -188,17 +211,13 @@ class AwcFile:
             hdr = f.read(0x10)
             if len(hdr) < 0x10 or hdr[:4] != b"ADAT":
                 raise AwcError(tr("err_not_awc"))
-            _magic, _ver, _flags, _n, info_off = struct.unpack("<4sHHII", hdr)
+            _magic, _ver, flags, count, info_off = struct.unpack("<4sHHII", hdr)
             if info_off < 0x10 or info_off > 0x10000:
                 raise AwcError(tr("err_header"))
             f.seek(self.base)
             head = f.read(info_off)
             chunks = {}
-            for i in range(0x10, info_off - 7, 4):
-                v = struct.unpack_from("<Q", head, i)[0]
-                tag = v >> 56
-                off = v & 0xFFFFFFF
-                size = (v >> 28) & 0xFFFFFFF
+            for tag, off, size in _awc_tags(head, flags, count, info_off):
                 if tag in BLOCK_CHUNK_TAGS and off >= info_off and off < self.size + 0x10000000:
                     chunks.setdefault(tag, (off, size))
             if 0x48 not in chunks or 0x55 not in chunks:
@@ -272,12 +291,18 @@ class AwcFile:
         for idx in jobs:
             if not self.streams[idx].supported:
                 raise AwcError(tr("err_codec", c=self.streams[idx].codec_name))
-        writers = {i: OggOpusWriter(p, 0x4157 + i, self.streams[i].sample_rate, tags.get(i))
-                   for i, p in jobs.items()}
-        prev_kept = {i: [] for i in writers}
-        prev_deficit = {i: 0 for i in writers}
-        ok = False
-        try:
+        prev_kept = {i: [] for i in jobs}
+        prev_deficit = {i: 0 for i in jobs}
+        with ExitStack() as cleanup:
+            writers = {}
+            staged = {}
+            for i, path in jobs.items():
+                parent = os.path.dirname(os.path.abspath(path))
+                tempdir = cleanup.enter_context(tempfile.TemporaryDirectory(dir=parent, prefix=".awc-"))
+                staged[i] = os.path.join(tempdir, "stem.opus")
+                writer = OggOpusWriter(staged[i], 0x4157 + i, self.streams[i].sample_rate, tags.get(i))
+                cleanup.callback(writer.fh.close)
+                writers[i] = writer
             with open(self.path, "rb") as f:
                 for b in range(self.n_blocks):
                     if cancel and cancel():
@@ -287,7 +312,7 @@ class AwcFile:
                     blk = f.read(min(self.block_size, self.data_off + self.data_size - off))
                     if len(blk) < 0x18 * nch:
                         break
-                    recs = [struct.unpack_from("<iii", blk, 0x18 * c + 4) for c in range(nch)]
+                    recs = [struct.unpack_from("<iII", blk, 0x18 * c + 4) for c in range(nch)]
                     ents = [r[0] for r in recs]
                     if any(e < 0 or e > 4096 for e in ents):
                         break  # corrupt block (e.g. truncated file)
@@ -306,11 +331,15 @@ class AwcFile:
                                         break
                                     pkts.append(ent[p + 2:p + 2 + n])
                                     p += 2 + n
+                            if skip_samples and not pkts:
+                                raise AwcError(f"Channel {c}: skip without packets")
                             if pkts:
                                 pch = max(1, self.streams[c].opus_channels)
                                 kept = pkts
                                 deficit = 0
                                 if block_samples > 0:
+                                    if block_samples % pch:
+                                        raise AwcError(f"Channel {c}: invalid interleaved block sample count")
                                     target_f = block_samples // pch
                                     tot_f = sum(opus_packet_samples(pkt) for pkt in pkts)
                                     if tot_f > target_f:
@@ -328,7 +357,9 @@ class AwcFile:
                                 if skip_samples > 0:
                                     skip_f = skip_samples // pch
                                     matched = False
-                                    for cand in ((skip_f, skip_samples) if pch > 1 else (skip_samples,)):
+                                    candidates = ((skip_f, skip_samples)
+                                                  if pch > 1 and skip_samples % pch == 0 else (skip_samples,))
+                                    for cand in candidates:
                                         if cand <= 0:
                                             continue
                                         acc = 0
@@ -343,14 +374,20 @@ class AwcFile:
                                         if matched:
                                             break
                                     if not matched:
-                                        net_skip = max(0, skip_f - prev_deficit[c])
+                                        if not prev_deficit[c] or skip_samples % pch or skip_f < prev_deficit[c]:
+                                            raise AwcError(f"Channel {c}: unverified skip of {skip_samples} samples")
+                                        net_skip = skip_f - prev_deficit[c]
                                         if net_skip > 0:
                                             acc = 0
                                             for idx, pkt in enumerate(kept, 1):
                                                 acc += opus_packet_samples(pkt)
-                                                if acc >= net_skip:
+                                                if acc == net_skip:
                                                     drop = idx
                                                     break
+                                                if acc > net_skip:
+                                                    break
+                                            if not drop:
+                                                raise AwcError(f"Channel {c}: skip cuts through or exceeds the block")
                                 for pkt in (kept[drop:] if drop else kept):
                                     w.add(pkt)
                                 prev_kept[c] = kept
@@ -358,17 +395,11 @@ class AwcFile:
                         pos += ents[c] * 0x800
                     if progress:
                         progress((b + 1) / float(self.n_blocks))
-            ok = True
-        finally:
             for w in writers.values():
                 w.close()
-            if not ok:
-                for p in jobs.values():
-                    try:
-                        os.remove(p)
-                    except OSError:
-                        pass
-        return {i: w.seconds for i, w in writers.items()}
+            for i, path in jobs.items():
+                os.replace(staged[i], path)
+            return {i: w.seconds for i, w in writers.items()}
 
 
 # --------------------------------------------------------------------------- scanner
@@ -377,6 +408,7 @@ import json
 import time
 
 SCAN_CHUNK = 64 * 1024 * 1024
+SCAN_CACHE_VERSION = 6
 
 
 def _probe_adat(g, pos, container_size):
@@ -389,9 +421,7 @@ def _probe_adat(g, pos, container_size):
     if ver != 1 or not (1 <= n <= 65536) or not (0x10 <= info_off <= 0xFFF0):
         return None
     end = 0
-    for i in range(0x10, min(info_off, len(head)) - 7, 4):
-        v = struct.unpack_from("<Q", head, i)[0]
-        tag, off, size = v >> 56, v & 0xFFFFFFF, (v >> 28) & 0xFFFFFFF
+    for tag, off, size in _awc_tags(head, flags, n, info_off):
         if tag in BLOCK_CHUNK_TAGS and off >= info_off and pos + off + size <= container_size:
             end = max(end, off + size)
     return {"length": end or None}
@@ -479,7 +509,8 @@ def scan_container_cached(path, progress=None, cancel=None, use_cache=True):
         try:
             with open(cf, "r", encoding="utf-8") as fh:
                 c = json.load(fh)
-            if c.get("size") == st.st_size and c.get("mtime") == int(st.st_mtime) and c.get("v") == 5:
+            if (c.get("size") == st.st_size and c.get("mtime") == int(st.st_mtime)
+                    and c.get("v") == SCAN_CACHE_VERSION):
                 for it in c["items"]:
                     it["path"] = path          # the archive may have been moved/renamed since the scan
                 add_groups(c["items"])
@@ -490,7 +521,7 @@ def scan_container_cached(path, progress=None, cancel=None, use_cache=True):
     add_groups(items)
     try:
         with open(cf, "w", encoding="utf-8") as fh:
-            json.dump({"v": 5, "path": path, "size": st.st_size, "mtime": int(st.st_mtime),
+            json.dump({"v": SCAN_CACHE_VERSION, "path": path, "size": st.st_size, "mtime": int(st.st_mtime),
                        "total": total, "items": items}, fh)
     except OSError:
         pass
