@@ -188,7 +188,7 @@ On Windows you can also double-click `Start AWC-Tool.bat`.
    On the first start a dialog offers to download the decoder of the [Leonida](https://github.com/ItsNotRexed/Leonida)
    project (a few files from GitHub, GPL-3, saved with its LICENSE to `%APPDATA%\AWC-Tool\leonida\`; they are not part
    of this tool). Afterwards the logos are cut out of your own game files into `%APPDATA%\AWC-Tool\icons\`. The
-   button **Station logos…** repeats the step. 22 stations are known; the station comes from the credits list
+   button **Station logos…** repeats the step. The logos are saved at the game's full size (256 × 256). *Note (2026-11-24): the Leonida repository is currently not reachable on GitHub (404), so the decoder download fails for new users; logos that were cut out earlier keep working.* 23 stations are known; the station comes from the credits list
    (see step 7). Group rows get a small logo, and FLAC/MP3 exports carry the logo as cover picture. Nothing from the
    game is shipped with the tool.
 9. **Station mixes** (optional): a few very long streams (40-120 min) are whole radio mixes. The game stores a
@@ -222,7 +222,7 @@ The phone app plays the same live programme as the PC: same UTC clock, same orde
 
 * **`AWC-Radio.apk`** - the app, from the [release page](../../releases/latest). The same file for everybody, no game data
   inside. Android 7.0 or newer, English and German. It keeps playing in the background with a media notification,
-  lock-screen and headset buttons (previous / next station, pause) and has a sleep timer.
+  lock-screen and headset buttons (previous / next station, pause) and has a sleep timer. **Android Auto** is supported: the stations show up as a grid with their logos, the player screen shows the song and station, and voice commands ("play Radio On-U on AWC Radio") work. Because the app does not come from the Play Store, switch on *Unknown sources* in Android Auto's developer settings first.
 * **A station pack (`.dat`)** - made on the PC: in AWC Radio click **Android pack...**, tick the stations and save. It holds
   the songs of those stations in the game's own quality (about 128 kbit/s, not re-encoded; about 3.6 GB for all 28 stations),
   their logos and the programme. Copy it to the phone, start the app and pick the file once; the songs are played straight

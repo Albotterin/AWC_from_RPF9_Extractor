@@ -35,7 +35,7 @@ RAW = "https://raw.githubusercontent.com/%s/%s/%s"
 FILES = ["tools/ttpf_mips.py", "tools/bcpack.py", "tools/bcpack_tables.py", "tools/bcpack_tables_bptc.py",
          "tools/file_mode.py", "tools/tex_headers.py", "LICENSE"]
 POOL = os.path.join("data", "ttdb", "ui", "ttdb_ui.ttpf")
-ICON_SIZE = 128
+ICON_SIZE = 256          # the game's logos are 256 x 256: keep them at full size (earlier versions saved 128)
 
 # station name (as on the credits page) -> asset key of its logo in ttdb_ui.ttpf
 STATION_KEYS = {
@@ -116,8 +116,23 @@ def find_pool(rpf_path):
     return p if os.path.isfile(p) else ""
 
 
+def _png_width(path):
+    try:
+        with open(path, "rb") as f:
+            head = f.read(24)
+        return int.from_bytes(head[16:20], "big") if head[1:4] == b"PNG" else 0
+    except OSError:
+        return 0
+
+
 def missing_stations():
-    return [s for s in STATION_KEYS if not icon_path(s)]
+    """Stations without a logo, or with one that was saved smaller than ICON_SIZE by an earlier version (made again)."""
+    out = []
+    for s in STATION_KEYS:
+        p = icon_path(s)
+        if not p or _png_width(p) < ICON_SIZE:
+            out.append(s)
+    return out
 
 
 def extract(pool_path, progress=None):
@@ -144,7 +159,9 @@ def extract(pool_path, progress=None):
             blob = t.texture_dds(pool, t.analyze(pool, i), allow_provisional=True)
             im = Image.open(io.BytesIO(blob))
             im.load()
-            im = im.convert("RGBA").resize((ICON_SIZE, ICON_SIZE), Image.LANCZOS)
+            im = im.convert("RGBA")
+            if im.size != (ICON_SIZE, ICON_SIZE):
+                im = im.resize((ICON_SIZE, ICON_SIZE), Image.LANCZOS)
             dst = icon_path_for_write(todo[key])
             im.save(dst + ".part", "PNG")
             os.replace(dst + ".part", dst)

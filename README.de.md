@@ -182,7 +182,7 @@ Unter Windows geht auch ein Doppelklick auf `Start AWC-Tool.bat`.
    [Leonida](https://github.com/ItsNotRexed/Leonida) herunterzuladen (ein paar Dateien von GitHub, GPL-3, mit seiner
    LICENSE nach `%APPDATA%\AWC-Tool\leonida\`; sie sind nicht Teil dieses Tools). Danach werden die Logos aus deinen
    eigenen Spieldateien nach `%APPDATA%\AWC-Tool\icons\` geschnitten. Der Knopf **Sender-Logos…** wiederholt den
-   Schritt. Bekannt sind 22 Sender; den Sender liefert die Credits-Liste (siehe Punkt 7). Gruppen-Zeilen bekommen ein kleines Logo, und FLAC/MP3-Exporte tragen das Logo als Cover-Bild.
+   Schritt. Die Logos werden in voller Spielgröße (256 × 256) gespeichert. *Hinweis (24.11.2026): Das Leonida-Repository ist auf GitHub derzeit nicht erreichbar (404), der Download des Decoders schlägt für neue Nutzer deshalb fehl; früher ausgelesene Logos funktionieren weiter.* Bekannt sind 23 Sender; den Sender liefert die Credits-Liste (siehe Punkt 7). Gruppen-Zeilen bekommen ein kleines Logo, und FLAC/MP3-Exporte tragen das Logo als Cover-Bild.
    Vom Spiel wird nichts mitgeliefert.
 9. **Sender-Mixe** (optional): ein paar sehr lange Streams (40-120 Min.) sind komplette Radio-Mixe. Das Spiel legt
    für jeden gespielten Track einen `trackid`-Marker ab; das Tool zeigt sie als Kapitel unter dem Stream (Doppelklick
@@ -218,7 +218,7 @@ Es sind zwei Dateien:
 
 * **`AWC-Radio.apk`** - die App, von der [Release-Seite](../../releases/latest). Für alle dieselbe Datei, ohne Spieldaten.
   Android 7.0 oder neuer, Deutsch und Englisch. Sie spielt im Hintergrund weiter, mit Medien-Benachrichtigung,
-  Sperrbildschirm- und Kopfhörertasten (voriger / nächster Sender, Pause) und hat einen Einschlaftimer.
+  Sperrbildschirm- und Kopfhörertasten (voriger / nächster Sender, Pause) und hat einen Einschlaftimer. **Android Auto** wird unterstützt: Die Sender erscheinen als Raster mit ihren Logos, der Player-Bildschirm zeigt Song und Sender, und Sprachbefehle („Spiele Radio On-U auf AWC Radio“) funktionieren. Da die App nicht aus dem Play Store kommt, muss in den Entwicklereinstellungen von Android Auto zuerst „Unbekannte Quellen“ aktiviert werden.
 * **Ein Sender-Pack (`.dat`)** - wird am PC erzeugt: in AWC Radio auf **Android-Pack...** klicken, Sender ankreuzen und
   speichern. Darin liegen die Songs dieser Sender in der Originalqualität des Spiels (ca. 128 kbit/s, nicht neu kodiert;
   etwa 3,6 GB für alle 28 Sender), ihre Logos und das Programm. Aufs Handy kopieren, die App starten und die Datei

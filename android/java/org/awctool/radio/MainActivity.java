@@ -12,16 +12,26 @@ import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
 import android.content.res.Configuration;
+import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Outline;
+import android.graphics.Paint;
 import android.graphics.Typeface;
+import android.graphics.drawable.ClipDrawable;
+import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.LayerDrawable;
+import android.graphics.drawable.RippleDrawable;
+import android.graphics.drawable.ShapeDrawable;
+import android.graphics.drawable.shapes.OvalShape;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.provider.Settings;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -50,8 +60,8 @@ import java.util.TimeZone;
 
 /** Station tiles and a compact player panel. All the playing is done by RadioService. */
 public class MainActivity extends Activity {
-    private static final int BG = 0xFF14161C, PANEL = 0xFF1C1F27, CARD = 0xFF232733, SEL = 0xFF2A2F45,
-            FG = 0xFFECEEF4, DIM = 0xFF8B91A3, ACCENT = 0xFFFF5A36;
+    private static final int BG = 0xFF12141B, PANEL = 0xFF1A1D27, CARD = 0xFF212532, SEL = 0xFF2B2F47,
+            FG = 0xFFF1F2F7, DIM = 0xFF9096A8, ACCENT = 0xFFFF5A36, HEAD = 0xFF2E1B52, RIPPLE = 0x33FFFFFF;
     private static final int REQ_PICK = 42;
     private static final int[] SLEEP_MINUTES = {0, 15, 30, 45, 60, 90};
 
@@ -119,16 +129,68 @@ public class MainActivity extends Activity {
         b.setText(s);
         b.setAllCaps(false);
         b.setTextColor(Color.WHITE);
-        b.setBackground(rounded(bg, 24));
-        b.setPadding(dp(24), dp(10), dp(24), dp(10));
+        b.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        b.setStateListAnimator(null);
+        b.setBackground(ripple(rounded(bg, 26), rounded(Color.WHITE, 26)));
+        b.setPadding(dp(28), dp(12), dp(28), dp(12));
         return b;
+    }
+
+    /** Three bars that dance while the station plays (and rest while it is paused): the "this is on air" sign. */
+    private final class EqView extends View {
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private boolean dancing = true;
+
+        EqView(Context c) {
+            super(c);
+            paint.setColor(ACCENT);
+        }
+
+        void setDancing(boolean on) {
+            if (on != dancing) {
+                dancing = on;
+                invalidate();
+            }
+        }
+
+        @Override
+        protected void onDraw(Canvas c) {
+            float w = getWidth(), h = getHeight(), bw = w / 5f;
+            long t = SystemClock.uptimeMillis();
+            for (int i = 0; i < 3; i++) {
+                double f = dancing ? 0.3 + 0.7 * Math.abs(Math.sin(t / 240.0 * (1 + 0.43 * i) + i * 1.7)) : 0.3;
+                float bh = (float) (h * f);
+                c.drawRoundRect(i * 2 * bw, h - bh, i * 2 * bw + bw, h, bw / 2, bw / 2, paint);
+            }
+            if (dancing) postInvalidateOnAnimation();
+        }
+    }
+
+    /** The thin progress line of the song: rounded, the accent colour on a dark track. */
+    private Drawable progressLine() {
+        GradientDrawable track = rounded(CARD, 3);
+        ClipDrawable fill = new ClipDrawable(rounded(ACCENT, 3), Gravity.START, ClipDrawable.HORIZONTAL);
+        LayerDrawable ld = new LayerDrawable(new Drawable[]{track, fill});
+        ld.setId(0, android.R.id.background);
+        ld.setId(1, android.R.id.progress);
+        return ld;
+    }
+
+    /** The touch feedback that every modern Android control has: a ripple that stays inside the shape. */
+    private Drawable ripple(Drawable content, Drawable mask) {
+        return new RippleDrawable(ColorStateList.valueOf(RIPPLE), content, mask);
+    }
+
+    private Drawable circleMask() {
+        return new ShapeDrawable(new OvalShape());
     }
 
     private ImageButton icon(int res, int descRes, int sizeDp) {
         ImageButton b = new ImageButton(this);
         b.setImageResource(res);
         b.setColorFilter(FG);
-        b.setBackgroundColor(Color.TRANSPARENT);
+        b.setBackground(ripple(null, circleMask()));
         b.setScaleType(ImageView.ScaleType.FIT_CENTER);
         int pad = dp(sizeDp / 4f);
         b.setPadding(pad, pad, pad, pad);
@@ -161,25 +223,45 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
-        getWindow().setStatusBarColor(BG);
+        getWindow().setStatusBarColor(HEAD);
         getWindow().setNavigationBarColor(PANEL);
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(BG);
 
+        pack = PackStore.get(this);
+        stations = pack != null ? pack.stations() : null;
+
+        // header: a soft sunset gradient (the colours of the icon) with the logo, the name and what is on offer
         LinearLayout headRow = new LinearLayout(this);
         headRow.setOrientation(LinearLayout.HORIZONTAL);
         headRow.setGravity(Gravity.CENTER_VERTICAL);
-        headRow.setPadding(dp(20), dp(6), dp(6), dp(2));
-        headRow.addView(text(getString(R.string.app_name), 24, FG, true), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        headRow.setPadding(dp(16), dp(10), dp(6), dp(14));
+        headRow.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{HEAD, BG}));
+        ImageView mark = new ImageView(this);
+        mark.setImageResource(R.drawable.logo);
+        mark.setClipToOutline(true);
+        mark.setOutlineProvider(new ViewOutlineProvider() {
+            @Override
+            public void getOutline(View v, Outline o) {
+                o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), dp(10));
+            }
+        });
+        headRow.addView(mark, new LinearLayout.LayoutParams(dp(42), dp(42)));
+        LinearLayout titles = new LinearLayout(this);
+        titles.setOrientation(LinearLayout.VERTICAL);
+        titles.setPadding(dp(12), 0, 0, 0);
+        titles.addView(text(getString(R.string.app_name), 22, FG, true));
+        if (stations != null && !stations.isEmpty()) {
+            titles.addView(text(getString(R.string.header_sub, stations.size()), 12, DIM, false));
+        }
+        headRow.addView(titles, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         ImageButton btnMenu = icon(R.drawable.ic_more, R.string.act_menu, 48);
         btnMenu.setOnClickListener(v -> showMenu(v));
         headRow.addView(btnMenu, new LinearLayout.LayoutParams(dp(48), dp(48)));
         root.addView(headRow, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        pack = PackStore.get(this);
-        stations = pack != null ? pack.stations() : null;
         if (stations == null || stations.isEmpty()) {
             root.addView(buildSetup(), new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
             setContentView(root);
@@ -225,11 +307,24 @@ public class MainActivity extends Activity {
         setup.setGravity(Gravity.CENTER);
         setup.setPadding(dp(32), dp(24), dp(32), dp(48));
         ImageView ico = new ImageView(this);
-        ico.setImageResource(R.mipmap.ic_launcher);
-        setup.addView(ico, new LinearLayout.LayoutParams(dp(104), dp(104)));
+        ico.setImageResource(R.drawable.logo);
+        ico.setClipToOutline(true);
+        ico.setOutlineProvider(new ViewOutlineProvider() {
+            @Override
+            public void getOutline(View v, Outline o) {
+                o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), dp(26));
+            }
+        });
+        ico.setElevation(dp(6));
+        setup.addView(ico, new LinearLayout.LayoutParams(dp(112), dp(112)));
+        TextView head = text(getString(R.string.setup_title), 22, FG, true);
+        head.setGravity(Gravity.CENTER);
+        head.setPadding(0, dp(24), 0, dp(8));
+        setup.addView(head);
         TextView msg = text(getString(R.string.setup_hint), 15, DIM, false);
         msg.setGravity(Gravity.CENTER);
-        msg.setPadding(0, dp(20), 0, dp(20));
+        msg.setLineSpacing(0, 1.15f);
+        msg.setPadding(0, 0, 0, dp(24));
         setup.addView(msg);
         if (pack == null && !PackStore.error.isEmpty()) {
             TextView err = text(getString(R.string.pack_open_error, PackStore.error), 13, 0xFFFF8866, false);
@@ -248,20 +343,22 @@ public class MainActivity extends Activity {
         panel.setOrientation(LinearLayout.VERTICAL);
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(PANEL);
-        bg.setCornerRadii(new float[]{dp(22), dp(22), dp(22), dp(22), 0, 0, 0, 0});
+        bg.setCornerRadii(new float[]{dp(26), dp(26), dp(26), dp(26), 0, 0, 0, 0});
         panel.setBackground(bg);
-        panel.setPadding(dp(18), dp(16), dp(18), dp(8));
+        panel.setElevation(dp(14));                                    // lifts the player off the station tiles
+        panel.setPadding(dp(20), dp(18), dp(20), dp(6));
 
         LinearLayout top = new LinearLayout(this);
         top.setOrientation(LinearLayout.HORIZONTAL);
         top.setGravity(Gravity.CENTER_VERTICAL);
         imgLogo = new SquareImage(this);
-        top.addView(imgLogo, new LinearLayout.LayoutParams(dp(60), dp(60)));
+        top.addView(imgLogo, new LinearLayout.LayoutParams(dp(64), dp(64)));
         LinearLayout col = new LinearLayout(this);
         col.setOrientation(LinearLayout.VERTICAL);
         col.setPadding(dp(14), 0, 0, 0);
         lblStation = text("", 11, ACCENT, true);
-        lblTitle = text(getString(R.string.tap_station), 17, FG, true);
+        lblStation.setLetterSpacing(0.08f);
+        lblTitle = text(getString(R.string.tap_station), 18, FG, true);
         lblTitle.setSingleLine(true);
         lblTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
         lblArtist = text("", 13, DIM, false);
@@ -281,12 +378,11 @@ public class MainActivity extends Activity {
         lblLen = text("0:00", 11, DIM, false);
         bar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         bar.setMax(1000);
-        bar.setProgressTintList(ColorStateList.valueOf(ACCENT));
-        bar.setProgressBackgroundTintList(ColorStateList.valueOf(CARD));
+        bar.setProgressDrawable(progressLine());
         barRow.addView(lblPos);
-        LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-        blp.leftMargin = dp(8);
-        blp.rightMargin = dp(8);
+        LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(0, dp(5), 1f);
+        blp.leftMargin = dp(10);
+        blp.rightMargin = dp(10);
         barRow.addView(bar, blp);
         barRow.addView(lblLen);
         panel.addView(barRow);
@@ -295,15 +391,20 @@ public class MainActivity extends Activity {
         ctl.setOrientation(LinearLayout.HORIZONTAL);
         ctl.setGravity(Gravity.CENTER);
         btnPrev = icon(R.drawable.ic_prev, R.string.act_prev, 56);
-        btnToggle = icon(R.drawable.ic_pause, R.string.act_pause, 72);
+        btnToggle = icon(R.drawable.ic_pause, R.string.act_pause, 64);
+        btnToggle.setBackground(ripple(rounded(ACCENT, 40), circleMask()));      // the one filled button: play / pause
+        btnToggle.setPadding(dp(16), dp(16), dp(16), dp(16));
+        btnToggle.setElevation(dp(4));
         btnNext = icon(R.drawable.ic_next, R.string.act_next, 56);
         btnSleep = icon(R.drawable.ic_timer, R.string.menu_sleep, 44);
         btnPrev.setOnClickListener(v -> command(RadioService.ACTION_PREV));
         btnNext.setOnClickListener(v -> command(RadioService.ACTION_NEXT));
         btnToggle.setOnClickListener(v -> toggle());
         btnSleep.setOnClickListener(v -> showSleepDialog());
+        LinearLayout.LayoutParams cm = new LinearLayout.LayoutParams(dp(64), dp(64));
+        cm.setMargins(dp(18), dp(6), dp(18), dp(6));
         ctl.addView(btnPrev, new LinearLayout.LayoutParams(dp(56), dp(56)));
-        ctl.addView(btnToggle, new LinearLayout.LayoutParams(dp(72), dp(72)));
+        ctl.addView(btnToggle, cm);
         ctl.addView(btnNext, new LinearLayout.LayoutParams(dp(56), dp(56)));
         panel.addView(ctl);
 
@@ -311,6 +412,7 @@ public class MainActivity extends Activity {
         bottom.setOrientation(LinearLayout.HORIZONTAL);
         bottom.setGravity(Gravity.CENTER_VERTICAL);
         lblNext = text("", 12, DIM, false);
+        lblNext.setPadding(dp(2), 0, 0, 0);
         lblNext.setSingleLine(true);
         lblNext.setEllipsize(android.text.TextUtils.TruncateAt.END);
         bottom.addView(lblNext, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
@@ -322,11 +424,30 @@ public class MainActivity extends Activity {
     }
 
     // ------------------------------------------------------------------------------------------ lifecycle
+    /** "Hey Google, play <station> on AWC Radio" starts the app with this intent (the query is empty for "play something"). */
+    private void handleVoice(Intent in) {
+        if (in == null || !"android.media.action.MEDIA_PLAY_FROM_SEARCH".equals(in.getAction())) return;
+        in.setAction(Intent.ACTION_MAIN);                                  // handle it once
+        if (stations == null || stations.isEmpty()) return;
+        String q = in.getStringExtra(android.app.SearchManager.QUERY);
+        Intent i = new Intent(this, RadioService.class).setAction(RadioService.ACTION_PLAY).putExtra(RadioService.EXTRA_QUERY, q == null ? "" : q);
+        if (Build.VERSION.SDK_INT >= 26) startForegroundService(i);
+        else startService(i);
+    }
+
+    @Override
+    protected void onNewIntent(Intent in) {
+        super.onNewIntent(in);
+        setIntent(in);
+        handleVoice(in);
+    }
+
     @Override
     protected void onStart() {
         super.onStart();
         bound = bindService(new Intent(this, RadioService.class), conn, Context.BIND_AUTO_CREATE);
         handler.post(refresh);
+        handleVoice(getIntent());
     }
 
     @Override
@@ -533,17 +654,24 @@ public class MainActivity extends Activity {
             long left = s.sleepAt - System.currentTimeMillis();
             lblSleep.setText(s.sleepAt > 0 && left > 0 ? getString(R.string.sleep_active, (int) ((left + 59_999) / 60_000)) + "  " : "");
         }
-        if (adapter != null) adapter.setCurrent(cur);
+        btnSleep.setColorFilter(active && s.sleepAt > System.currentTimeMillis() ? ACCENT : DIM);
+        if (adapter != null) adapter.setCurrent(cur, active && st == RadioService.PLAYING);
     }
 
     // ------------------------------------------------------------------------------------------ station tiles
     private final class StationAdapter extends BaseAdapter {
         private int current = -1;
+        private boolean playing;
+        private EqView eq;                                             // the dancing bars of the station on air
 
-        void setCurrent(int c) {
+        void setCurrent(int c, boolean isPlaying) {
             if (c != current) {
                 current = c;
+                playing = isPlaying;
                 notifyDataSetChanged();
+            } else if (isPlaying != playing) {
+                playing = isPlaying;
+                if (eq != null) eq.setDancing(isPlaying);
             }
         }
 
@@ -568,10 +696,11 @@ public class MainActivity extends Activity {
             boolean on = i == current;
             LinearLayout card = new LinearLayout(MainActivity.this);
             card.setOrientation(LinearLayout.VERTICAL);
-            GradientDrawable bg = rounded(on ? SEL : CARD, 16);
+            GradientDrawable bg = rounded(on ? SEL : CARD, 18);
             if (on) bg.setStroke(dp(2), ACCENT);
-            card.setBackground(bg);
-            card.setPadding(dp(8), dp(8), dp(8), dp(10));
+            card.setBackground(ripple(bg, rounded(Color.WHITE, 18)));
+            card.setPadding(dp(9), dp(9), dp(9), dp(11));
+            card.setContentDescription(st.name);
             card.setLayoutParams(new AbsListView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
             FrameLayout logoBox = new FrameLayout(MainActivity.this);
@@ -579,20 +708,29 @@ public class MainActivity extends Activity {
             img.setImageBitmap(Logos.get(pack, st, 256));
             logoBox.addView(img, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
             if (on) {
+                LinearLayout pill = new LinearLayout(MainActivity.this);
+                pill.setOrientation(LinearLayout.HORIZONTAL);
+                pill.setGravity(Gravity.CENTER_VERTICAL);
+                pill.setBackground(rounded(0xCC0B0C11, 10));
+                pill.setPadding(dp(8), dp(4), dp(9), dp(4));
+                eq = new EqView(MainActivity.this);
+                eq.setDancing(playing);
+                pill.addView(eq, new LinearLayout.LayoutParams(dp(13), dp(11)));
                 TextView live = text(getString(R.string.live), 10, Color.WHITE, true);
-                live.setBackground(rounded(ACCENT, 8));
-                live.setPadding(dp(7), dp(2), dp(7), dp(2));
+                live.setLetterSpacing(0.1f);
+                live.setPadding(dp(6), 0, 0, 0);
+                pill.addView(live);
                 FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-                lp.gravity = Gravity.TOP | Gravity.END;
-                lp.setMargins(0, dp(6), dp(6), 0);
-                logoBox.addView(live, lp);
+                lp.gravity = Gravity.TOP | Gravity.START;
+                lp.setMargins(dp(7), dp(7), 0, 0);
+                logoBox.addView(pill, lp);
             }
             card.addView(logoBox, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
             TextView name = text(st.name, 14, on ? ACCENT : FG, true);
             name.setSingleLine(true);
             name.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            name.setPadding(dp(2), dp(8), dp(2), 0);
+            name.setPadding(dp(2), dp(9), dp(2), 0);
             card.addView(name);
             TextView sub = text(getString(R.string.songs_count, st.songs.size()), 11, DIM, false);
             sub.setPadding(dp(2), dp(1), dp(2), 0);

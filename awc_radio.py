@@ -796,16 +796,29 @@ class RadioApp(tk.Tk):
             threading.Thread(target=work, daemon=True).start()
 
     # -------------------------------------------------------------------------------- station list
-    def _logo(self, station, size_div):
+    def _logo(self, station, size):
+        """The logo scaled (smoothly, Pillow) to size x size pixels; the file itself is 256 x 256."""
         p = icons.icon_path(station)
         if not p:
             return None
         try:
-            img = tk.PhotoImage(file=p)
-            img = img.subsample(size_div, size_div) if size_div > 1 else img
+            try:
+                import base64  # noqa: PLC0415
+                import io  # noqa: PLC0415
+                from PIL import Image  # noqa: PLC0415
+                im = Image.open(p).convert("RGBA")
+                if im.size != (size, size):
+                    im = im.resize((size, size), Image.LANCZOS)
+                buf = io.BytesIO()
+                im.save(buf, "PNG")
+                img = tk.PhotoImage(data=base64.b64encode(buf.getvalue()))
+            except ImportError:
+                img = tk.PhotoImage(file=p)
+                w = max(1, img.width() // size)                   # without Pillow: crude whole-number shrink
+                img = img.subsample(w, w) if w > 1 else img
             self.logo_refs.append(img)
             return img
-        except tk.TclError:
+        except (tk.TclError, OSError):
             return None
 
     @staticmethod
@@ -813,9 +826,9 @@ class RadioApp(tk.Tk):
         h = zlib.crc32(name.encode("utf-8"))
         return "#%02x%02x%02x" % (60 + (h & 0x7F), 60 + ((h >> 8) & 0x7F), 80 + ((h >> 16) & 0x7F))
 
-    def _draw_logo(self, cv, station, size, div):
+    def _draw_logo(self, cv, station, size):
         cv.delete("all")
-        img = self._logo(station, div)
+        img = self._logo(station, size)
         if img:
             cv.create_image(size // 2, size // 2, image=img)
         else:
@@ -833,7 +846,7 @@ class RadioApp(tk.Tk):
             card.pack(fill="x", padx=(10, 6), pady=3)
             cv = tk.Canvas(card, width=44, height=44, bg=CARD, highlightthickness=0)
             cv.pack(side="left", padx=8, pady=6)
-            self._draw_logo(cv, name, 44, 3)
+            self._draw_logo(cv, name, 44)
             box = tk.Frame(card, bg=CARD)
             box.pack(side="left", fill="x", expand=True)
             lab = tk.Label(box, text=name, bg=CARD, fg=FG, font=("Segoe UI", 11, "bold"), anchor="w")
@@ -867,9 +880,9 @@ class RadioApp(tk.Tk):
     def _refresh_logos(self):
         self.logo_refs.clear()
         for name, widgets in self.cards.items():
-            self._draw_logo(widgets[1], name, 44, 3)
+            self._draw_logo(widgets[1], name, 44)
         if self.station:
-            self._draw_logo(self.big, self.station, 150, 1)
+            self._draw_logo(self.big, self.station, 150)
 
     # -------------------------------------------------------------------------------- playback
     def _save_prefs(self):
@@ -890,7 +903,7 @@ class RadioApp(tk.Tk):
         self.cur = None
         self._mark_selected()
         self._see_card(name)
-        self._draw_logo(self.big, name, 150, 1)
+        self._draw_logo(self.big, name, 150)
         self.lbl_station.config(text=name)
         self._sync()
 

@@ -3,7 +3,9 @@
     <string name="app_name">AWC Radio</string>
 
     <string name="choose_pack">Sender-Pack wählen …</string>
-    <string name="setup_hint">Sender-Pack (.dat) auswählen.</string>
+    <string name="setup_title">Willkommen</string>
+    <string name="setup_hint">Wähle das Sender-Pack (.dat) aus, das AWC Radio am PC geschrieben hat (Knopf „Android-Pack …“) und das du auf dieses Handy kopiert hast.</string>
+    <string name="header_sub">%1$d Sender · Live-Programm</string>
     <string name="pack_open_error">Das gespeicherte Pack konnte nicht geöffnet werden: %1$s</string>
     <string name="pack_invalid">Das ist kein gültiges Sender-Pack: %1$s</string>
 
@@ -43,4 +45,7 @@
     <string name="info_copy">Protokoll kopieren</string>
     <string name="info_copied">Protokoll kopiert</string>
     <string name="battery_failed">Die Akku-Einstellungen konnten nicht geöffnet werden</string>
+
+    <string name="auto_no_pack">Wähle zuerst in der AWC-Radio-App auf dem Handy das Sender-Pack aus.</string>
+    <string name="stations">Sender</string>
 </resources>

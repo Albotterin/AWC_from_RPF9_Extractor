@@ -4,7 +4,6 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
-import android.app.Service;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -13,19 +12,24 @@ import android.content.SharedPreferences;
 import android.content.pm.ServiceInfo;
 import android.graphics.Bitmap;
 import android.graphics.drawable.Icon;
+import android.media.MediaDescription;
 import android.media.AudioAttributes;
 import android.media.AudioFocusRequest;
 import android.media.AudioManager;
+import android.media.browse.MediaBrowser;
 import android.media.MediaMetadata;
 import android.media.session.MediaSession;
 import android.media.session.PlaybackState;
 import android.os.Binder;
+import android.os.Bundle;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.PowerManager;
+import android.service.media.MediaBrowserService;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -34,7 +38,7 @@ import java.util.List;
  * focus handling (calls, other apps), pause when the headphones are unplugged, a sleep timer, and a programme that is
  * calculated from the UTC clock exactly like on the PC (Schedule, played by Engine).
  */
-public class RadioService extends Service {
+public class RadioService extends MediaBrowserService {
     static final String ACTION_PLAY = "org.awctool.radio.PLAY";
     static final String ACTION_TOGGLE = "org.awctool.radio.TOGGLE";
     static final String ACTION_STOP = "org.awctool.radio.STOP";
@@ -43,6 +47,7 @@ public class RadioService extends Service {
     static final String ACTION_SLEEP = "org.awctool.radio.SLEEP";
     static final String EXTRA_STATION = "station";
     static final String EXTRA_MINUTES = "minutes";
+    static final String EXTRA_QUERY = "query";            // a spoken station name from the voice assistant
 
     static final int STOPPED = 0, PLAYING = 1, PAUSED = 2;
 
@@ -77,7 +82,7 @@ public class RadioService extends Service {
     private AudioFocusRequest focusRequest;
     private PowerManager.WakeLock wakeLock;
     private MediaSession session;
-    private boolean pausedByFocus, noisyRegistered, timeRegistered;
+    private boolean pausedByFocus, noisyRegistered, timeRegistered, started;
     private float focusDuck = 1f;
 
     private final Runnable tickRun = new Runnable() {
@@ -157,6 +162,9 @@ public class RadioService extends Service {
     // ------------------------------------------------------------------------------------------ service
     @Override
     public IBinder onBind(Intent intent) {
+        // Android Auto, the Assistant and the system media controls bind with the MediaBrowserService action; our own
+        // screen binds without one and gets the local binder
+        if (intent != null && MediaBrowserService.SERVICE_INTERFACE.equals(intent.getAction())) return super.onBind(intent);
         return binder;
     }
 
@@ -175,7 +183,7 @@ public class RadioService extends Service {
             @Override
             public void onPlay() {
                 if (state == PAUSED) resumeLive();
-                else if (state == STOPPED) play(getSharedPreferences(PREFS, MODE_PRIVATE).getInt("last", 0));
+                else if (state == STOPPED) play(lastStation());
             }
 
             @Override
@@ -198,19 +206,165 @@ public class RadioService extends Service {
             public void onSkipToPrevious() {
                 skip(-1);
             }
+
+            // ---- the car (Android Auto), the Assistant and other media controllers
+            @Override
+            public void onPlayFromMediaId(String mediaId, Bundle extras) {
+                int idx = stationOfMediaId(mediaId);
+                AppLog.d("play from media id " + mediaId + " -> " + idx);
+                if (idx >= 0) startPlaying(idx);
+                else if (NOPACK.equals(mediaId)) showError(getString(R.string.auto_no_pack));
+            }
+
+            @Override
+            public void onSkipToQueueItem(long id) {
+                if (id >= 0) startPlaying((int) id);
+            }
+
+            @Override
+            public void onPlayFromSearch(String query, Bundle extras) {
+                // "Hey Google, play Radio On-U on AWC Radio": a station name, or nothing (then the last station)
+                int idx = stationForQuery(query);
+                AppLog.d("play from search '" + query + "' -> " + idx);
+                startPlaying(idx);
+            }
         });
         // flags are deprecated (Android 8+ always handles them) but needed on Android 7
         session.setFlags(MediaSession.FLAG_HANDLES_MEDIA_BUTTONS | MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS);
+        Intent open = new Intent(this, MainActivity.class).setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        session.setSessionActivity(PendingIntent.getActivity(this, 0, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
+        setSessionToken(session.getSessionToken());                 // lets browsers (Android Auto) connect to the session
         AppLog.d("service created");
+    }
+
+    // ------------------------------------------------------------------------------------------ browsing (Android Auto)
+    private static final String ROOT = "awc_root", RECENT = "awc_recent", NOPACK = "awc_nopack", STATION_ID = "st:";
+    // Android Auto / Automotive hints for how to draw the tree (the strings are part of the public media-app contract)
+    private static final String STYLE_SUPPORTED = "android.media.browse.CONTENT_STYLE_SUPPORTED";
+    private static final String STYLE_PLAYABLE = "android.media.browse.CONTENT_STYLE_PLAYABLE_HINT";
+    private static final String STYLE_BROWSABLE = "android.media.browse.CONTENT_STYLE_BROWSABLE_HINT";
+    private static final int STYLE_LIST = 1, STYLE_GRID = 2;
+
+    @Override
+    public BrowserRoot onGetRoot(String clientPackageName, int clientUid, Bundle rootHints) {
+        // The tree holds nothing but station names and logos, and the radio is a live programme anyone may tune in, so
+        // every media client (Android Auto, the Assistant, the system media controls, head units) may browse it.
+        Bundle extras = new Bundle();
+        extras.putBoolean(STYLE_SUPPORTED, true);
+        extras.putInt(STYLE_PLAYABLE, STYLE_GRID);
+        extras.putInt(STYLE_BROWSABLE, STYLE_LIST);
+        if (rootHints != null && rootHints.getBoolean(BrowserRoot.EXTRA_RECENT, false)) {
+            return new BrowserRoot(RECENT, extras);                  // "resume what I heard last"
+        }
+        return new BrowserRoot(ROOT, extras);
+    }
+
+    @Override
+    public void onLoadChildren(final String parentId, final Result<List<MediaBrowser.MediaItem>> result) {
+        result.detach();                                              // decoding the logos takes a moment: not on the main thread
+        final Context ctx = getApplicationContext();
+        new Thread(() -> {
+            List<MediaBrowser.MediaItem> out = new ArrayList<>();
+            try {
+                Pack p = PackStore.get(ctx);
+                if (p == null || p.stations().isEmpty()) {
+                    out.add(new MediaBrowser.MediaItem(new MediaDescription.Builder().setMediaId(NOPACK)
+                            .setTitle(getString(R.string.auto_no_pack)).build(), MediaBrowser.MediaItem.FLAG_PLAYABLE));
+                } else {
+                    List<Library.Station> list = p.stations();
+                    int only = RECENT.equals(parentId) ? lastStation() : -1;
+                    for (int i = 0; i < list.size(); i++) {
+                        if (RECENT.equals(parentId) && i != only) continue;
+                        Library.Station st = list.get(i);
+                        out.add(new MediaBrowser.MediaItem(new MediaDescription.Builder()
+                                .setMediaId(STATION_ID + i)
+                                .setTitle(st.name)
+                                .setSubtitle(getString(R.string.songs_count, st.songs.size()))
+                                .setIconBitmap(Logos.get(p, st, 192))
+                                .build(), MediaBrowser.MediaItem.FLAG_PLAYABLE));
+                    }
+                }
+            } catch (RuntimeException e) {
+                AppLog.e("browse " + parentId, e);
+            }
+            result.sendResult(out);
+        }, "awc-browse").start();
+    }
+
+    private static int stationOfMediaId(String id) {
+        if (id == null || !id.startsWith(STATION_ID)) return -1;
+        try {
+            return Integer.parseInt(id.substring(STATION_ID.length()));
+        } catch (NumberFormatException e) {
+            return -1;
+        }
+    }
+
+    private int lastStation() {
+        return getSharedPreferences(PREFS, MODE_PRIVATE).getInt("last", 0);
+    }
+
+    private int stationForQuery(String query) {
+        int idx = findStation(query);
+        return idx >= 0 ? idx : lastStation();
+    }
+
+    /** The station whose name best matches a spoken query, or -1. */
+    private int findStation(String query) {
+        if (query == null || query.trim().isEmpty()) return -1;
+        Pack p = PackStore.get(this);
+        if (p == null) return -1;
+        String q = norm(query);
+        int best = -1, bestLen = Integer.MAX_VALUE;
+        List<Library.Station> list = p.stations();
+        for (int i = 0; i < list.size(); i++) {
+            String n = norm(list.get(i).name);
+            if (n.equals(q)) return i;
+            if ((n.contains(q) || q.contains(n)) && n.length() < bestLen) {
+                best = i;
+                bestLen = n.length();
+            }
+        }
+        return best;
+    }
+
+    private static String norm(String s) {
+        return s.toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9]+", "");
+    }
+
+    private void startPlaying(int index) {
+        play(index);
+    }
+
+    /** Tells the controllers (the car screen) why nothing plays, e.g. no station pack chosen yet. */
+    private void showError(String message) {
+        if (session == null) return;
+        session.setActive(true);
+        session.setPlaybackState(new PlaybackState.Builder().setState(PlaybackState.STATE_ERROR, 0, 0f)
+                .setErrorMessage(message).build());
+    }
+
+    /** Fills the "queue" of the session with the stations: the car shows it as the station list. */
+    private void publishQueue() {
+        if (session == null || stations == null) return;
+        List<MediaSession.QueueItem> q = new ArrayList<>();
+        for (int i = 0; i < stations.size(); i++) {
+            q.add(new MediaSession.QueueItem(new MediaDescription.Builder().setMediaId(STATION_ID + i)
+                    .setTitle(stations.get(i).name).build(), i));
+        }
+        session.setQueue(q);
+        session.setQueueTitle(getString(R.string.stations));
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         String action = intent != null ? intent.getAction() : null;
+        started = true;
         try {
             if (ACTION_PLAY.equals(action)) {
                 startForegroundNow();             // must happen within seconds of startForegroundService(), whatever follows
-                play(intent.getIntExtra(EXTRA_STATION, 0));
+                play(intent.hasExtra(EXTRA_QUERY) ? stationForQuery(intent.getStringExtra(EXTRA_QUERY))
+                        : intent.getIntExtra(EXTRA_STATION, 0));
             } else if (ACTION_TOGGLE.equals(action)) {
                 toggle();
             } else if (ACTION_NEXT.equals(action)) {
@@ -225,7 +379,10 @@ public class RadioService extends Service {
         } catch (RuntimeException e) {
             AppLog.e("command " + action, e);
         }
-        if (state == STOPPED && !ACTION_PLAY.equals(action)) stopSelf();
+        if (state == STOPPED && !ACTION_PLAY.equals(action)) {
+            started = false;
+            stopSelf();
+        }
         return START_NOT_STICKY;
     }
 
@@ -253,14 +410,26 @@ public class RadioService extends Service {
 
     // ------------------------------------------------------------------------------------------ control
     void play(int index) {
+        if (!started) {
+            // a request from a controller (the car) only binds to the service; it must also be started to keep running
+            try {
+                startService(new Intent(this, RadioService.class));
+                started = true;
+            } catch (RuntimeException e) {
+                AppLog.e("startService", e);                          // still bound by the controller: plays on regardless
+            }
+        }
         pack = PackStore.get(this);
         if (pack == null || pack.stations().isEmpty()) {
             AppLog.d("play: no usable station pack (" + PackStore.error + ")");
             stopAll();
+            showError(getString(R.string.auto_no_pack));                // the car screen says what to do
             return;
         }
+        boolean newList = stations == null || stations != pack.stations();
         stations = pack.stations();
         if (index < 0 || index >= stations.size()) index = 0;
+        if (newList) publishQueue();
         handler.removeCallbacks(tickRun);
         handler.removeCallbacks(pauseTimeout);
         if (engine != null) engine.stop();
@@ -340,6 +509,7 @@ public class RadioService extends Service {
     void stopAll() {
         AppLog.d("stop");
         state = STOPPED;
+        started = false;
         handler.removeCallbacksAndMessages(null);
         if (engine != null) engine.stop();
         engine = null;
@@ -349,6 +519,7 @@ public class RadioService extends Service {
         sleepAt = 0;
         stationIndex = -1;
         title = artist = nextText = stationName = "";
+        stations = null;
         if (session != null) {
             session.setPlaybackState(new PlaybackState.Builder().setState(PlaybackState.STATE_STOPPED, 0, 0f).build());
             session.setActive(false);
@@ -427,13 +598,20 @@ public class RadioService extends Service {
         int ps = state == PLAYING ? PlaybackState.STATE_PLAYING : state == PAUSED ? PlaybackState.STATE_PAUSED : PlaybackState.STATE_STOPPED;
         long pos = itemStart > 0 ? (long) (Math.max(0, System.currentTimeMillis() / 1000.0 - itemStart) * 1000) : 0;
         long actions = PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PAUSE | PlaybackState.ACTION_PLAY_PAUSE
-                | PlaybackState.ACTION_SKIP_TO_NEXT | PlaybackState.ACTION_SKIP_TO_PREVIOUS | PlaybackState.ACTION_STOP;
-        session.setPlaybackState(new PlaybackState.Builder().setActions(actions)
-                .setState(ps, pos, state == PLAYING ? 1f : 0f).build());
+                | PlaybackState.ACTION_SKIP_TO_NEXT | PlaybackState.ACTION_SKIP_TO_PREVIOUS | PlaybackState.ACTION_STOP
+                | PlaybackState.ACTION_PLAY_FROM_MEDIA_ID | PlaybackState.ACTION_PLAY_FROM_SEARCH
+                | PlaybackState.ACTION_SKIP_TO_QUEUE_ITEM;
+        PlaybackState.Builder pb = new PlaybackState.Builder().setActions(actions)
+                .setState(ps, pos, state == PLAYING ? 1f : 0f);
+        if (stationIndex >= 0) pb.setActiveQueueItemId(stationIndex);
+        session.setPlaybackState(pb.build());
         MediaMetadata.Builder md = new MediaMetadata.Builder()
                 .putString(MediaMetadata.METADATA_KEY_TITLE, title.isEmpty() ? stationName : title)
                 .putString(MediaMetadata.METADATA_KEY_ARTIST, artist.isEmpty() ? stationName : artist)
                 .putString(MediaMetadata.METADATA_KEY_ALBUM, stationName)
+                .putString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE, title.isEmpty() ? stationName : title)
+                .putString(MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE, artist.isEmpty() ? stationName : artist + " • " + stationName)
+                .putString(MediaMetadata.METADATA_KEY_MEDIA_ID, STATION_ID + stationIndex)
                 .putLong(MediaMetadata.METADATA_KEY_DURATION, itemEnd > itemStart ? (long) ((itemEnd - itemStart) * 1000) : -1);
         Bitmap logo = logo();
         if (logo != null) {
@@ -560,8 +738,14 @@ public class RadioService extends Service {
 
     private void startForegroundNow() {
         Notification n = buildNotification();
-        if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
-        else startForeground(NOTIF_ID, n);
+        try {
+            if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
+            else startForeground(NOTIF_ID, n);
+        } catch (RuntimeException e) {
+            // Android 12+ may refuse a foreground start that was triggered from the background; the controller that
+            // is bound (the car) keeps the service alive, so the radio plays on anyway
+            AppLog.e("startForeground", e);
+        }
     }
 
     private void updateNotification() {

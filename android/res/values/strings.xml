@@ -3,7 +3,9 @@
     <string name="app_name">AWC Radio</string>
 
     <string name="choose_pack">Choose station pack …</string>
-    <string name="setup_hint">Pick your station pack (.dat).</string>
+    <string name="setup_title">Welcome</string>
+    <string name="setup_hint">Pick the station pack (.dat) that AWC Radio on your PC wrote (button “Android pack …”) and that you copied to this phone.</string>
+    <string name="header_sub">%1$d stations · live programme</string>
     <string name="pack_open_error">The saved pack could not be opened: %1$s</string>
     <string name="pack_invalid">Not a valid station pack: %1$s</string>
 
@@ -43,4 +45,7 @@
     <string name="info_copy">Copy log</string>
     <string name="info_copied">Log copied</string>
     <string name="battery_failed">The battery settings could not be opened</string>
+
+    <string name="auto_no_pack">Choose the station pack in the AWC Radio app on your phone first.</string>
+    <string name="stations">Stations</string>
 </resources>
