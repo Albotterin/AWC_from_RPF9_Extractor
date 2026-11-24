@@ -4,7 +4,7 @@
 
 How many of the songs that the public credits page lists for each station could be found as files in the game's `audio.rpf`.
 
-**Status: 2026-11-24** · 766 / 837 (91.5 %)
+**Status: 2026-11-24** · 766 / 813 (94.2 %)
 
 🟢 90 % or more · 🟡 70–89 % · 🟠 30–69 % · 🔴 below 30 %
 
@@ -39,10 +39,17 @@ How many of the songs that the public credits page lists for each station could 
 | 🟡 Worldwide FM | 36 / 41 | 87.8 % |
 | 🟡 Bodega The DJ | 36 / 45 | 80.0 % |
 | 🟡 DJ Stevie J | 19 / 24 | 79.2 % |
-| 🔴 The Vault Radio | 0 / 24 | 0.0 % |
-| **Total** | **766 / 837** | **91.5 %** |
+| **Total** | **766 / 813** | **94.2 %** |
 
 </details>
+
+## Station that is one mix
+
+One continuous DJ mix; its songs are not stored as separate files, so they are not counted above.
+
+| Station | Found | Listed songs inside |
+|---|---|---:|
+| 🎚 The Vault Radio | 1 mix (83 min), plays as the station | 24 |
 
 ## Talk radio and shows
 
@@ -56,7 +63,7 @@ The credits list speakers and shows here, not songs, so these numbers say little
 
 ## Reading the gaps
 
-- **The Vault Radio** (0 %) is a single long DJ mix without per-song files, so none of its 24 listed songs exist as files. The mix itself is played as the station. **Symphony FM** is 15 of 17: its names sit in the game's config with a length byte in front, which is now cut off; the Beethoven piece has no file of its own.
+- **The Vault Radio** is not in the chart: it is a single long DJ mix without per-song files, so its 24 listed songs cannot be counted as files. The mix itself (83 minutes) is found and played as the station. **Symphony FM** is 15 of 17: its names sit in the game's config with a length byte in front, which is now cut off; the Beethoven piece has no file of its own.
 - Titles are matched by their hash first, then by how similar the game's internal name is ("IM_IN_LUV" for "I'm N Luv (Wit a Stripper)"); 64 songs are found this way.
 - Long DJ mixes are played as stations: The Vault Radio, and extra "(Mix)" stations for Radio On-U, Worldwide FM and The Sniper Of La Perle. The station of a mix comes from the song markers inside it, or (The Vault) from the folder order in the archive. While a mix plays, the title of the current part is shown (20 of 22, 27 of 41 and 10 of 24 parts have a name). The remaining long mixes (club and DJ-venue music) are played together as the station "Clubmixes" until they can be assigned to a station.
 - The other stations lack a few songs each (different spelling or no file of their own).

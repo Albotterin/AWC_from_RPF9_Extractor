@@ -208,7 +208,7 @@ Spätere Starts gehen sofort. Die Songs kommen aus der Credits-Liste; als **Jing
 dienen die kurzen unbenannten Streams, die im Archiv zwischen den Tracks des Senders liegen (eine begründete
 Vermutung - manche können Sprecher-Ansagen o. Ä. sein). Braucht wie das Hauptprogramm `ffplay`.
 
-**Fortschritt:** 766 von 837 gelisteten Songs (91,5 %) wurden als Dateien gefunden; alle Sender in [Fortschritt der Sender](docs/RADIO-PROGRESS.de.md).
+**Fortschritt:** 766 von 813 gelisteten Songs (94,2 %) wurden als Dateien gefunden; alle Sender in [Fortschritt der Sender](docs/RADIO-PROGRESS.de.md).
 Lange DJ-Mixe laufen auch als Sender: **The Vault Radio**, zusätzliche „(Mix)“-Sender für Radio On-U, Worldwide FM und The Sniper Of La Perle sowie **Clubmixes** (die Club- und DJ-Mixe, die noch keinem Sender zugeordnet werden können). Während ein Mix läuft, wird der Titel des aktuellen Abschnitts angezeigt (aus den Markern im Mix; ein Abschnitt hat nur dann einen Namen, wenn der Marker auf einen bekannten Song zeigt).
 
 ### AWC Radio für Android

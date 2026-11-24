@@ -4,7 +4,7 @@
 
 Wie viele der Songs, die die öffentliche Credits-Seite für jeden Sender aufführt, als Dateien in der `audio.rpf` des Spiels gefunden wurden.
 
-**Stand: 2026-11-24** · 766 / 837 (91.5 %)
+**Stand: 2026-11-24** · 766 / 813 (94.2 %)
 
 🟢 ab 90 % · 🟡 70–89 % · 🟠 30–69 % · 🔴 unter 30 %
 
@@ -39,10 +39,17 @@ Wie viele der Songs, die die öffentliche Credits-Seite für jeden Sender auffü
 | 🟡 Worldwide FM | 36 / 41 | 87.8 % |
 | 🟡 Bodega The DJ | 36 / 45 | 80.0 % |
 | 🟡 DJ Stevie J | 19 / 24 | 79.2 % |
-| 🔴 The Vault Radio | 0 / 24 | 0.0 % |
-| **Gesamt** | **766 / 837** | **91.5 %** |
+| **Gesamt** | **766 / 813** | **94.2 %** |
 
 </details>
+
+## Sender, der ein einziger Mix ist
+
+Ein durchgehender DJ-Mix; seine Songs liegen nicht als einzelne Dateien vor und sind deshalb oben nicht mitgezählt.
+
+| Sender | Gefunden | Gelistete Songs darin |
+|---|---|---:|
+| 🎚 The Vault Radio | 1 Mix (83 Min.), läuft als Sender | 24 |
 
 ## Talk-Radio und Shows
 
@@ -56,7 +63,7 @@ Die Credits führen hier Sprecher und Sendungen, keine Songs; die Zahlen sagen d
 
 ## Die Lücken
 
-- **The Vault Radio** (0 %) ist ein einziger langer DJ-Mix ohne Einzeldateien, deshalb gibt es keinen seiner 24 gelisteten Songs als Datei. Der Mix selbst läuft als Sender. **Symphony FM** steht bei 15 von 17: die Namen stehen in der Config mit einem Längenbyte davor, das jetzt abgeschnitten wird; das Stück von Beethoven hat keine eigene Datei.
+- **The Vault Radio** steht nicht in der Grafik: Der Sender ist ein einziger langer DJ-Mix ohne Einzeldateien, seine 24 gelisteten Songs lassen sich deshalb nicht als Dateien zählen. Der Mix selbst (83 Minuten) ist gefunden und läuft als Sender. **Symphony FM** steht bei 15 von 17: die Namen stehen in der Config mit einem Längenbyte davor, das jetzt abgeschnitten wird; das Stück von Beethoven hat keine eigene Datei.
 - Titel werden zuerst über den Hash gefunden, dann über die Ähnlichkeit des internen Spiel-Namens ("IM_IN_LUV" für "I'm N Luv (Wit a Stripper)"); so kommen 64 Songs dazu.
 - Lange DJ-Mixe laufen als Sender: The Vault Radio, und zusätzliche „(Mix)“-Sender für Radio On-U, Worldwide FM und The Sniper Of La Perle. Der Sender eines Mixes ergibt sich aus den Song-Markern darin oder (The Vault) aus der Ordnerreihenfolge im Archiv. Während ein Mix läuft, wird der Titel des aktuellen Abschnitts angezeigt (20 von 22, 27 von 41 und 10 von 24 Abschnitten haben einen Namen). Die übrigen langen Mixe (Club- und DJ-Musik) laufen zusammen als Sender „Clubmixes“, bis sie einem Sender zugeordnet werden können.
 - Den übrigen Sendern fehlen je wenige Songs (andere Schreibweise oder keine eigene Datei).

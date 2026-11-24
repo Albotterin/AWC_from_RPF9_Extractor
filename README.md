@@ -213,7 +213,7 @@ Later starts are instant.
 Songs come from the credits list; **jingles** are the short unnamed streams that lie in the archive among the
 station's tracks (an educated guess - some may be station voice-overs or similar). Needs `ffplay` like the main tool.
 
-**Progress:** 766 of 837 credited songs (91.5 %) are found as files; see [station progress](docs/RADIO-PROGRESS.md) for every station.
+**Progress:** 766 of 813 credited songs (94.2 %) are found as files; see [station progress](docs/RADIO-PROGRESS.md) for every station.
 Long DJ mixes are played as stations too: **The Vault Radio**, extra "(Mix)" stations for Radio On-U, Worldwide FM and The Sniper Of La Perle, and **Clubmixes** (the club and DJ-venue mixes that cannot be assigned to a station yet). While a mix plays, the title of the current part is shown (from the markers in the mix; the part is only named where the marker points to a known song).
 
 ### AWC Radio for Android
