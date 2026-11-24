@@ -67,8 +67,10 @@ Tags seen in music containers:
 | `0xBD` | events / markers (4 × `u32` per event: type hash, params hash, timestamp, flags) |
 
 The scanner and reader locate the chunk table after the optional tables and stream records. With an odd
-number of chunk indices, the table can start on a 2-byte boundary. Version 6 of the scan cache rebuilds
-inventories made by the former 4-byte scan. A music container must have both `0x48` and `0x55`.
+number of chunk indices, the table can start on a 2-byte boundary. Version 6 of the scan cache rebuilt
+inventories made by the former 4-byte scan. Version 7 rebuilds cached channel counts and duration estimates
+for streams whose first Opus packet arrives after an empty block. A music container must have both `0x48`
+and `0x55`.
 
 ## 3. Stream format chunk (`0x48`)
 
@@ -107,11 +109,13 @@ audio, stream after stream:
   N units of 0x800 bytes each
 ```
 
-Divide the interleaved counts by the stream's Opus channel count to get frames. For a positive block budget,
+Divide the interleaved counts by the stream's Opus channel count to get frames. The first available packet
+in each stream supplies its channel count, even when its first block has no packets. For a positive block budget,
 `AwcFile.extract()` keeps the packet that reaches or crosses the budget and drops later packets in that block.
 For a nonzero skip it first checks for a byte-for-byte overlap, also allowing a per-channel count if that gives
-an exact match. If the previous block fell short, the extractor can subtract the shortfall from the interleaved
-skip converted to frames. The result must be nonnegative and land on a packet boundary.
+an exact match. If the immediately preceding block fell short, the extractor can subtract the shortfall from
+the interleaved skip converted to frames. The result must be nonnegative and land on a packet boundary.
+An empty block clears overlap history and contributes its own budget as the shortfall.
 A skip that cannot be reconciled aborts the export before replacing any output files.
 
 The Ogg writer still uses complete packets for the final granule. For example, both stems at `audio.rpf`
@@ -207,6 +211,7 @@ of Xbox Series 1.0.2.1 omits three 64 KiB stored chunks from section 2 of `SOUND
    * Each `RadioStationTrackList` (`type 0x11`) uses an external `ObjectList` (`type 0x02`) ref at `+0x44` or,
      when that field is `0xFFFFFFFF`, an inline count at `+0x48` (`u16`) and refs at `+0x4C` (`u32`).
      Both forms resolve to `RadioTrackSettings` (`type 0x0F`, sound ref at `+0x0C`).
+     Reference arrays must fit before the next object offset, or the end of the metadata section for the final object.
 2. **`SOUNDS.DAT`**:
    * Each `StreamingSound` (`type 0x08`) carries its `u32 duration_ms` immediately before
      `0x0C <channel_count> <u32 child_refs...>` in the layout used here. The parser checks the adjacent

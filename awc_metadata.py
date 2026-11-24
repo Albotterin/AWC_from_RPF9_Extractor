@@ -159,31 +159,41 @@ def parse_sounds_streaming_index(sounds_meta):
     return parsed
 
 
+def _object_ends(meta):
+    offsets = sorted(meta["by_offset"])
+    return dict(zip(offsets, offsets[1:] + [meta["meta_size"]]))
+
+
 def walk_tracklist_tracks(tl_hash, game_meta, game_refs):
     """Return [(track_settings_hash, sound_hash)] for one RadioStationTrackList (0x11)."""
+    return _walk_tracklist_tracks(tl_hash, game_meta, game_refs, _object_ends(game_meta))
+
+
+def _walk_tracklist_tracks(tl_hash, game_meta, game_refs, object_ends):
     blob = game_meta["blob"]
-    meta_size = game_meta["meta_size"]
     by_hash = game_meta["by_hash"]
 
     tl_off = by_hash.get(tl_hash)
-    if tl_off is None or tl_off + 0x4C > meta_size or blob[8 + tl_off] != TYPE_RADIO_TRACKLIST:
+    if tl_off is None or tl_off + 0x48 > object_ends[tl_off] or blob[8 + tl_off] != TYPE_RADIO_TRACKLIST:
         return []
     tl_pos = 8 + tl_off
     obj_list_ref, = struct.unpack_from("<I", blob, tl_pos + 0x44)
-    inline_count, = struct.unpack_from("<H", blob, tl_pos + 0x48)
     track_refs = []
     if obj_list_ref != OBJECT_REF_NONE:
         if obj_list_ref >= len(game_refs):
             return []
         ol_hash = game_refs[obj_list_ref]
         ol_off = by_hash.get(ol_hash)
-        if ol_off is not None and ol_off + 12 <= meta_size and blob[8 + ol_off] == TYPE_OBJECT_LIST:
+        if ol_off is not None and ol_off + 12 <= object_ends[ol_off] and blob[8 + ol_off] == TYPE_OBJECT_LIST:
             ol_count, = struct.unpack_from("<I", blob, 8 + ol_off + 8)
-            if ol_off + 12 + ol_count * 4 > meta_size:
+            if ol_off + 12 + ol_count * 4 > object_ends[ol_off]:
                 raise ValueError(f"object list 0x{ol_hash:08x} truncated")
             track_refs.extend(struct.unpack_from(f"<{ol_count}I", blob, 8 + ol_off + 12))
-    elif inline_count:
-        if tl_off + 0x4C + inline_count * 4 > meta_size:
+    else:
+        if tl_off + 0x4C > object_ends[tl_off]:
+            return []
+        inline_count, = struct.unpack_from("<H", blob, tl_pos + 0x48)
+        if tl_off + 0x4C + inline_count * 4 > object_ends[tl_off]:
             raise ValueError(f"tracklist 0x{tl_hash:08x} inline reference array truncated")
         track_refs.extend(struct.unpack_from(f"<{inline_count}I", blob, tl_pos + 0x4C))
 
@@ -193,7 +203,7 @@ def walk_tracklist_tracks(tl_hash, game_meta, game_refs):
             continue
         tr_hash = game_refs[tr_ref]
         tr_off = by_hash.get(tr_hash)
-        if tr_off is None or tr_off + 0x10 > meta_size or blob[8 + tr_off] != TYPE_RADIO_TRACK:
+        if tr_off is None or tr_off + 0x10 > object_ends[tr_off] or blob[8 + tr_off] != TYPE_RADIO_TRACK:
             continue
         sound_ref, = struct.unpack_from("<I", blob, 8 + tr_off + 0x0C)
         if sound_ref >= len(game_refs):
@@ -213,9 +223,9 @@ def parse_radio_metadata(game_meta, sounds_meta):
       - streaming_sounds: {sound_hash: {duration_ms, channel_count, channels}}
     """
     game_blob = game_meta["blob"]
-    game_meta_size = game_meta["meta_size"]
     game_by_hash = game_meta["by_hash"]
     game_refs = parse_aud_refs(game_meta)
+    object_ends = _object_ends(game_meta)
     streaming_sounds = parse_sounds_streaming_index(sounds_meta)
 
     stations = []
@@ -229,10 +239,10 @@ def parse_radio_metadata(game_meta, sounds_meta):
         list_off = game_by_hash.get(list_hash)
         if list_off is None:
             continue
-        if list_off + 8 > game_meta_size or game_blob[8 + list_off] != TYPE_RADIO_STATION_LIST:
+        if list_off + 8 > object_ends[list_off] or game_blob[8 + list_off] != TYPE_RADIO_STATION_LIST:
             raise ValueError(f"{RADIO_STATIONS_LIST_PREFIX}{list_index:02d} has unexpected object layout")
         st_count = game_blob[8 + list_off + 5]
-        if list_off + 8 + st_count * 4 > game_meta_size:
+        if list_off + 8 + st_count * 4 > object_ends[list_off]:
             raise ValueError(f"{RADIO_STATIONS_LIST_PREFIX}{list_index:02d} station ref list truncated")
         for i in range(st_count):
             st_ref, = struct.unpack_from("<I", game_blob, 8 + list_off + 8 + i * 4)
@@ -243,13 +253,13 @@ def parse_radio_metadata(game_meta, sounds_meta):
                 continue
             seen_stations.add(st_hash)
             st_off = game_by_hash.get(st_hash)
-            if st_off is None or st_off + 0x40 > game_meta_size or game_blob[8 + st_off] != TYPE_RADIO_STATION:
+            if st_off is None or st_off + 0x40 > object_ends[st_off] or game_blob[8 + st_off] != TYPE_RADIO_STATION:
                 continue
             st_pos = 8 + st_off
             flags, = struct.unpack_from("<I", game_blob, st_pos + 1)
             name_hash, wheel_position = struct.unpack_from("<II", game_blob, st_pos + 8)
             tl_count, = struct.unpack_from("<I", game_blob, st_pos + 0x3C)
-            if st_off + 0x40 + tl_count * 12 > game_meta_size:
+            if st_off + 0x40 + tl_count * 12 > object_ends[st_off]:
                 raise ValueError(f"station 0x{st_hash:08x} tracklist array truncated")
 
             tl_hashes = []
@@ -262,7 +272,7 @@ def parse_radio_metadata(game_meta, sounds_meta):
 
             tracks = []
             for tl_hash in tl_hashes:
-                for tr_hash, sound_hash in walk_tracklist_tracks(tl_hash, game_meta, game_refs):
+                for tr_hash, sound_hash in _walk_tracklist_tracks(tl_hash, game_meta, game_refs, object_ends):
                     sound = streaming_sounds.get(sound_hash)
                     tracks.append({
                         "tracklist_hash": tl_hash,
@@ -301,7 +311,7 @@ def parse_radio_metadata(game_meta, sounds_meta):
         if obj_hash in attached_tracklists or game_blob[8 + obj_off] != TYPE_RADIO_TRACKLIST:
             continue
         tracks = []
-        for tr_hash, sound_hash in walk_tracklist_tracks(obj_hash, game_meta, game_refs):
+        for tr_hash, sound_hash in _walk_tracklist_tracks(obj_hash, game_meta, game_refs, object_ends):
             sound = streaming_sounds.get(sound_hash)
             tracks.append({
                 "track_settings_hash": tr_hash,

@@ -255,32 +255,43 @@ class AwcFile:
 
     def _estimate(self, f):
         nch = len(self.streams)
+        if min(self.block_size, self.data_size) < 0x18 * (nch - 1) + 8:
+            raise AwcError(tr("err_format_chunk"))
         totals = [0] * nch
+        pending = set(range(nch))
         for b in range(self.n_blocks):
             off = self.data_off + b * self.block_size
             f.seek(self.base + off)
-            raw = f.read(0x18 * nch)
+            avail = min(self.block_size, self.data_off + self.data_size - off)
+            raw = f.read(min(0x18 * nch, avail))
             if len(raw) < 0x18 * nch:
                 break
-            avail = min(self.block_size, self.data_off + self.data_size - off)
             frac = 1.0 if avail >= self.block_size else avail / float(self.block_size)
             for c in range(nch):
                 totals[c] += struct.unpack_from("<i", raw, 0x18 * c + 0x0C)[0] * frac
-        # Opus channel count from the first packet
-        f.seek(self.base + self.data_off)
-        blk = f.read(min(self.block_size, self.data_size))
-        ents = [struct.unpack_from("<i", blk, 0x18 * c + 4)[0] for c in range(nch)]
-        pos = ((0x18 * nch + 4 * sum(ents)) + 0x7FF) & ~0x7FF
-        for c in range(nch):
-            st = self.streams[c]
-            if ents[c] > 0 and pos + 3 <= len(blk):
-                n = struct.unpack_from("<H", blk, pos)[0]
-                if 0 < n and pos + 3 <= len(blk):
-                    st.opus_channels = 2 if (blk[pos + 2] & 4) else 1
+            if pending:
+                ents = [struct.unpack_from("<i", raw, 0x18 * c + 4)[0] for c in range(nch)]
+                if any(e < 0 or e > 4096 for e in ents):
+                    break
+                pos = ((0x18 * nch + 4 * sum(ents)) + 0x7FF) & ~0x7FF
+                for c, count in enumerate(ents):
+                    end = pos + count * 0x800
+                    if c in pending:
+                        for unit in range(pos, min(end, avail - 2), 0x800):
+                            f.seek(self.base + off + unit)
+                            prefix = f.read(3)
+                            if len(prefix) < 3:
+                                break
+                            n, toc = struct.unpack("<HB", prefix)
+                            if 0 < n <= min(0x800, avail - unit) - 2:
+                                self.streams[c].opus_channels = 2 if (toc & 4) else 1
+                                pending.remove(c)
+                                break
+                    pos = end
+        for c, st in enumerate(self.streams):
             st.est_seconds = totals[c] / float(st.sample_rate * st.opus_channels)
             if st.header_samples > 0:   # the format chunk holds the exact length (matches the game's config)
                 st.est_seconds = st.header_samples / float(st.sample_rate * st.opus_channels)
-            pos += ents[c] * 0x800
 
     # -- extraction -------------------------------------------------------------
     def extract(self, jobs, progress=None, cancel=None, tags=None):
@@ -333,14 +344,14 @@ class AwcFile:
                                     p += 2 + n
                             if skip_samples and not pkts:
                                 raise AwcError(f"Channel {c}: skip without packets")
+                            pch = self.streams[c].opus_channels
+                            if block_samples % pch:
+                                raise AwcError(f"Channel {c}: invalid interleaved block sample count")
+                            target_f = block_samples // pch
                             if pkts:
-                                pch = max(1, self.streams[c].opus_channels)
                                 kept = pkts
                                 deficit = 0
-                                if block_samples > 0:
-                                    if block_samples % pch:
-                                        raise AwcError(f"Channel {c}: invalid interleaved block sample count")
-                                    target_f = block_samples // pch
+                                if target_f > 0:
                                     tot_f = sum(opus_packet_samples(pkt) for pkt in pkts)
                                     if tot_f > target_f:
                                         acc = 0
@@ -392,6 +403,9 @@ class AwcFile:
                                     w.add(pkt)
                                 prev_kept[c] = kept
                                 prev_deficit[c] = deficit
+                            else:
+                                prev_kept[c] = []
+                                prev_deficit[c] = target_f
                         pos += ents[c] * 0x800
                     if progress:
                         progress((b + 1) / float(self.n_blocks))
@@ -408,7 +422,7 @@ import json
 import time
 
 SCAN_CHUNK = 64 * 1024 * 1024
-SCAN_CACHE_VERSION = 6
+SCAN_CACHE_VERSION = 7
 
 
 def _probe_adat(g, pos, container_size):

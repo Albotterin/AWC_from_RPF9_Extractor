@@ -16,19 +16,25 @@ import awc_metadata
 from awc_names import joaat
 
 
-def _build_synthetic_music_awc(block_specs, stream_id=0x1234567, declared_samples=0, indexed=False):
-    """Build a 1-channel streamed AWC (0x48 + 0x55) from [(skip_samples, block_samples, [packets])]."""
-    chunk_size = 4096  # 2048 header + 2048 single subblock
-    desc = struct.pack("<III", len(block_specs), chunk_size, 1)
-    desc += struct.pack("<IIhHBBH", stream_id, declared_samples, 0, 48000, 0x0B, 2, 0xFFFF)
+def _build_synthetic_music_awc(block_specs, stream_id=0x1234567, declared_samples=0, indexed=False,
+                               second_stream=None):
+    """Build a streamed AWC (0x48 + 0x55) from [(skip_samples, block_samples, [packets])] per stream."""
+    stream_count = 1 if second_stream is None else 2
+    chunk_size = 2048 * (1 + stream_count)
+    desc = struct.pack("<III", len(block_specs), chunk_size, stream_count)
+    for c in range(stream_count):
+        desc += struct.pack("<IIhHBBH", stream_id + c, declared_samples, 0, 48000, 0x0B, 2, 0xFFFF)
 
     data = bytearray(len(block_specs) * chunk_size)
-    for b_idx, (skip_samples, block_samples, packets) in enumerate(block_specs):
+    blocks = ((spec,) for spec in block_specs) if second_stream is None else zip(block_specs, second_stream, strict=True)
+    for b_idx, streams in enumerate(blocks):
         base = b_idx * chunk_size
-        struct.pack_into("<iiiiII", data, base, -1, 1, skip_samples, block_samples, 0, 0)
-        payload = b"".join(struct.pack("<H", len(p)) + p for p in packets)
-        assert len(payload) <= 2048
-        data[base + 2048:base + 2048 + len(payload)] = payload
+        for c, (skip_samples, block_samples, packets) in enumerate(streams):
+            struct.pack_into("<iiiiII", data, base + 24 * c, -1, 1, skip_samples, block_samples, 0, 0)
+            payload = b"".join(struct.pack("<H", len(p)) + p for p in packets)
+            assert len(payload) <= 2048
+            unit = base + 2048 * (1 + c)
+            data[unit:unit + len(payload)] = payload
 
     flags = 0xFF25 if indexed else 0
     tables = struct.pack("<HII", 0, 0, 0) if indexed else b""
@@ -91,6 +97,13 @@ def _build_aud_metadata_blob(objects, refs=()):
 
 
 class AwcBlockSkipTests(unittest.TestCase):
+    def test_scan_omits_bank_truncated_before_first_block(self):
+        raw = _build_synthetic_music_awc([(0, 1920, [b"\xfcA"])], declared_samples=1920)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "truncated.rpf"
+            path.write_bytes(raw[:-4096])
+            self.assertEqual(awc_core.scan_container(str(path)), ([], 1))
+
     def test_opens_indexed_bank_with_unaligned_chunk_tags(self):
         raw = _build_synthetic_music_awc([(0, 1920, [b"\xfcA"])], indexed=True)
         with tempfile.TemporaryDirectory() as tmp:
@@ -101,19 +114,20 @@ class AwcBlockSkipTests(unittest.TestCase):
                 self.assertEqual(awc_core._probe_adat(f, 0, len(raw)), {"length": len(raw)})
             self.assertEqual(len(awc_core.AwcFile(path).streams), 1)
 
-    def test_rebuilds_version_5_cache_with_indexed_bank(self):
-        raw = _build_synthetic_music_awc([(0, 1920, [b"\xfcA"])], indexed=True)
+    def test_rebuilds_version_6_cache_with_indexed_bank(self):
+        raw = _build_synthetic_music_awc([(0, 0, []), (0, 1920, [b"\xf8A", b"\xf8B"])], indexed=True)
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "indexed.rpf"
             path.write_bytes(raw)
             cache = Path(tmp) / "cache.json"
             cache.write_text(json.dumps({
-                "v": 5, "size": len(raw), "mtime": int(path.stat().st_mtime), "items": [], "total": 1,
+                "v": 6, "size": len(raw), "mtime": int(path.stat().st_mtime), "items": [], "total": 1,
             }), encoding="utf-8")
             with patch.object(awc_core, "_cache_file", return_value=cache):
                 items, total, cached = awc_core.scan_container_cached(str(path))
                 self.assertFalse(cached)
                 self.assertEqual((len(items), total), (1, 1))
+                self.assertEqual(items[0]["streams"][0]["ch"], 1)
                 self.assertEqual(awc_core.scan_container_cached(str(path)), (items, total, True))
 
     def test_nonmatching_partial_skip_does_not_drop_a_whole_packet(self):
@@ -149,6 +163,50 @@ class AwcBlockSkipTests(unittest.TestCase):
                 else:
                     awc.extract({0: output})
                     self.assertEqual(_extract_ogg_audio_payload(output), packet)
+
+    def test_first_packet_after_empty_block_sets_mono_budget(self):
+        p1, p2 = b"\xf8A", b"\xf8B"
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "mono.awc"
+            path.write_bytes(_build_synthetic_music_awc([(0, 0, []), (0, 1920, [p1, p2])]))
+            awc = awc_core.AwcFile(path)
+            output = Path(tmp) / "out.opus"
+            awc.extract({0: output})
+            self.assertEqual(_extract_ogg_audio_payload(output), p1 + p2)
+            self.assertEqual(awc.streams[0].opus_channels, 1)
+            self.assertAlmostEqual(awc.streams[0].est_seconds, 0.04)
+
+    def test_channel_inference_finds_first_packet_in_each_stream(self):
+        stereo = [(0, 1920, [b"\xfcA"]), (0, 1920, [b"\xfcB"])]
+        mono = [(0, 0, []), (0, 1920, [b"\xf8A", b"\xf8B"])]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "two-streams.awc"
+            path.write_bytes(_build_synthetic_music_awc(stereo, second_stream=mono))
+            awc = awc_core.AwcFile(path)
+            self.assertEqual([stem.opus_channels for stem in awc.streams], [2, 1])
+            output = Path(tmp) / "mono.opus"
+            awc.extract({1: output})
+            self.assertEqual(_extract_ogg_audio_payload(output), b"\xf8A\xf8B")
+
+    def test_skip_cannot_use_overlap_or_deficit_from_before_empty_block(self):
+        p1, p2 = b"\xfcA", b"\xfcB"
+        for budget, packet in ((1920, p1), (3840, p2)):
+            with self.subTest(budget=budget), tempfile.TemporaryDirectory() as tmp:
+                path = Path(tmp) / "stale.awc"
+                path.write_bytes(_build_synthetic_music_awc([(0, budget, [p1]), (0, 0, []),
+                                                            (1920, 1920, [packet])]))
+                with self.assertRaisesRegex(awc_core.AwcError, "unverified skip"):
+                    awc_core.AwcFile(path).extract({0: Path(tmp) / "out.opus"})
+
+    def test_empty_block_with_positive_budget_records_deficit(self):
+        p1, p2 = b"\xfcA", b"\xfcB"
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "deficit.awc"
+            path.write_bytes(_build_synthetic_music_awc([(0, 1920, [p1]), (0, 1920, []),
+                                                        (1920, 1920, [p2])]))
+            output = Path(tmp) / "out.opus"
+            awc_core.AwcFile(path).extract({0: output})
+            self.assertEqual(_extract_ogg_audio_payload(output), p1 + p2)
 
     def test_trims_block_budget_padding_and_deduplicates_interleaved_skip(self):
         # Stereo 20 ms Opus packets (TOC 0xFC) = 960 frames = 1920 interleaved samples each.
@@ -204,6 +262,41 @@ class AwcBlockSkipTests(unittest.TestCase):
 
 
 class AudMetadataTests(unittest.TestCase):
+    def test_external_tracklist_ends_after_its_list_reference(self):
+        tracklist, object_list, track, sound = 1, 2, 3, 4
+        blob = _build_aud_metadata_blob([
+            (tracklist, b"\x11" + bytes(67) + struct.pack("<I", 0)),
+            (object_list, b"\x02" + bytes(7) + struct.pack("<II", 1, 1)),
+            (track, b"\x0f" + bytes(11) + struct.pack("<I", 2)),
+        ], refs=[object_list, track, sound])
+        meta = awc_metadata.parse_aud_metadata(blob)
+        refs = awc_metadata.parse_aud_refs(meta)
+        self.assertEqual(awc_metadata.walk_tracklist_tracks(tracklist, meta, refs), [(track, sound)])
+
+    def test_reference_arrays_cannot_run_into_next_object(self):
+        station_list = joaat("RADIO_STATIONS_01")
+        station, tracklist, object_list, following = 1, 2, 3, 4
+        station_ref = b"\x0e\0\0\0\0\x01\0\0" + struct.pack("<I", 0)
+        station_header = b"\x10" + bytes(59)
+        tracklist_header = b"\x11" + bytes(67)
+        sounds_meta = awc_metadata.parse_aud_metadata(_build_aud_metadata_blob([]))
+        cases = [
+            ([(station_list, station_ref[:8])], "station ref list truncated"),
+            ([(station_list, station_ref), (station, station_header + struct.pack("<I", 1))],
+             "tracklist array truncated"),
+            ([(tracklist, tracklist_header + struct.pack("<IHH", 0xFFFFFFFF, 1, 0))],
+             "inline reference array truncated"),
+            ([(tracklist, tracklist_header + struct.pack("<IHH", 1, 0, 0)),
+              (object_list, b"\x02" + bytes(7) + struct.pack("<I", 1))],
+             "object list .* truncated"),
+        ]
+        for objects, error in cases:
+            with self.subTest(error=error):
+                game_blob = _build_aud_metadata_blob(objects + [(following, bytes(12))],
+                                                     refs=[station, object_list])
+                with self.assertRaisesRegex(ValueError, error):
+                    awc_metadata.parse_radio_metadata(awc_metadata.parse_aud_metadata(game_blob), sounds_meta)
+
     def test_omits_streaming_sound_with_incomplete_adjacent_children(self):
         sound_hash = joaat("incomplete")
         sound = b"\x08\0\0\0" + struct.pack("<I", 1000) + b"\x0c\x02" + struct.pack("<II", 1, 2)
