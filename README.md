@@ -26,10 +26,6 @@ folders next to each other when you run from source.
 
 ## Quick start
 
-> The newest [release](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/latest) is **v2.4.1**: its Windows programs and app 1.3 still work with
-> the single `.dat` pack. For what is described here (v2.5.0: `.radiopak` packs, app 1.5) run and build from source until
-> the next release.
-
 1. Download `AWC-Tool-…-win64.zip` from the [latest release](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/latest) and unzip it. It holds both Windows programs.
 2. Put `ffmpeg.exe` and `ffplay.exe` ([ffmpeg.org](https://ffmpeg.org/download.html)) next to them, or into your `PATH`.
 3. Start **`AWC-Tool.exe`** to extract, or **`AWC-Radio.exe`** to listen, and pick the `audio.rpf` of your own game.
@@ -85,7 +81,7 @@ song at the same time.
 
 **Set it up**
 
-1. Install `AWC-Radio.apk` (from a [release](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases), or build it from [`radio/android/`](radio/README.md#awc-radio-for-android)). Allow notifications: the alarm needs them.
+1. Install `AWC-Radio.apk` (from the [latest release](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/latest), or build it from [`radio/android/`](radio/README.md#awc-radio-for-android)). Allow notifications: the alarm needs them.
 2. On the PC, click **Android packs…** in AWC Radio, choose a folder and write the packs (original quality, about 4.2 GB for all 34 stations). Later only new or changed packs are written.
 3. Copy the `.radiopak` files into one folder on the phone, start the app and choose that folder once.
 4. For Android Auto: in the Android Auto settings tap *Version* about ten times, open the developer settings in the three-dot menu and switch on *Unknown sources*.
@@ -139,7 +135,7 @@ Details for every station: [radio progress](radio/docs/RADIO-PROGRESS.md).
 | [v2.3.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.3.0) | 2026-11-24 | 📻 Android Auto, new app design |
 | [v2.4.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.4.0) | 2026-11-25 | 📻 Talk radio and complete station playlists |
 | [v2.4.1](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.4.1) | 2026-11-25 | 🎛 📻 Own station logo reader, no download needed |
-| v2.5.0 | 2026-11-25 | 📻 One pack per station, app 1.5 with radio alarm and new design, venue stations |
+| [v2.5.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.5.0) | 2026-11-25 | 📻 One pack per station, app 1.5 with radio alarm and new design, venue stations |
 
 ## Repository layout
 

@@ -26,10 +26,6 @@ Start aus dem Quellcode müssen deshalb beide Ordner nebeneinander liegen.
 
 ## Schnellstart
 
-> Das neueste [Release](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/latest) ist **v2.4.1**: Seine Windows-Programme und die App 1.3 arbeiten noch
-> mit dem einzelnen `.dat`-Pack. Für das hier Beschriebene (v2.5.0: `.radiopak`-Packs, App 1.5) bis zum nächsten Release
-> aus dem Quellcode starten und bauen.
-
 1. `AWC-Tool-…-win64.zip` aus dem [neuesten Release](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/latest) laden und entpacken. Darin liegen beide Windows-Programme.
 2. `ffmpeg.exe` und `ffplay.exe` ([ffmpeg.org](https://ffmpeg.org/download.html)) daneben oder in den `PATH` legen.
 3. **`AWC-Tool.exe`** zum Extrahieren oder **`AWC-Radio.exe`** zum Hören starten und die `audio.rpf` deines eigenen Spiels
@@ -85,7 +81,7 @@ spielen Handy und PC zur selben Zeit denselben Song.
 
 **Einrichten**
 
-1. `AWC-Radio.apk` installieren (aus einem [Release](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases) oder selbst gebaut aus [`radio/android/`](radio/README.de.md#awc-radio-für-android)). Benachrichtigungen erlauben: Der Wecker braucht sie.
+1. `AWC-Radio.apk` installieren (aus dem [neuesten Release](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/latest) oder selbst gebaut aus [`radio/android/`](radio/README.de.md#awc-radio-für-android)). Benachrichtigungen erlauben: Der Wecker braucht sie.
 2. Am PC in AWC Radio auf **Android-Packs…** klicken, einen Ordner wählen und die Packs schreiben (Originalqualität, etwa 4,2 GB für alle 34 Sender). Später werden nur neue oder geänderte Packs geschrieben.
 3. Die `.radiopak`-Dateien in einen Ordner auf dem Handy kopieren, die App starten und diesen Ordner einmal wählen.
 4. Für Android Auto: in den Einstellungen von Android Auto etwa zehnmal auf *Version* tippen, im Drei-Punkte-Menü die Entwicklereinstellungen öffnen und *Unbekannte Quellen* aktivieren.
@@ -139,7 +135,7 @@ Details zu jedem Sender: [Fortschritt des Radios](radio/docs/RADIO-PROGRESS.de.m
 | [v2.3.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.3.0) | 2026-11-24 | 📻 Android Auto, neues App-Design |
 | [v2.4.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.4.0) | 2026-11-25 | 📻 Talk-Radio und vollständige Sender-Playlists |
 | [v2.4.1](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.4.1) | 2026-11-25 | 🎛 📻 Eigener Leser für die Sender-Logos, kein Download nötig |
-| v2.5.0 | 2026-11-25 | 📻 Ein Pack je Sender, App 1.5 mit Radiowecker und neuem Design, Sender für Orte aus dem Spiel |
+| [v2.5.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.5.0) | 2026-11-25 | 📻 Ein Pack je Sender, App 1.5 mit Radiowecker und neuem Design, Sender für Orte aus dem Spiel |
 
 ## Aufbau des Repositorys
 
