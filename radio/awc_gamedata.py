@@ -16,12 +16,15 @@ table (u32 count, count x (name hash, x)). Objects refer to each other by their 
 """
 import bisect
 import collections
+import os
 import struct
+import sys
 import zlib
 
-import awc_config as gamecfg
-import awc_credits as credits
-from awc_names import STREAM_ID_MASK, joaat
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "extractor"))   # shared modules
+import awc_config as gamecfg  # noqa: E402
+import awc_credits as credits  # noqa: E402
+from awc_names import STREAM_ID_MASK, joaat  # noqa: E402
 
 MAGIC = 0x045A88EA
 BLOCK = 0x10000

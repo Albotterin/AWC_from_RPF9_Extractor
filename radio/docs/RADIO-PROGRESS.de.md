@@ -1,6 +1,6 @@
 # AWC Radio – Fortschritt der Sender
 
-[English version](RADIO-PROGRESS.md)
+[AWC Radio](../README.de.md) · [Projektübersicht](../../README.de.md) · [English version](RADIO-PROGRESS.md)
 
 Wie viele der Songs, die die öffentliche Credits-Seite für jeden Sender aufführt, als Dateien in der `audio.rpf` des Spiels gefunden wurden.
 

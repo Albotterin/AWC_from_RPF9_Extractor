@@ -1,6 +1,6 @@
 # AWC Radio – station progress
 
-[Deutsche Version](RADIO-PROGRESS.de.md)
+[AWC Radio](../README.md) · [Project overview](../../README.md) · [Deutsche Version](RADIO-PROGRESS.de.md)
 
 How many of the songs that the public credits page lists for each station could be found as files in the game's `audio.rpf`.
 
