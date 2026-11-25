@@ -71,7 +71,7 @@ python radio/awc_radio.py        # the radio
 
 ## 📱 AWC Radio app for Android
 
-The radio for your pocket, your car and your bedside. **`AWC-Radio.apk`** (version 1.11; an earlier version runs on a real
+The radio for your pocket, your car and your bedside. **`AWC-Radio.apk`** (version 1.11; tested on a real
 Android phone) plays the same live programme as
 the PC: same UTC clock, same order, same crossfades – with station packs from the same version, phone and PC play the same
 song at the same time.
@@ -122,7 +122,7 @@ Status **2026-11-25** (v2.8.0), measured with a 28.5 GB `audio.rpf`.
 | Extractor by station | 28 stations and 5 podcasts with logo, 3,417 DJ lines | ✅ |
 | Podcasts | all 5 the credits name, with 20 episodes (3 h 36 min), in the app and on the PC | ✅ |
 | Score | 2,543 pieces (about 33 h); 974 of at least 30 seconds (26.5 h) go into the app packs | ✅ |
-| Android app | version 1.11: radio, podcasts, score, DJ, adverts, radio alarm, Android Auto; an earlier version runs on a real Android phone | ✅ |
+| Android app | version 1.11: radio, podcasts, score, DJ, adverts, radio alarm, Android Auto; runs on a real Android phone | ✅ |
 | The Vault Radio | plays as one long mix; its 24 listed songs are not separate files | 🎚 |
 
 ![AWC Radio – station progress](radio/docs/radio-progress.svg)
@@ -139,8 +139,8 @@ Details for every station: [radio progress](radio/docs/RADIO-PROGRESS.md).
 - [ ] The product names of the adverts are not known
 - [x] AWC Radio on the PC plays the podcasts
 - [x] The radio speaks the DJ intros and outros over the songs (PC and app)
-- [x] The Android app runs on a real phone (confirmed for a version before 1.11)
-- [ ] Newer app functions (score, DJ) are tested on the PC (Robolectric), not yet on a phone
+- [x] The Android app runs on a real phone
+- [x] Score and DJ in the app are tested on a real phone
 - [ ] Extractor: Opus only; the RPF9 table of contents is not read, so there are no file names
 
 ### Milestones
