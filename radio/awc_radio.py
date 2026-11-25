@@ -20,7 +20,8 @@ import tkinter as tk
 import zlib
 from tkinter import filedialog, messagebox, ttk
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path[:0] = [HERE, os.path.join(os.path.dirname(HERE), "extractor")]   # the shared modules live with the extractor
 import awc_config as gamecfg  # noqa: E402
 import awc_core as core  # noqa: E402
 import awc_credits as credits  # noqa: E402

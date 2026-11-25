@@ -1,60 +1,111 @@
-# AWC from RPF9 Extractor
+# AWC from RPF9 Extractor & AWC Radio
 
-**Musik-Streams aus RAGE-Engine-`.rpf`-Archiven (RPF9) und `.awc`-Dateien finden, abspielen und extrahieren – mit einfacher GUI.**
+**Musik aus RAGE-Engine-`audio.rpf`-Archiven: das Audio extrahieren oder die Radiosender des Spiels hören – am PC und auf Android.**
 
-🇬🇧 [English version](README.md) · 📄 [Technische Format-Notizen (englisch)](docs/FORMAT.md) · ⬇️ [**Download (Releases)**](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/latest)
+🇬🇧 [English version](README.md) · ⬇️ [**Download (Releases)**](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/latest) · 📊 [Fortschritt des Radios](radio/docs/RADIO-PROGRESS.de.md)
 
-![Hauptfenster](docs/screenshots/04-german.png)
+| 🎛 AWC Audio Extractor | 📻 AWC Radio |
+|:---:|:---:|
+| ![AWC Audio Extractor](extractor/docs/screenshots/04-german.png) | ![AWC Radio](radio/docs/screenshots/06-radio.png) |
 
----
+## Zwei Projekte in einem Repository
 
-## Inhalt
+| | 🎛 AWC Audio Extractor | 📻 AWC Radio |
+|---|---|---|
+| **Wofür** | Jeden Musik-Stream finden, abspielen und extrahieren | Die Sender hören wie ein echtes Radio |
+| **Ordner** | [`extractor/`](extractor/README.de.md) | [`radio/`](radio/README.de.md) |
+| **Programme** | `AWC-Tool.exe` | `AWC-Radio.exe` + `AWC-Radio.apk` (Android) |
+| **Anleitung** | [Extractor-Anleitung](extractor/README.de.md) | [Radio-Anleitung](radio/README.de.md) |
+| **Technische Notizen** (englisch) | [AWC-/RPF9-Format](extractor/docs/FORMAT.md) | [Senderdefinitionen](radio/docs/STATIONS.md) |
 
-1. [Was macht das Tool?](#was-macht-das-tool)
-2. [Rechtlicher Hinweis](#rechtlicher-hinweis)
-3. [Funktionen](#funktionen)
-4. [Screenshots](#screenshots)
-5. [Voraussetzungen & Installation](#voraussetzungen--installation)
-6. [Bedienung](#bedienung)
-7. [Ausgabeformate und Dateinamen](#ausgabeformate-und-dateinamen)
-8. [So funktioniert es](#so-funktioniert-es)
-9. [Gruppierung: was gehört zusammen?](#gruppierung-was-gehört-zusammen)
-10. [Als Bibliothek nutzen](#als-bibliothek-nutzen)
-11. [Eigene `.exe` bauen](#eigene-exe-bauen)
-12. [Sprachen](#sprachen)
-13. [Einschränkungen](#einschränkungen)
-14. [Fehlerbehebung](#fehlerbehebung)
-15. [Lizenz & Credits](#lizenz--credits)
+Der Extractor ist die Basis: Er liest das Archiv und die AWC-Dateien. AWC Radio baut auf seinen Modulen auf – beim
+Start aus dem Quellcode müssen deshalb beide Ordner nebeneinander liegen.
 
----
+## Schnellstart
 
-## Was macht das Tool?
+1. `AWC-Tool-…-win64.zip` aus dem [neuesten Release](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/latest) laden und entpacken. Darin liegen beide Windows-Programme.
+2. `ffmpeg.exe` und `ffplay.exe` ([ffmpeg.org](https://ffmpeg.org/download.html)) daneben oder in den `PATH` legen.
+3. **`AWC-Tool.exe`** zum Extrahieren oder **`AWC-Radio.exe`** zum Hören starten und die `audio.rpf` deines eigenen Spiels
+   wählen. Das Radio fragt zusätzlich nach der Textur-Datei `data\ttdb\ui\ttdb_ui.ttpf` (Sender-Logos).
+4. **Aufs Handy:** `AWC-Radio.apk` aus dem Release installieren, in AWC Radio mit **Android-Pack…** ein Sender-Pack
+   schreiben, aufs Handy kopieren und in der App auswählen.
 
-Spiele auf Basis der RAGE-Engine von Rockstar speichern ihr Audio in großen `audio.rpf`-Archiven. Die Musik liegt
-darin in **AWC**-Containern (Header `ADAT`). Die neueren **RPF9**-Archive lassen sich mit den üblichen RPF7-Tools nicht
-öffnen, und ihr Inhaltsverzeichnis ist nicht lesbar – die AWC-Dateien kann man also nicht einfach über Namen finden.
+Aus dem Quellcode (Python 3 mit tkinter; Pillow für die Logos):
 
-Dieses Tool geht einen anderen Weg:
+```bash
+git clone https://github.com/Albotterin/AWC_from_RPF9_Extractor.git
+cd AWC_from_RPF9_Extractor
+python extractor/awc_tool.py     # der Extractor
+python radio/awc_radio.py        # das Radio
+```
 
-1. **Es durchsucht das rohe Archiv nach AWC-Headern** (`ADAT`) – ohne Inhaltsverzeichnis. Ein 28-GB-Archiv dauert
-   auf einer normalen Festplatte etwa 6 Minuten; das Ergebnis wird zwischengespeichert, der nächste Scan ist sofort fertig.
-2. **Es erkennt die Musik-Container** (Mehrkanal-AWC mit Stream-Format-Chunk) und liest Stream-IDs, Codec,
-   Kanal-Aufbau und Dauer.
-3. **Es entschlüsselt das Container-Layout** (Blöcke → Kanal-Einträge → Opus-Pakete) und **schreibt die originalen
-   Opus-Pakete 1:1 in normale Ogg-Opus-Dateien** – es gibt *keine Neukodierung*, das Audio ist also bitgleich zu dem,
-   was das Spiel abspielt.
-4. Optional **konvertiert es nach FLAC, WAV oder MP3** (mit ffmpeg) und kann **jeden Stream direkt abspielen**,
-   mit Vor-/Zurückspulen und Lautstärkeregler.
-5. Da das Inhaltsverzeichnis des Archivs (und damit jeder Dateiname) nicht lesbar ist, **gruppiert es die AWCs nach
-   ihrer Lage im Archiv** – Dateien eines Ordners liegen hintereinander, eine Gruppe ist also typischerweise ein
-   Radiosender bzw. ein Ordner. Die **Gruppen kannst du selbst benennen** (Rechtsklick); der Name wird zum Ordnernamen
-   beim Export.
+## 🎛 AWC Audio Extractor
 
-Du kannst eine einzelne `.awc`, eine `.rpf` oder einen **ganzen Ordner** angeben – dann werden alle Unterordner nach
-`.rpf`- und `.awc`-Dateien durchsucht und alle gefundenen Musik-Streams aufgelistet.
+* Durchsucht `.rpf`-Archive jeder Größe nach Audio-Containern – ohne Inhaltsverzeichnis.
+* Schreibt die originalen Opus-Pakete 1:1 in `.opus`-Dateien (keine Neukodierung); optional FLAC, WAV oder MP3.
+* Spielt jeden Stream direkt aus dem Archiv.
+* Benennt Streams aus der Spiel-Konfiguration, von der öffentlichen Credits-Seite oder aus eigenen Listen; Sender-Logos optional.
+* Oberfläche auf Deutsch und Englisch.
 
-> Beispiel: 28,5-GB-`audio.rpf` → 6.636 AWC-Header, davon 2.968 Musik-Container mit 2.992 Streams
-> (Opus, 48 kHz) ≈ 96 Stunden Audio ≈ 5 GB als `.opus`.
+➡️ [**Extractor-Anleitung**](extractor/README.de.md)
+
+## 📻 AWC Radio
+
+* **30 Sender**, darunter die Talk-Sender **WKTT** und **The Wipe**, samt Playlists aus der Audio-Konfiguration des Spiels gelesen.
+* Ein Live-Programm nach der UTC-Uhr: Jeder Sender läuft weiter, alle mit derselben Uhrzeit hören denselben Song.
+* Jingles, DJ-Ansagen und Überblendungen zwischen den Songs; lange DJ-Mixe zeigen den Titel des aktuellen Abschnitts.
+* **Android-App** mit Hintergrundwiedergabe, Android Auto und Einschlaftimer, gespeist aus einem Sender-Pack deiner eigenen Dateien.
+
+➡️ [**Radio-Anleitung**](radio/README.de.md)
+
+## Fortschritt
+
+Stand **2026-11-25** (v2.4.0), gemessen an einer 28,5 GB großen `audio.rpf`.
+
+| Bereich | Stand | |
+|---|---|---|
+| Vom Scan gefundene Musik-Container | 2.968 mit 2.992 Streams (rund 96 Stunden), alle Opus und extrahierbar | ✅ |
+| Songs, die die Credits für die Musiksender nennen | **792 von 809** gefunden (97,9 %) | 🟢 |
+| Talk-Radio | alle 5 in den Credits genannten Sendungen, **15 Folgen** | ✅ |
+| Sender in AWC Radio | 30 (darunter 3 „(Mix)“-Sender und „Clubmixes“) | ✅ |
+| The Vault Radio | läuft als ein langer Mix; seine 24 gelisteten Songs sind keine Einzeldateien | 🎚 |
+
+![AWC Radio – Fortschritt der Sender](radio/docs/radio-progress.svg)
+
+Details zu jedem Sender: [Fortschritt des Radios](radio/docs/RADIO-PROGRESS.de.md).
+
+### Noch offen
+
+- [ ] 17 gelistete Songs ohne Datei: die Club-DJ-Sets (Bodega The DJ, DJ Stevie J), zwei von Worldwide FM, einer von Radio On-U
+- [ ] Die 8 eigens geschriebenen Songs von „Honey FM – Liquid City“
+- [ ] Die fünf Podcasts, die die Spiel-Konfiguration nennt
+- [ ] Die Android-App zählt die Folgen der Talk-Sender als „Songs“
+- [ ] Extractor: nur Musik-Container mit Opus-Codec; das RPF9-Inhaltsverzeichnis wird nicht gelesen, es gibt also keine Dateinamen
+- [ ] Sender-Logos für neue Nutzer: Das Leonida-Repository mit dem Texturdecoder ist derzeit nicht erreichbar
+
+### Meilensteine
+
+| Version | Datum | Neu dazugekommen |
+|---|---|---|
+| [v1.0.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v1.0.0) | 2026-11-22 | 🎛 Archiv-Scan, Player, verlustfreie Extraktion |
+| [v1.1.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v1.1.0) | 2026-11-22 | 🎛 Gruppen nach Lage im Archiv |
+| [v1.7.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v1.7.0) | 2026-11-23 | 🎛 Songnamen und Sender-Logos · 📻 erstes AWC Radio |
+| [v1.8.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v1.8.0) | 2026-11-23 | 📻 Programm nach der UTC-Uhr |
+| [v1.9.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v1.9.0) | 2026-11-23 | 📻 Überblendungen |
+| [v2.0.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.0.0) | 2026-11-23 | 📻 Android-App und Sender-Packs |
+| [v2.1.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.1.0) | 2026-11-24 | 📻 Mehr Sender und Songs, Mix-Sender |
+| [v2.2.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.2.0) | 2026-11-24 | 📻 The Vault Radio, Clubmixes, Titel innerhalb der Mixe |
+| [v2.3.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.3.0) | 2026-11-24 | 📻 Android Auto, neues App-Design |
+| [v2.4.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.4.0) | 2026-11-25 | 📻 Talk-Radio und vollständige Sender-Playlists |
+
+## Aufbau des Repositorys
+
+```
+extractor/     AWC Audio Extractor: Programm, gemeinsame Module, Format-Notizen, Screenshots
+radio/         AWC Radio: Programm, Sender-Leser, Android-App, Fortschritt, Screenshots
+LICENSE        MIT
+README.md      diese Übersicht auf Englisch (README.de.md auf Deutsch)
+```
 
 ## Rechtlicher Hinweis
 
@@ -62,296 +113,18 @@ Du kannst eine einzelne `.awc`, eine `.rpf` oder einen **ganzen Ordner** angeben
   keine extrahierten Audiodaten** – und wird das auch nie.
 * Du brauchst deine eigenen Dateien aus einem Spiel, das du rechtmäßig besitzt. Für extrahiertes Audio bist du selbst
   verantwortlich – es unterliegt dem Urheberrecht der Rechteinhaber. Private, nicht-kommerzielle Analyse und
-  Archivierung ist eine Sache, die Weitergabe in der Regel nicht erlaubt.
+  Archivierung ist eine Sache, die Weitergabe in der Regel nicht erlaubt. Ein Sender-Pack enthält Spiel-Audio: bitte
+  nicht weitergeben.
+* Die Screenshots zeigen Senderlogos und Songtitel aus dem Spiel nur, um zu illustrieren, was die Programme aus deinen
+  eigenen Dateien lesen.
 * Das Projekt steht in **keiner Verbindung** zu Rockstar Games, Take-Two oder anderen Publishern und wird von
   diesen nicht unterstützt. Alle Marken gehören ihren jeweiligen Inhabern.
 
-## Funktionen
+## Credits und Lizenz
 
-* 🔍 **Archiv-Scan** per Header-Suche in `.rpf`-Dateien beliebiger Größe (64-MiB-Blöcke, strenge Prüfung).
-* 📂 **Ordner-Modus**: alle Unterordner nach `*.rpf` und `*.awc` durchsuchen.
-* 🌳 **Baumansicht** Container → Gruppe → AWC → Stream mit Stream-ID, Codec, Stereo/Mono, Dauer und Größe.
-* 🗂 **Gruppen**: AWCs werden nach ihrer Lage im Archiv gebündelt (≈ ein Ordner / Radiosender). Rechtsklick auf eine Gruppe → **Gruppe umbenennen…**; der Name wird für den Export-Ordner genutzt.
-* ▶️ **Player** direkt aus dem Archiv (Play/Pause/Stop, Positionsleiste, Lautstärke) über `ffplay`.
-* 💾 **Extraktion** als Opus (verlustfrei), FLAC, WAV (16 Bit) oder MP3 (320 kbit/s) – für Streams, ganze AWCs oder Container.
-* ⏱ **Dauer-Filter** („Nur Streams ab N Sekunden“) blendet die vielen Kurz-Schnipsel aus.
-* 🛡 **Sicherheitsnetz**: geschätzte Ausgabegröße, Warnung bei zu wenig Speicher, Rückfrage bei großen Jobs.
-* ⚡ **Schnell**: Ogg-Muxer in reinem Python mit zlib-basierter Prüfsumme (~100 MB Opus in etwa einer Sekunde).
-* 🧠 **Scan-Cache** in `%APPDATA%\AWC-Tool\cache` (abschaltbar).
-* 📻 **AWC Radio + Android-App**: ein Webradio-Player für die Sender des Spiels, der live nach der UTC-Uhr läuft, und eine Android-App, die dasselbe Programm aus einer Sender-Pack-Datei spielt.
-* 🌍 **Mehrsprachige Oberfläche** (Englisch/Deutsch), zur Laufzeit umschaltbar und leicht erweiterbar.
-* ❌ Scans und Extraktionen sind **abbrechbar**; angefangene Dateien werden entfernt.
-
-## Screenshots
-
-**Musik-Container eines Archivs durchsuchen** – Mehrstream-AWCs (hier 3 Stereo-Streams) lassen sich aufklappen:
-
-![Hauptfenster](docs/screenshots/01-main.png)
-
-**Gruppen** – ohne lesbares Inhaltsverzeichnis bündelt das Tool die AWCs nach ihrer Lage im Archiv. Jede *Gruppe NN* ist
-typischerweise ein Ordner bzw. Radiosender. Rechtsklick → Name vergeben (hier: „My station name“; der Name wird nur auf
-deinem PC gespeichert und für den Export-Ordner verwendet):
-
-![Gruppen](docs/screenshots/05-groups.png)
-
-**Direkt aus dem Archiv abspielen** (hier bei 44:38 eines zweistündigen Streams):
-
-![Player](docs/screenshots/02-player.png)
-
-**Extraktion läuft** (FLAC) mit Fortschrittsbalken und *Abbrechen*-Button:
-
-![Extraktion](docs/screenshots/03-extracting.png)
-
-**Sprachumschaltung** – dasselbe Fenster auf Deutsch:
-
-![Deutsche Oberfläche](docs/screenshots/04-german.png)
-
-**Benannte Sender** – nach *Songs von der Credits-Seite* heißt jede Gruppe wie ihr Radiosender und bekommt dessen Logo
-(Zeilen und Player); Titel, Interpreten und Sender sind für die erkannten Streams eingetragen.
-
-![Sender, Titel und Logos](docs/screenshots/08-main-stations.png)
-
-**AWC Radio** (Zusatzprogramm) – links die Sender mit Logos; der gewählte spielt seine Songs, nach jeweils 2-4 Songs
-kommt ein Jingle.
-
-![AWC Radio](docs/screenshots/06-radio.png)
-
-Beim ersten Start fragt das Radio nach der `audio.rpf` und der Textur-Datei des Spiels:
-
-![AWC Radio Einrichtung](docs/screenshots/07-radio-setup.png)
-
-*Die Screenshots zeigen Senderlogos und Songtitel aus dem Spiel; sie illustrieren nur, was das Tool aus deinen eigenen
-Spieldateien liest. Vom Spiel wird nichts mitgeliefert.*
-
-## Voraussetzungen & Installation
-
-* **Windows** (GUI und `.exe` zielen auf Windows; die Kernmodule sind reines, portables Python).
-* **Python 3 mit tkinter** (im Standard-Installer von python.org enthalten; entwickelt und getestet mit 3.14). Keine `pip`-Pakete nötig, außer **Pillow** (`pip install pillow`) für die optionalen Sender-Logos.
-* **ffmpeg + ffplay** – nur für *Abspielen* und den Export nach *FLAC/WAV/MP3*. Opus-Extraktion geht auch ohne.
-  ffmpeg gibt es unter <https://ffmpeg.org/download.html>; `ffmpeg.exe` und `ffplay.exe` **neben das Programm** oder in den `PATH` legen.
-
-```bash
-git clone https://github.com/Albotterin/AWC_from_RPF9_Extractor.git
-cd AWC_from_RPF9_Extractor
-python awc_tool.py
-```
-
-Unter Windows geht auch ein Doppelklick auf `Start AWC-Tool.bat`.
-
-## Bedienung
-
-1. **Ordner scannen…** klicken und einen Ordner mit `.rpf`/`.awc`-Dateien wählen (Unterordner inklusive) – oder
-   **Dateien öffnen (AWC/RPF)…** für einzelne Dateien. Pfade können auch auf der Kommandozeile übergeben werden:
-   ```bash
-   python awc_tool.py "D:\spiel\audio.rpf"
-   python awc_tool.py "D:\spiel"          # ganzer Ordner
-   python awc_tool.py --lang=de           # auf Deutsch starten
-   ```
-2. Scan abwarten. Der Balken zeigt, wie viel vom Archiv gelesen wurde und wie viele Musik-AWCs bisher gefunden wurden.
-3. Im Baum **stöbern**. Doppelklick auf einen Stream **spielt** ihn ab (beim ersten Mal wird er kurz in einen
-   temporären Cache extrahiert – etwa eine Sekunde pro 100 MB).
-4. **Extrahieren**: Streams, AWCs oder einen ganzen Container markieren (Strg/Umschalt für Mehrfachauswahl), **Format**
-   und **Zielordner** wählen und **Markierte extrahieren** klicken. **Alle Streams extrahieren** verarbeitet die ganze
-   Liste. *Markierte → FLAC* / *→ WAV* sind Ein-Klick-Abkürzungen.
-5. Mit **Nur Streams ab (Sek.)** lassen sich kurze Schnipsel überspringen (z. B. `60` = nur Streams ab einer Minute).
-6. **Gruppen benennen** (optional): Rechtsklick auf eine Zeile *Gruppe NN* → **Gruppe umbenennen…** (z. B. nach dem
-   Reinhören). Die Namen liegen in `%APPDATA%\AWC-Tool\group_names.json` und werden Teil des Export-Ordnernamens.
-7. **Namen** (optional) – die AWC-Dateien enthalten nur 32-Bit-Hash-IDs, keine Namen:
-   * **Namen aus Spieldateien lesen** hasht die internen Namen aus der Audio-Konfiguration des Spiels (der
-     zlib-Teil am Anfang der `audio.rpf`) und trägt Titel für die erkannten Streams ein (im Beispielarchiv etwa ein
-     Drittel der Musik-Streams; nur interne Titel, keine Interpreten). Die dort gefundenen Stationsnamen werden
-     bei **Gruppe umbenennen…** vorgeschlagen.
-   * **Songs von der Credits-Seite** lädt die Soundtrack-Liste der öffentlichen Credits-Seite des Herausgebers
-     (`rockstargames.com/VI/credits`: jeder Sender mit seinen Songs und Interpreten), hasht die Titel wie das Spiel
-     und setzt für jeden erkannten Stream **Titel, Interpret und Sender** (im Beispielarchiv etwa 660 der
-     Musik-Streams; die meisten Sender werden fast vollständig getroffen). Der Sender wird pro Track gespeichert
-     und für Tags, Playlists und als Vorschlag bei **Gruppe umbenennen…** genutzt. Schlägt der Download fehl, kann
-     die im Browser gespeicherte Seite gewählt werden. Die Liste wird nicht mitgeliefert und bleibt auf deinem PC.
-     Die Gruppen werden danach automatisch **nach ihrem Sender benannt** (die Sender liegen im Archiv hintereinander;
-     eine Gruppe über zwei Sender heißt `A + B`). Selbst vergebene Namen werden nie überschrieben, und Tracks ohne
-     Titel übernehmen für Tags und Playlists den Sender ihrer Nachbarn.
-   * **Namen importieren…** liest eine CSV/TXT/JSON-Liste (nach Stream-ID oder internem Namen), **Namensliste
-     exportieren…** schreibt eine Vorlage zum Ausfüllen, Rechtsklick → **Titel / Interpret setzen…** benennt einen
-     einzelnen Stream.
-   * Benannte Streams bekommen beim Export `Interpret - Titel` als Dateinamen und Opus/FLAC/MP3-Tags, optional
-     `.m3u8`-Playlists. Die Namen bleiben auf deinem PC (`%APPDATA%\AWC-Tool\track_names.json`), das Tool liefert
-     keine mit.
-8. **Sender-Logos** (optional): beim Abspielen wird das Logo des Radiosenders angezeigt. Die Logos liegen im Textur-Pool
-   des Spiels (`data\ttdb\ui\ttdb_ui.ttpf`, neben der `audio.rpf`) in einem Format, das dieses Tool nicht selbst
-   dekodiert. Beim ersten Start bietet ein Dialog an, den Decoder des Projekts
-   [Leonida](https://github.com/ItsNotRexed/Leonida) herunterzuladen (ein paar Dateien von GitHub, GPL-3, mit seiner
-   LICENSE nach `%APPDATA%\AWC-Tool\leonida\`; sie sind nicht Teil dieses Tools). Danach werden die Logos aus deinen
-   eigenen Spieldateien nach `%APPDATA%\AWC-Tool\icons\` geschnitten. Der Knopf **Sender-Logos…** wiederholt den
-   Schritt. Die Logos werden in voller Spielgröße (256 × 256) gespeichert. *Hinweis (24.11.2026): Das Leonida-Repository ist auf GitHub derzeit nicht erreichbar (404), der Download des Decoders schlägt für neue Nutzer deshalb fehl; früher ausgelesene Logos funktionieren weiter.* Bekannt sind 23 Sender; den Sender liefert die Credits-Liste (siehe Punkt 7). Gruppen-Zeilen bekommen ein kleines Logo, und FLAC/MP3-Exporte tragen das Logo als Cover-Bild.
-   Vom Spiel wird nichts mitgeliefert.
-9. **Sender-Mixe** (optional): ein paar sehr lange Streams (40-120 Min.) sind komplette Radio-Mixe. Das Spiel legt
-   für jeden gespielten Track einen `trackid`-Marker ab; das Tool zeigt sie als Kapitel unter dem Stream (Doppelklick
-   spielt ab dort) und benennt sie, wenn der passende Einzel-Track einen Titel hat. Mit **Sender-Mixe an
-   Track-Markern teilen** wird jedes Kapitel zusätzlich als eigene Datei in einem Ordner `... (tracks)`
-   geschrieben (braucht ffmpeg; der Schnitt ist eine Stream-Kopie, markergenau). Die Bedeutung der Marker ist
-   erschlossen, siehe `docs/FORMAT.md`.
-
-### AWC Radio (Zusatzprogramm)
-
-`awc_radio.py` (oder `Start AWC-Radio.bat` / `AWC-Radio.exe`) ist ein kleiner Webradio-Player auf Basis desselben
-Codes. Beim ersten Start wählst du die `audio.rpf` des Spiels und die Textur-Datei (`data\ttdb\ui\ttdb_ui.ttpf`).
-Die App liest das Archiv einmal ein (derselbe Scan-Cache wie das Hauptprogramm; beim ersten Mal mehrere Minuten) und
-zeigt dann jeden Sender mit seinem Logo.
-
-**Woher die Sender kommen:** Die Audio-Konfiguration des Spiels (der zlib-Teil am Anfang der `audio.rpf`) beschreibt
-jeden Radiosender mit seiner kompletten Playlist samt Titeln und Interpreten. Die Musiksender und die beiden
-**Talk-Radio**-Sender (**WKTT** und **The Wipe**) werden direkt daraus gelesen. Die Songliste der öffentlichen
-Credits-Seite liefert die Schreibweise der Namen und die Club-DJ-Sets und Mixe, die weiterhin über ihre Namen zugeordnet
-werden. Siehe [docs/FORMAT.md](docs/FORMAT.md) (englisch).
-
-Ein Klick auf einen Sender schaltet ihn ein: seine Songs laufen nacheinander, nach jeweils 2-4 Songs kommt ein kurzer
-Jingle. Beim Talk-Radio ist ein „Titel“ eine ganze Sendungsfolge (ihre Teile am Stück, 10-23 Minuten). Das Programm wird
-aus der **UTC-Uhrzeit** berechnet (jeden UTC-Tag eine neue Reihenfolge, Jingles inklusive), jeder Sender „läuft“ also im
-Hintergrund weiter: Wer zu einem anderen Sender und zurück wechselt, landet dort, wo der erste Sender inzwischen ist.
-Alle mit denselben Spieldateien und derselben Uhrzeit hören denselben Song zur selben Sekunde (auf etwa eine Sekunde
-genau; der Song, der über Mitternacht UTC laufen würde, wird abgeschnitten). Aufeinanderfolgende Songs und Jingles werden
-3 Sekunden lang **überblendet** (um kurze Jingles herum kürzer), für alle im selben Moment. Es gibt keinen
-Überspringen-Knopf – wie bei einem echten Radio; nach einer Pause geht es live weiter. Spätere Starts gehen sofort. Als
-**Jingles** dienen die kurzen Aufnahmen (Senderkennungen und DJ-Ansagen), die nur dieser Sender benutzt; bei den
-Club-DJ-Sets ist das eine begründete Vermutung. Die Werbung, die sich mehrere Sender teilen, wird nicht gespielt. Braucht
-wie das Hauptprogramm `ffplay`.
-
-**Fortschritt:** 792 von 809 Songs, die die Credits für die Musiksender nennen (97,9 %), sind gefunden, dazu alle 15 Folgen
-der Talk-Sendungen; alle Sender in [Fortschritt der Sender](docs/RADIO-PROGRESS.de.md).
-Lange DJ-Mixe laufen auch als Sender: **The Vault Radio**, zusätzliche „(Mix)“-Sender für Radio On-U, Worldwide FM und The Sniper Of La Perle sowie **Clubmixes** (die Club- und DJ-Mixe, die noch keinem Sender zugeordnet werden können). Während ein Mix läuft, wird der Titel des aktuellen Abschnitts angezeigt (aus den Markern im Mix; ein Abschnitt hat nur dann einen Namen, wenn der Marker auf einen bekannten Song zeigt).
-
-### AWC Radio für Android
-
-Die Handy-App spielt dasselbe Live-Programm wie der PC: gleiche UTC-Uhr, gleiche Reihenfolge, gleiche Überblendungen.
-Es sind zwei Dateien:
-
-* **`AWC-Radio.apk`** - die App, von der [Release-Seite](../../releases/latest). Für alle dieselbe Datei, ohne Spieldaten.
-  Android 7.0 oder neuer, Deutsch und Englisch. Sie spielt im Hintergrund weiter, mit Medien-Benachrichtigung,
-  Sperrbildschirm- und Kopfhörertasten (voriger / nächster Sender, Pause) und hat einen Einschlaftimer. **Android Auto** wird unterstützt: Die Sender erscheinen als Raster mit ihren Logos, der Player-Bildschirm zeigt Song und Sender, und Sprachbefehle („Spiele Radio On-U auf AWC Radio“) funktionieren. Da die App nicht aus dem Play Store kommt, muss in den Entwicklereinstellungen von Android Auto zuerst „Unbekannte Quellen“ aktiviert werden.
-* **Ein Sender-Pack (`.dat`)** - wird am PC erzeugt: in AWC Radio auf **Android-Pack...** klicken, Sender ankreuzen und
-  speichern. Darin liegen die Songs dieser Sender in der Originalqualität des Spiels (ca. 128 kbit/s, nicht neu kodiert;
-  etwa 4 GB für alle 30 Sender), ihre Logos und das Programm. Aufs Handy kopieren, die App starten und die Datei
-  einmal auswählen; die Songs werden direkt daraus abgespielt.
-
-Das Pack enthält Spiel-Audio: nur für den eigenen Gebrauch, bitte nicht weitergeben. Ohne Pack ist die App leer.
-`python awc_radio.py --export-pack out.dat [--stations "Name" ...]` schreibt ein Pack ohne Fenster. Quelltext und
-Build-Skripte der App liegen in `android/`.
-
-Kommandozeile: `python awc_tool.py [--lang=en|de] [Ordner | datei.awc | datei.rpf ...]`
-
-## Ausgabeformate und Dateinamen
-
-| Format | Größe (Stereo, pro Stunde) | Hinweis |
-|---|---|---|
-| **Opus** | ≈ 58 MB | Originalpakete im Ogg-Container – **bitgleiches Audio, keine Neukodierung**. |
-| FLAC | ≈ 600 MB | Verlustfreie Kopie des *dekodierten* Audios (die Quelle ist verlustbehaftetes Opus). |
-| WAV | ≈ 700 MB | 16 Bit PCM, 48 kHz. Sehr groß. |
-| MP3 | ≈ 140 MB | 320 kbit/s, aus dem dekodierten Audio neu kodiert. |
-
-> Die Quelle ist verlustbehaftet (Opus, 128 kbit/s Stereo). FLAC/WAV verbessern die Qualität nicht – sie dienen der
-> Kompatibilität mit Programmen, die kein Opus lesen können.
-
-Dateiname: `<Zielordner>/<Container>/<Gruppenordner>/<awc-name>_stream<N>_<STREAMID>.<ext>`, z. B.
-`AWC-Export/audio/group_04/audio_956_at_000000015034A000_stream0_1D7CA6CC.opus` (nach dem Benennen der Gruppe z. B.
-`group_04_Mein Sender/…`) – `group_04` ist die Gruppe (siehe [Gruppierung](#gruppierung-was-gehört-zusammen)), `956` die laufende Nummer des AWC-Headers,
-`000000015034A000` der Byte-Offset im Archiv, `1D7CA6CC` die 32-Bit-Stream-ID (ein Hash; echte Namen stehen nicht in der AWC).
-
-## So funktioniert es
-
-```
-audio.rpf (28 GB)
-  └─ Suche nach "ADAT" ──► Kandidaten ──► strenge Header-Prüfung ──► AWC bei Offset X, Länge L
-        └─ Chunk-Tabelle: 0x48 Stream-Format · 0x55 Daten · 0xA3 Seek-Tabelle · 0xBD Events
-              └─ Daten = Blöcke à 512 KiB
-                    └─ Block: Kanal-Tabelle · Seek-Tabellen · 0x800-Byte-Einheiten [u16 Länge | Opus-Paket]*
-                          └─ Opus-Pakete ──► Ogg-Seiten (OpusHead/OpusTags + CRC) ──► .opus
-                                                  └─ ffmpeg ──► FLAC / WAV / MP3
-```
-
-Die Byte-genaue Beschreibung steht in **[docs/FORMAT.md](docs/FORMAT.md)** (englisch).
-
-## Gruppierung: was gehört zusammen?
-
-Das RPF9-Inhaltsverzeichnis ist nicht lesbar, das Archiv verrät also nicht, welche AWC zu welchem Sender oder Ordner
-gehört. Das Tool nutzt deshalb eine **Heuristik über die physische Anordnung**:
-
-* Dateien eines Ordners liegen **direkt hintereinander**; zwischen zwei Ordnern gibt es meist eine größere Lücke (und
-  eine Nicht-Musik-AWC). Eine neue Gruppe beginnt, wenn die Lücke zur vorigen Musik-AWC **≥ 64 KiB** ist oder die
-  laufende AWC-Nummer springt (= dazwischen liegt eine Nicht-Musik-AWC).
-* Im Beispiel-Archiv ergab das **29 Gruppen** (eine mit ~300 Dateien, einige mit nur 4–7 langen Stücken).
-* Typischer Inhalt: Songs (3–5 Min.), viele kurze Sprach-/Jingle-Schnipsel und manchmal ein 1–2-stündiger
-  Dauerstream. Gruppen mit nur sehr kurzen Schnipseln sind vermutlich gar kein Radio.
-
-**Was es nicht kann:** sagen, welcher Sender eine Gruppe ist (das Tool schlägt nur die in der Spiel-Konfiguration gefundenen
-Sendernamen vor). Eine Gruppe ist *wahrscheinlich* ein Ordner,
-aber das ist ein Schluss, keine Tatsache. Ein paar Titel anhören, dann die Gruppen im Tool benennen.
-Praktisch: `Nur Streams ab (Sek.)` mit `90` behält nur die echten Titel.
-
-Im Code: `awc_core.add_groups(items)` setzt `item["g"]` (ab 1) auf den Einträgen des Scanners.
-
-## Als Bibliothek nutzen
-
-```python
-import awc_core as core
-
-items, total_awc, from_cache = core.scan_container_cached(r"D:\spiel\audio.rpf")
-ref = core.AwcRef(items[0])
-jobs = {s.index: f"out_{s.index}_{s.id:08X}.opus" for s in ref.streams if s.supported}
-seconds = ref.extract(jobs, progress=lambda f: print(f"{f:.0%}"))
-```
-
-## Eigene `.exe` bauen
-
-```bat
-build_exe.bat
-```
-
-Installiert bei Bedarf PyInstaller und erzeugt `dist\AWC-Tool.exe`. `ffmpeg.exe` und `ffplay.exe` daneben legen.
-(Die `.exe` und ffmpeg sind bewusst **nicht** Teil dieses Repositories. PyInstaller-Programme werden von Virenscannern
-manchmal fälschlich gemeldet – im Zweifel aus dem Quellcode starten.)
-
-## Sprachen
-
-Die Oberfläche lässt sich jederzeit über das Feld **Sprache** (oben rechts) umschalten; die Wahl wird in
-`%APPDATA%\AWC-Tool\settings.json` gespeichert. Aktuell: **English** (Standard) und **Deutsch**. Weitere Sprachen:
-in `awc_i18n.py` einen Eintrag in `LANGUAGES` und eine Tabelle in `STRINGS` ergänzen (fehlende Schlüssel fallen auf
-Englisch zurück). Pull Requests mit Übersetzungen sind willkommen.
-
-## Einschränkungen
-
-* **Nur Musik-Container mit Opus-Codec (`0x0B`)**. Andere AWC-Arten (Effekte, Sprache, Vorbis/ADPCM/XMA …) werden
-  als „kein Musik-Container“ erkannt und übersprungen.
-* Das **RPF9-Inhaltsverzeichnis wird nicht gelesen** (es wirkt verschlüsselt/verschleiert) – deshalb gibt es **keine
-  echten Dateinamen**, nur Offsets und Stream-IDs.
-* **Gruppen sind eine Layout-Heuristik** (siehe oben), keine echten Ordner; Namen musst du selbst vergeben.
-* Entwickelt und getestet mit den AWC-Dateien **eines** RPF9-Archivs; andere Spiele/Versionen können abweichen.
-* Dauern in der Liste (mit `~`) stammen aus der Sample-Zahl im Stream-Header. Im Beispielarchiv stimmten sie bei 2236
-  von 2240 Streams auf 1 % genau mit den Längen aus der Audio-Konfiguration des Spiels überein; die genaue Länge steht
-  nach Extraktion/Wiedergabe fest.
-* Beim Spulen startet `ffplay` an der neuen Stelle neu (kurze Lücke ist normal).
-
-## Fehlerbehebung
-
-| Problem | Lösung |
-|---|---|
-| Warnung „ffmpeg fehlt“ | `ffmpeg.exe` und `ffplay.exe` neben das Programm oder in den `PATH`. Opus-Extraktion geht trotzdem. |
-| Scan großer Archive ist langsam | Festplatten-Tempo (≈ 80 MB/s HDD, SSD deutlich schneller). Der zweite Lauf ist dank Cache sofort fertig. |
-| Neu scannen | **Scan-Cache nutzen** abwählen (oder `%APPDATA%\AWC-Tool\cache` löschen). |
-| „Kein Mehrkanal-Musik-Container“ | Es ist eine andere AWC-Art (Effekte/Sprache) – nicht unterstützt. |
-| Zu wenig Speicherplatz | WAV/FLAC sind groß – Opus nehmen oder nach Dauer filtern. |
-
-## Lizenz & Credits
+Das AWC-Block-Layout wurde mit Hilfe von [**vgmstream**](https://github.com/vgmstream/vgmstream) erarbeitet; allgemeines
+AWC/RPF-Wissen stammt aus der Community, v. a. von [**CodeWalker**](https://github.com/dexyfex/CodeWalker). Das Layout der
+Audio-Konfiguration folgt den Notizen von [**Leonida**](https://github.com/ItsNotRexed/Leonida). Abspielen und
+Konvertieren übernimmt [FFmpeg](https://ffmpeg.org/).
 
 [MIT](LICENSE) – gilt nur für den Quellcode, nicht für Spieldaten.
-
-Das Block-Layout der AWC-Musikstreams wurde anhand des Open-Source-Codes von
-[vgmstream](https://github.com/vgmstream/vgmstream) (`awc.c`, `awc_streamfile.h`) und durch Analyse von Beispieldateien
-erarbeitet; allgemeines AWC/RPF-Wissen stammt aus der Community, v. a. von
-[CodeWalker](https://github.com/dexyfex/CodeWalker). Opus: Xiph.Org/IETF (RFC 6716), Ogg: RFC 3533/7845.
-Abspielen und Konvertieren übernimmt [FFmpeg](https://ffmpeg.org/).
-
-Das Layout der Audio-Konfiguration des Spiels (Namensliste, die 29-Bit-Stream-IDs als `joaat`-Hashes) folgt den Notizen
-von [Leonida](https://github.com/ItsNotRexed/Leonida) (`docs/audio_config.md`, `docs/audio.md`). Die Funde zu den
-`0xBD`-Markern in `docs/FORMAT.md` wurden dort zurückgemeldet.
-
-Das Startbild-Symbol der Android-App wurde mit der Fan-Schrift *GTA Art Deco* gezeichnet (nicht Teil dieses Repositorys).

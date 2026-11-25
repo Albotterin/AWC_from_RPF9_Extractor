@@ -30,7 +30,8 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path[:0] = [HERE, os.path.join(os.path.dirname(HERE), "extractor")]   # the shared modules live with the extractor
 import awc_i18n  # noqa: E402
 import awc_icons as icons  # noqa: E402
 

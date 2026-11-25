@@ -32,6 +32,6 @@ __pycache__/
 *.apk
 *.idsig
 *.p12
-android/keys/
-android/build/
-android/test/build/
+**/android/keys/
+**/android/build/
+**/android/test/build/
