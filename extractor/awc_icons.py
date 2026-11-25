@@ -12,6 +12,7 @@ import awc_logos
 
 POOL = os.path.join("data", "ttdb", "ui", "ttdb_ui.ttpf")
 ICON_SIZE = 256          # the game's logos are 256 x 256: keep them at full size (earlier versions saved 128)
+OWN_LOGOS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logos")      # our own designs (make_station_logos.py)
 
 # station name (as on the credits page) -> asset key of its logo in ttdb_ui.ttpf
 STATION_KEYS = {
@@ -23,11 +24,16 @@ STATION_KEYS = {
     "Kaleidoscope FM": 16012335521546458767, "Leonida Jazz Radio": 13404308210168051815,
     "Radio La Ola": 1328110711360071785, "Radio On-U": 14262925714437913040,
     "Stockyard FM": 1178477634407948612, "Symphony FM": 11064473243466034039,
-    "The Chamber 106.6": 11926422907678209697,
+    "The Chamber 106.6": 11926422907678209697, "The Sniper Of La Perle": 1200660029869278654,
     "The Wipe Talk Radio": 1649912805196772093, "V-Rock": 859321332381681553,
     "Vice City FM": 13940589714920136956, "Vice City Rap Radio": 15555537565538920778,
     "WKTT Talk Radio": 2259141511428128088, "Worldwide FM": 4853129926419308999,
+    "Thrillbilly Mud Club": 5000657249313955474,
+    "Jack of Hearts": 6811332632485254002, "VYB": 11378843460216095013,
 }
+ROUND = ("Jack of Hearts", "VYB")          # badges drawn as a circle: the corners get the colour of the circle's edge
+SAME_LOGO = {"The Vault (Club)": "The Vault Radio",
+             "DJ Stevie J": "VYB"}                       # the club where this DJ is resident
 
 
 def _appdata():
@@ -43,12 +49,16 @@ def slug(station):
 
 
 def icon_path(station):
-    """Path of the extracted logo of a station, or "" if there is none."""
+    """Path of the logo of a station (extracted from the game, else one of our own), or "" if there is none."""
     if not station:
         return ""
     station = re.sub(r"\s*\(Mix\)$", "", station)              # a mix station uses the logo of its station
-    p = os.path.join(icon_dir(), slug(station) + ".png")
-    return p if os.path.isfile(p) else ""
+    station = SAME_LOGO.get(station, station)
+    for folder in (icon_dir(), OWN_LOGOS):
+        p = os.path.join(folder, slug(station) + ".png")
+        if os.path.isfile(p):
+            return p
+    return ""
 
 
 def find_pool(rpf_path):
@@ -76,6 +86,20 @@ def missing_stations():
     return out
 
 
+def _squared(im):
+    """A round badge on a square: its inside, faded into the colour found near its edge (without the outline ring)."""
+    from PIL import Image, ImageDraw, ImageFilter  # noqa: PLC0415
+    w, h = im.size
+    colour = im.getpixel((w // 2, h * 9 // 100))[:3]
+    inside = Image.new("L", im.size, 0)
+    inner = (w * 6 // 100, h * 6 // 100, w - w * 6 // 100, h - h * 6 // 100)
+    ImageDraw.Draw(inside).ellipse(inner, fill=255)
+    inside = inside.filter(ImageFilter.GaussianBlur(w * 0.025))
+    out = Image.new("RGBA", im.size, colour + (255,))
+    out.paste(im.convert("RGB"), (0, 0), inside)
+    return out
+
+
 def extract(pool_path, progress=None):
     """Cut the missing station logos out of the texture pool. Returns the number of logos written. Needs Pillow."""
     todo = missing_stations()
@@ -91,6 +115,8 @@ def extract(pool_path, progress=None):
             except awc_logos.LogoError:
                 im = None                                       # this texture is stored differently: no logo
             if im is not None:
+                if station in ROUND:
+                    im = _squared(im)
                 if im.size != (ICON_SIZE, ICON_SIZE):
                     im = im.resize((ICON_SIZE, ICON_SIZE), Image.LANCZOS)
                 dst = icon_path_for_write(station)

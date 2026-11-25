@@ -296,6 +296,7 @@ extractor/
   awc_credits.py      Liest die öffentliche Credits-Seite und ordnet ihre Songs Stream-IDs zu
   awc_icons.py        Optional: schneidet die Sender-Logos aus dem Spiel
   awc_logos.py        Kleiner Leser für die Logo-Texturen im UI-Textur-Pool des Spiels
+  logos/              Selbst gezeichnete Bilder für Sender, die die Programme selbst bilden (make_station_logos.py)
   Start AWC-Tool.bat  Starter
   build_exe.bat       Baut dist\AWC-Tool.exe mit PyInstaller
   docs/FORMAT.md      Technische Notizen zum AWC/RPF9-Aufbau (englisch)

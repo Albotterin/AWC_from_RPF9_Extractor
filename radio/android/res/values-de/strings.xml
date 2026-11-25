@@ -2,23 +2,22 @@
 <resources>
     <string name="app_name">AWC Radio</string>
 
-    <string name="choose_pack">Sender-Pack wählen …</string>
+    <string name="choose_folder">Ordner wählen …</string>
     <string name="setup_title">Willkommen</string>
-    <string name="setup_hint">Wähle das Sender-Pack (.dat) aus, das AWC Radio am PC geschrieben hat (Knopf „Android-Pack …“) und das du auf dieses Handy kopiert hast.</string>
-    <string name="header_sub">%1$d Sender · Live-Programm</string>
-    <string name="pack_open_error">Das gespeicherte Pack konnte nicht geöffnet werden: %1$s</string>
-    <string name="pack_invalid">Das ist kein gültiges Sender-Pack: %1$s</string>
-
-    <string name="tap_station">Sender antippen</string>
+    <string name="setup_hint">Kopiere deine Sender-Packs (.radiopak) in einen Ordner auf diesem Handy, zum Beispiel „AWC-Radio“, und wähle diesen Ordner aus. Später hinzugefügte Packs erscheinen von selbst. AWC Radio am PC erzeugt sie (Knopf „Android-Packs …“).</string>
+    <string name="folder_error">Der Ordner konnte nicht gelesen werden: %1$s</string>
+    <string name="folder_empty_title">Noch keine Sender</string>
+    <string name="folder_empty">Im Ordner „%1$s“ liegt kein lesbares Sender-Pack (.radiopak). Packs hineinkopieren und neu laden, oder einen anderen Ordner wählen.</string>
     <string name="loading">Lade …</string>
     <string name="up_next">Als Nächstes: %1$s</string>
     <string name="jingle">Jingle</string>
     <string name="live">LIVE</string>
-    <string name="station_live">%1$s · LIVE</string>
     <string name="songs_count">%1$d Songs</string>
+    <string name="shows_count">%1$d Sendungen</string>
 
     <string name="menu_sleep">Einschlaftimer</string>
-    <string name="menu_pack">Sender-Pack ändern …</string>
+    <string name="menu_reload">Sender neu laden</string>
+    <string name="menu_folder">Ordner ändern …</string>
     <string name="menu_battery">Akku-Einstellungen</string>
     <string name="menu_info">Info &amp; Protokoll</string>
 
@@ -40,12 +39,79 @@
     <string name="act_menu">Mehr</string>
 
     <string name="info_title">Info &amp; Protokoll</string>
-    <string name="info_body">Version: %1$s\nSender-Pack: %2$s\nErstellt: %3$s\nSender: %4$d, Songs: %5$d\nHandy-Zeit (UTC): %6$s</string>
+    <string name="info_body">Version: %1$s\nOrdner: %2$s\nPacks: %3$d\nSender: %4$d, Songs und Sendungen: %5$d\nHandy-Zeit (UTC): %6$s</string>
+    <string name="info_skipped">Übersprungen: %1$s</string>
+    <string name="reloaded">%1$d Sender, %2$d Datei(en) übersprungen</string>
     <string name="info_close">Schließen</string>
     <string name="info_copy">Protokoll kopieren</string>
     <string name="info_copied">Protokoll kopiert</string>
     <string name="battery_failed">Die Akku-Einstellungen konnten nicht geöffnet werden</string>
 
-    <string name="auto_no_pack">Wähle zuerst in der AWC-Radio-App auf dem Handy das Sender-Pack aus.</string>
+    <string name="auto_no_pack">Wähle zuerst in der AWC-Radio-App auf dem Handy den Ordner mit den Sender-Packs aus.</string>
     <string name="stations">Sender</string>
+
+    <string name="tab_radio">Radio</string>
+    <string name="tab_alarms">Wecker</string>
+    <string name="paused">Pausiert</string>
+    <string name="tap_play">Zum Einschalten auf Play tippen</string>
+    <string name="wake_with_station">Mit diesem Sender wecken</string>
+    <string name="act_close">Schließen</string>
+    <string name="station_last">Zuletzt gehörter Sender</string>
+    <string name="station_missing">%1$s (Pack fehlt)</string>
+
+    <string name="alarm_new">Neuer Wecker</string>
+    <string name="alarm_edit">Wecker ändern</string>
+    <string name="alarm_time">Uhrzeit %1$s, zum Ändern tippen</string>
+    <string name="alarm_station">Sender</string>
+    <string name="alarm_volume">Lautstärke</string>
+    <string name="alarm_fade">Sanft lauter werden</string>
+    <string name="fade_off">Aus</string>
+    <string name="fade_seconds">über %1$d Sekunden</string>
+    <string name="fade_minutes">über %1$d Min.</string>
+    <string name="alarm_snooze_length">Schlummern</string>
+    <string name="alarm_vibrate">Vibrieren</string>
+    <string name="alarm_safety">Ist das Radio nicht zu hören, etwa weil das Pack fehlt, klingelt stattdessen der Weckton des Handys.</string>
+    <string name="alarm_test">Probehören</string>
+    <string name="alarm_save">Wecker speichern</string>
+    <string name="alarm_delete">Wecker löschen</string>
+    <string name="alarm_delete_ask">Den Wecker um %1$s löschen?</string>
+    <string name="alarm_next">Klingelt %1$s</string>
+    <string name="alarm_chip">Wecker %1$s</string>
+    <string name="alarm_all_off">Alle Wecker sind aus</string>
+    <string name="alarm_empty_title">Noch kein Wecker</string>
+    <string name="alarm_empty_hint">Lass dich von einem Sender wecken: Er läuft live, so wie beim Einschalten des Radios.</string>
+    <string name="alarm_switch">Wecker um %1$s</string>
+
+    <string name="alarm_ringing_title">Wecker %1$s</string>
+    <string name="alarm_snooze">%1$d Min. schlummern</string>
+    <string name="alarm_stop">Wecker aus</string>
+    <string name="alarm_keep">Wecker aus und weiterhören</string>
+    <string name="alarm_tone">Weckton</string>
+    <string name="alarm_fallback">Das Radio ist nicht zu hören, deshalb klingelt der Weckton des Handys.</string>
+    <string name="alarm_testing">Das ist ein Probelauf. Er endet nach einer Minute von selbst.</string>
+    <string name="alarm_test_end">Probelauf beenden</string>
+    <string name="alarm_snoozing">Schlummert bis %1$s</string>
+    <string name="alarm_cancel_snooze">Schlummern abbrechen</string>
+    <string name="alarm_missed">Wecker verpasst</string>
+
+    <string name="days_once">Einmalig</string>
+    <string name="days_every">Jeden Tag</string>
+    <string name="days_work">Montag bis Freitag</string>
+    <string name="days_weekend">Am Wochenende</string>
+    <string-array name="days_short">
+        <item>Mo</item><item>Di</item><item>Mi</item><item>Do</item><item>Fr</item><item>Sa</item><item>So</item>
+    </string-array>
+    <string-array name="days_long">
+        <item>Montag</item><item>Dienstag</item><item>Mittwoch</item><item>Donnerstag</item><item>Freitag</item><item>Samstag</item><item>Sonntag</item>
+    </string-array>
+    <string name="until_days">in %1$d T. %2$d Std.</string>
+    <string name="until_hours">in %1$d Std. %2$d Min.</string>
+    <string name="until_minutes">in %1$d Min.</string>
+
+    <string name="warn_notifications">Benachrichtigungen sind aus. Ohne sie hat ein klingelnder Wecker keinen Bildschirm zum Ausschalten.</string>
+    <string name="warn_exact">Android erlaubt dieser App keine genauen Wecker, deshalb kann ein Wecker verspätet klingeln.</string>
+    <string name="warn_fullscreen">Der Weck-Bildschirm erscheint vielleicht nicht über dem Sperrbildschirm.</string>
+    <string name="warn_allow">In den Einstellungen erlauben</string>
+    <string name="notif_alarm">Wecker</string>
+    <string name="notif_alarm_info">Schlummernde und verpasste Wecker</string>
 </resources>

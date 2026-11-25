@@ -29,6 +29,7 @@ __pycache__/
 
 # --- Android: station packs and APKs made from game data stay local; signing keys never go online ---
 *.dat
+*.radiopak
 *.apk
 *.idsig
 *.p12

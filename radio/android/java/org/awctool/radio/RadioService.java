@@ -38,14 +38,14 @@ import java.util.List;
  * focus handling (calls, other apps), pause when the headphones are unplugged, a sleep timer, and a programme that is
  * calculated from the UTC clock exactly like on the PC (Schedule, played by Engine).
  */
-public class RadioService extends MediaBrowserService {
+public class RadioService extends MediaBrowserService implements PackStore.Listener {
     static final String ACTION_PLAY = "org.awctool.radio.PLAY";
     static final String ACTION_TOGGLE = "org.awctool.radio.TOGGLE";
     static final String ACTION_STOP = "org.awctool.radio.STOP";
     static final String ACTION_NEXT = "org.awctool.radio.NEXT";
     static final String ACTION_PREV = "org.awctool.radio.PREV";
     static final String ACTION_SLEEP = "org.awctool.radio.SLEEP";
-    static final String EXTRA_STATION = "station";
+    static final String EXTRA_STATION = "station";        // the station's name
     static final String EXTRA_MINUTES = "minutes";
     static final String EXTRA_QUERY = "query";            // a spoken station name from the voice assistant
 
@@ -55,7 +55,7 @@ public class RadioService extends MediaBrowserService {
     private static final String CHANNEL = "radio";
     private static final long PAUSE_TIMEOUT_MS = 30L * 60 * 1000;     // a pause that is forgotten ends the service
     private static final long SLEEP_FADE_MS = 8000;
-    private static final String PREFS = "radio";
+    static final String PREFS = "radio", PREF_LAST = "lastName";
     private static final long WAKE_LOCK_MS = 30L * 60 * 1000;
 
     public final class LocalBinder extends Binder {
@@ -74,7 +74,6 @@ public class RadioService extends MediaBrowserService {
 
     private final IBinder binder = new LocalBinder();
     private final Handler handler = new Handler(Looper.getMainLooper());
-    private Pack pack;
     private List<Library.Station> stations;
     private Library.Station station;
     private Engine engine;
@@ -234,6 +233,7 @@ public class RadioService extends MediaBrowserService {
         Intent open = new Intent(this, MainActivity.class).setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         session.setSessionActivity(PendingIntent.getActivity(this, 0, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
         setSessionToken(session.getSessionToken());                 // lets browsers (Android Auto) connect to the session
+        PackStore.addListener(this);
         AppLog.d("service created");
     }
 
@@ -263,24 +263,24 @@ public class RadioService extends MediaBrowserService {
     public void onLoadChildren(final String parentId, final Result<List<MediaBrowser.MediaItem>> result) {
         result.detach();                                              // decoding the logos takes a moment: not on the main thread
         final Context ctx = getApplicationContext();
+        PackStore.refresh(ctx, null);                                 // new files show up through onStationsChanged
         new Thread(() -> {
             List<MediaBrowser.MediaItem> out = new ArrayList<>();
             try {
-                Pack p = PackStore.get(ctx);
-                if (p == null || p.stations().isEmpty()) {
+                List<Library.Station> list = PackStore.get(ctx).stations;
+                if (list.isEmpty()) {
                     out.add(new MediaBrowser.MediaItem(new MediaDescription.Builder().setMediaId(NOPACK)
                             .setTitle(getString(R.string.auto_no_pack)).build(), MediaBrowser.MediaItem.FLAG_PLAYABLE));
                 } else {
-                    List<Library.Station> list = p.stations();
-                    int only = RECENT.equals(parentId) ? lastStation() : -1;
+                    int only = RECENT.equals(parentId) ? lastStation(list) : -1;
                     for (int i = 0; i < list.size(); i++) {
                         if (RECENT.equals(parentId) && i != only) continue;
                         Library.Station st = list.get(i);
                         out.add(new MediaBrowser.MediaItem(new MediaDescription.Builder()
-                                .setMediaId(STATION_ID + i)
+                                .setMediaId(STATION_ID + st.name)
                                 .setTitle(st.name)
-                                .setSubtitle(getString(R.string.songs_count, st.songs.size()))
-                                .setIconBitmap(Logos.get(p, st, 192))
+                                .setSubtitle(getString(st.talk ? R.string.shows_count : R.string.songs_count, st.songs.size()))
+                                .setIconBitmap(Logos.get(st, 192))
                                 .build(), MediaBrowser.MediaItem.FLAG_PLAYABLE));
                     }
                 }
@@ -291,17 +291,18 @@ public class RadioService extends MediaBrowserService {
         }, "awc-browse").start();
     }
 
-    private static int stationOfMediaId(String id) {
+    private int stationOfMediaId(String id) {
         if (id == null || !id.startsWith(STATION_ID)) return -1;
-        try {
-            return Integer.parseInt(id.substring(STATION_ID.length()));
-        } catch (NumberFormatException e) {
-            return -1;
-        }
+        return Catalog.indexOf(PackStore.get(this).stations, id.substring(STATION_ID.length()));
+    }
+
+    /** The station heard last (by name: the list changes when packs are added), else the first one. */
+    private int lastStation(List<Library.Station> list) {
+        return Math.max(0, Catalog.indexOf(list, getSharedPreferences(PREFS, MODE_PRIVATE).getString(PREF_LAST, "")));
     }
 
     private int lastStation() {
-        return getSharedPreferences(PREFS, MODE_PRIVATE).getInt("last", 0);
+        return lastStation(PackStore.get(this).stations);
     }
 
     private int stationForQuery(String query) {
@@ -312,11 +313,9 @@ public class RadioService extends MediaBrowserService {
     /** The station whose name best matches a spoken query, or -1. */
     private int findStation(String query) {
         if (query == null || query.trim().isEmpty()) return -1;
-        Pack p = PackStore.get(this);
-        if (p == null) return -1;
         String q = norm(query);
         int best = -1, bestLen = Integer.MAX_VALUE;
-        List<Library.Station> list = p.stations();
+        List<Library.Station> list = PackStore.get(this).stations;
         for (int i = 0; i < list.size(); i++) {
             String n = norm(list.get(i).name);
             if (n.equals(q)) return i;
@@ -349,7 +348,7 @@ public class RadioService extends MediaBrowserService {
         if (session == null || stations == null) return;
         List<MediaSession.QueueItem> q = new ArrayList<>();
         for (int i = 0; i < stations.size(); i++) {
-            q.add(new MediaSession.QueueItem(new MediaDescription.Builder().setMediaId(STATION_ID + i)
+            q.add(new MediaSession.QueueItem(new MediaDescription.Builder().setMediaId(STATION_ID + stations.get(i).name)
                     .setTitle(stations.get(i).name).build(), i));
         }
         session.setQueue(q);
@@ -364,7 +363,7 @@ public class RadioService extends MediaBrowserService {
             if (ACTION_PLAY.equals(action)) {
                 startForegroundNow();             // must happen within seconds of startForegroundService(), whatever follows
                 play(intent.hasExtra(EXTRA_QUERY) ? stationForQuery(intent.getStringExtra(EXTRA_QUERY))
-                        : intent.getIntExtra(EXTRA_STATION, 0));
+                        : Catalog.indexOf(PackStore.get(this).stations, intent.getStringExtra(EXTRA_STATION)));
             } else if (ACTION_TOGGLE.equals(action)) {
                 toggle();
             } else if (ACTION_NEXT.equals(action)) {
@@ -396,6 +395,7 @@ public class RadioService extends MediaBrowserService {
     @Override
     public void onDestroy() {
         AppLog.d("service destroyed");
+        PackStore.removeListener(this);
         handler.removeCallbacksAndMessages(null);
         if (engine != null) engine.stop();
         unregisterReceivers();
@@ -419,15 +419,15 @@ public class RadioService extends MediaBrowserService {
                 AppLog.e("startService", e);                          // still bound by the controller: plays on regardless
             }
         }
-        pack = PackStore.get(this);
-        if (pack == null || pack.stations().isEmpty()) {
-            AppLog.d("play: no usable station pack (" + PackStore.error + ")");
+        List<Library.Station> list = PackStore.get(this).stations;
+        if (list.isEmpty()) {
+            AppLog.d("play: no station pack (" + PackStore.error + ")");
             stopAll();
             showError(getString(R.string.auto_no_pack));                // the car screen says what to do
             return;
         }
-        boolean newList = stations == null || stations != pack.stations();
-        stations = pack.stations();
+        boolean newList = stations != list;
+        stations = list;
         if (index < 0 || index >= stations.size()) index = 0;
         if (newList) publishQueue();
         handler.removeCallbacks(tickRun);
@@ -439,9 +439,8 @@ public class RadioService extends MediaBrowserService {
         title = artist = nextText = "";
         jingle = false;
         itemStart = itemEnd = 0;
-        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putInt("last", index).apply();
-        final Pack p = pack;
-        engine = new Engine(station.schedule, clock, track -> new PackPlayer(p, "t/" + track.key));
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(PREF_LAST, stationName).apply();
+        engine = newEngine(station);
         state = PLAYING;
         pausedByFocus = false;
         applyDuck();
@@ -455,6 +454,41 @@ public class RadioService extends MediaBrowserService {
         AppLog.d("play station " + index + ": " + stationName);
     }
 
+    private Engine newEngine(Library.Station st) {
+        final Pack p = st.pack;
+        return new Engine(st.schedule, clock, track -> new PackPlayer(p, "t/" + track.key, AudioAttributes.USAGE_MEDIA));
+    }
+
+    /** Packs were added, replaced or removed: keep playing the same station if it is still there. */
+    @Override
+    public void onStationsChanged() {
+        if (state != STOPPED) {
+            List<Library.Station> list = PackStore.get(this).stations;
+            int idx = Catalog.indexOf(list, stationName);
+            if (idx < 0) {
+                AppLog.d("the pack of " + stationName + " is gone: stop");
+                stopAll();
+            } else if (list.get(idx) != station && state == PLAYING) {
+                AppLog.d("new pack for " + stationName);
+                play(idx);                                           // tune in again, with the new programme
+            } else {
+                if (list.get(idx) != station) {                      // paused: take the new pack for the next start
+                    station = list.get(idx);
+                    if (engine != null) engine.stop();
+                    engine = newEngine(station);
+                }
+                stations = list;
+                stationIndex = idx;
+                publishQueue();
+                updateSession();
+                updateNotification();
+            }
+        } else {
+            stations = null;
+        }
+        notifyChildrenChanged(ROOT);                                 // the car reads its station list again
+    }
+
     void toggle() {
         if (state == PLAYING) {
             pausedByFocus = false;
@@ -466,13 +500,9 @@ public class RadioService extends MediaBrowserService {
 
     /** Previous (-1) / next (+1) station, wrapping around. */
     void skip(int delta) {
-        if (stations == null) {
-            pack = PackStore.get(this);
-            if (pack == null) return;
-            stations = pack.stations();
-        }
+        if (stations == null) stations = PackStore.get(this).stations;
         if (stations.isEmpty()) return;
-        int base = stationIndex >= 0 ? stationIndex : getSharedPreferences(PREFS, MODE_PRIVATE).getInt("last", 0);
+        int base = stationIndex >= 0 ? stationIndex : lastStation(stations);
         play(((base + delta) % stations.size() + stations.size()) % stations.size());
     }
 
@@ -611,7 +641,7 @@ public class RadioService extends MediaBrowserService {
                 .putString(MediaMetadata.METADATA_KEY_ALBUM, stationName)
                 .putString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE, title.isEmpty() ? stationName : title)
                 .putString(MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE, artist.isEmpty() ? stationName : artist + " • " + stationName)
-                .putString(MediaMetadata.METADATA_KEY_MEDIA_ID, STATION_ID + stationIndex)
+                .putString(MediaMetadata.METADATA_KEY_MEDIA_ID, STATION_ID + stationName)
                 .putLong(MediaMetadata.METADATA_KEY_DURATION, itemEnd > itemStart ? (long) ((itemEnd - itemStart) * 1000) : -1);
         Bitmap logo = logo();
         if (logo != null) {
@@ -622,7 +652,7 @@ public class RadioService extends MediaBrowserService {
     }
 
     private Bitmap logo() {
-        return station != null && pack != null ? Logos.get(pack, station, 256) : null;
+        return station != null ? Logos.get(station, 256) : null;
     }
 
     // ------------------------------------------------------------------------------------------ receivers, focus, wake lock
@@ -720,7 +750,7 @@ public class RadioService extends MediaBrowserService {
                 .setShowWhen(false)
                 .setCategory(Notification.CATEGORY_TRANSPORT)
                 .setVisibility(Notification.VISIBILITY_PUBLIC)
-                .setColor(0xFFFF5A36)
+                .setColor(Ui.SUN)
                 .setContentIntent(PendingIntent.getActivity(this, 0, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE))
                 .setDeleteIntent(actionIntent(ACTION_STOP, 9));
         Bitmap logo = logo();

@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * A station pack (.dat) made by the AWC Tool: the stations, their logos and all songs in one file.
+ * A station pack (.radiopak) made by AWC Radio: one station, its logo and all its songs in one file.
  *
  * Layout (all numbers little endian):
  *   0   8 bytes  magic "AWCPACK1"
@@ -25,8 +25,8 @@ import java.util.Map;
  *   16  u64      offset of the index
  *   24  u64      length of the index
  *   32  ...      the files (Ogg Opus songs, PNG logos), back to back
- *   idx          UTF-8 JSON: {"v":1,"created":"...","stations":[{name,logo,songs:[{k,t,a,s}],jingles:[{k,s}]}],
- *                "files":{"t/<key>":[offset,length],"logos/<name>.png":[offset,length]}}
+ *   idx          UTF-8 JSON: {"v":1,"created":"...","sig":"...","stations":[{name,logo,kind,songs:[{k,t,a,s}],
+ *                jingles:[{k,s}]}],"files":{"t/<key>":[offset,length],"logos/<name>.png":[offset,length]}}
  *
  * The songs are played straight out of this file (MediaPlayer with file descriptor, offset and length), nothing is
  * copied or unpacked on the phone.
@@ -84,6 +84,7 @@ final class Pack {
                 files.put(k, new Entry(off, len));
             }
             Library.parse(root.getJSONArray("stations"), stations);
+            for (Library.Station st : stations) st.pack = this;
         } catch (IOException e) {
             close();
             throw e;

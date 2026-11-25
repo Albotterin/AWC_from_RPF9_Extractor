@@ -65,12 +65,23 @@ One continuous DJ mix; its songs are not stored as separate files, so they are n
 |---|---|---:|
 | 🎚 The Vault Radio | 1 mix (84 min), plays as the station | 24 |
 
+## Places of the game
+
+What the audio config says these places play. Their recordings are not in the credits lists, so they are not counted above.
+
+| Station | Plays | Length |
+|---|---|---:|
+| 🎚 Jack of Hearts | DJ set of the club (resident: Bodega The DJ) | 100 min |
+| 🎚 VYB | DJ set of the club in four parts (resident: DJ Stevie J) | 45 min |
+| 🎚 The Vault (Club) | the club's set: same 25 track markers as The Vault Radio, another mix | 84 min |
+| 🎵 Thrillbilly Mud Club | 20 songs, mostly also on The Chamber 106.6 and Dirty South Classics | 84 min |
+
 ## Reading the gaps
 
 - **Bodega The DJ** and **DJ Stevie J** are DJ sets in clubs. The missing titles have no single file assigned to them there; some of them play on other stations.
 - **Worldwide FM**: two listed titles are not assigned, one recording of the playlist plays as "Unknown track". **Radio On-U**: one title is missing, very probably it is the station's "Unknown track".
 - **Honey FM - Liquid City** (8 original songs, not counted above) is in none of the station lists.
-- Long DJ mixes are also played as "(Mix)" stations: Radio On-U (10 of 24), The Sniper Of La Perle (20 of 22), Worldwide FM (31 of 41). The numbers are the parts that have a title. The other long club mixes play as "Clubmixes".
+- Long DJ mixes are also played as "(Mix)" stations: Radio On-U (10 of 24), The Sniper Of La Perle (20 of 22), Worldwide FM (31 of 41). The numbers are the parts that have a title. One further long club mix, which no place can be assigned to, plays as "Clubmixes".
 - The five podcasts the game config names are not assigned yet.
 
 ## How it is measured

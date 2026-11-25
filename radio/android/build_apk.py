@@ -1,6 +1,7 @@
 """Builds android/AWC-Radio.apk, the Android app (the same file for everybody; it contains NO game data).
 
-The music comes from a station pack (.dat) that AWC Tool writes (awc_android.py); the app asks for it on the first start.
+The music comes from station packs (.radiopak) that AWC Radio writes (awc_android.py); the app reads them from a folder
+that it asks for on the first start. assets/ holds the display font Poiret One (SIL Open Font License, text beside it).
 Needs the Android SDK (platform 34 + build-tools 36.1.0, or set ANDROID_BUILD_TOOLS) and a JDK; users only need the
 finished APK. The APK is signed with a key that is created once in android/keys/ (never commit that folder; keep a
 backup: only APKs signed with the same key can update an installed app).
@@ -63,7 +64,7 @@ def main():
     aapt2 = os.path.join(BT, "aapt2.exe")
     run([aapt2, "compile", "--dir", os.path.join(HERE, "res"), "-o", os.path.join(BUILD, "res.zip")])
     run([aapt2, "link", "-o", os.path.join(BUILD, "base.apk"), "-I", JAR, "--manifest", os.path.join(HERE, "AndroidManifest.xml"),
-         "--java", os.path.join(BUILD, "gen"), "--min-sdk-version", "24",
+         "--java", os.path.join(BUILD, "gen"), "-A", os.path.join(HERE, "assets"), "--min-sdk-version", "24",
          "--target-sdk-version", "34", os.path.join(BUILD, "res.zip")])
     sources = glob.glob(os.path.join(HERE, "java", "**", "*.java"), recursive=True) + \
         glob.glob(os.path.join(BUILD, "gen", "**", "*.java"), recursive=True)

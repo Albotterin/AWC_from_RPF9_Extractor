@@ -38,8 +38,12 @@ zeigt dann jeden Sender mit seinem Logo.
 Die Audio-Konfiguration des Spiels (der zlib-Teil am Anfang der `audio.rpf`) beschreibt
 jeden Radiosender mit seiner kompletten Playlist samt Titeln und Interpreten. Die Musiksender und die beiden
 **Talk-Radio**-Sender (**WKTT** und **The Wipe**) werden direkt daraus gelesen. Die Songliste der öffentlichen
-Credits-Seite liefert die Schreibweise der Namen und die Club-DJ-Sets und Mixe, die weiterhin über ihre Namen zugeordnet
-werden. Siehe [docs/STATIONS.md](docs/STATIONS.md) (englisch).
+Credits-Seite liefert die Schreibweise der Namen sowie die DJ-Sets von Bodega The DJ und DJ Stevie J und die Mixe, die
+über ihre Namen zugeordnet werden.
+
+Die Konfiguration nennt auch, was einige **Orte im Spiel** spielen: **Jack of Hearts** (ein 100-Minuten-Set), **VYB**
+(45 Minuten in vier Teilen) und **The Vault (Club)** bekommen die DJ-Sets dieser Clubs, der **Thrillbilly Mud Club** seine
+Playlist mit 20 Songs. Siehe [docs/STATIONS.md](docs/STATIONS.md) (englisch).
 
 ## Hören
 
@@ -59,29 +63,40 @@ wie der Extractor `ffplay`.
 
 792 von 809 Songs, die die Credits für die Musiksender nennen (97,9 %), sind gefunden, dazu alle 15 Folgen
 der Talk-Sendungen; alle Sender in [Fortschritt der Sender](docs/RADIO-PROGRESS.de.md).
-Lange DJ-Mixe laufen auch als Sender: **The Vault Radio**, zusätzliche „(Mix)“-Sender für Radio On-U, Worldwide FM und The Sniper Of La Perle sowie **Clubmixes** (die Club- und DJ-Mixe, die noch keinem Sender zugeordnet werden können). Während ein Mix läuft, wird der Titel des aktuellen Abschnitts angezeigt (aus den Markern im Mix; ein Abschnitt hat nur dann einen Namen, wenn der Marker auf einen bekannten Song zeigt).
+Lange DJ-Mixe laufen auch als Sender: **The Vault Radio**, zusätzliche „(Mix)“-Sender für Radio On-U, Worldwide FM und The Sniper Of La Perle sowie **Clubmixes** (der eine Club-Mix, der keinem Ort zugeordnet werden kann). Während ein Mix läuft, wird der Titel des aktuellen Abschnitts angezeigt (aus den Markern im Mix; ein Abschnitt hat nur dann einen Namen, wenn der Marker auf einen bekannten Song zeigt).
 
 Alle Zahlen je Sender: [Fortschritt der Sender](docs/RADIO-PROGRESS.de.md).
+
+Senderübersicht von v2.4.0 (ohne die später ergänzten Orte):
 
 ![Sender, Songs und Länge](docs/screenshots/awc_radio_stations_table.png)
 
 ## AWC Radio für Android
 
 Die Handy-App spielt dasselbe Live-Programm wie der PC: gleiche UTC-Uhr, gleiche Reihenfolge, gleiche Überblendungen.
-Es sind zwei Dateien:
+Dazu gehören die App und die Sender-Packs:
 
-* **`AWC-Radio.apk`** - die App, von der [Release-Seite](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/latest). Für alle dieselbe Datei, ohne Spieldaten.
-  Android 7.0 oder neuer, Deutsch und Englisch. Sie spielt im Hintergrund weiter, mit Medien-Benachrichtigung,
-  Sperrbildschirm- und Kopfhörertasten (voriger / nächster Sender, Pause) und hat einen Einschlaftimer. **Android Auto** wird unterstützt: Die Sender erscheinen als Raster mit ihren Logos, der Player-Bildschirm zeigt Song und Sender, und Sprachbefehle („Spiele Radio On-U auf AWC Radio“) funktionieren. Da die App nicht aus dem Play Store kommt, muss in den Entwicklereinstellungen von Android Auto zuerst „Unbekannte Quellen“ aktiviert werden.
-* **Ein Sender-Pack (`.dat`)** - wird am PC erzeugt: in AWC Radio auf **Android-Pack...** klicken, Sender ankreuzen und
-  speichern. Darin liegen die Songs dieser Sender in der Originalqualität des Spiels (ca. 128 kbit/s, nicht neu kodiert;
-  etwa 4 GB für alle 30 Sender), ihre Logos und das Programm. Aufs Handy kopieren, die App starten und die Datei
-  einmal auswählen; die Songs werden direkt daraus abgespielt.
+* **`AWC-Radio.apk`** - die App (Version 1.5), für alle dieselbe Datei, ohne Spieldaten. Android 7.0 oder neuer, Deutsch und
+  Englisch. Senderraster, kleiner Player und großer Player in der Farbe des Senderlogos; Wiedergabe im Hintergrund mit
+  Medien-Benachrichtigung, Sperrbildschirm- und Kopfhörertasten; Einschlaftimer; **Android Auto** (vorher in dessen
+  Entwicklereinstellungen „Unbekannte Quellen“ aktivieren, weil die App nicht aus dem Play Store kommt).
+* **Radiowecker** - mehrere Wecker mit Wochentagen, Sender, Lautstärke, sanftem Start, Schlummern und Vibration. Er klingelt
+  mit der Weckerlautstärke des Handys und zeigt einen Bildschirm über dem Sperrbildschirm. Ist vom Radio nach 10 Sekunden
+  nichts zu hören (Pack fehlt, Player-Fehler, Handy nach einem Neustart noch nicht entsperrt), klingelt der Weckton des
+  Handys. Nach 30 Minuten hört er von selbst auf.
+* **Sender-Packs (`.radiopak`)** - eine Datei je Sender, am PC erzeugt: in AWC Radio auf **Android-Packs…** klicken, einen
+  Ordner wählen und schreiben. Jedes enthält die Songs des Senders in der Originalqualität des Spiels (ca. 128 kbit/s, nicht
+  neu kodiert), sein Logo und die Programmdaten; etwa 4,2 GB für alle 34 Sender. In einen Ordner auf dem Handy kopieren und
+  diesen in der App wählen. Neue oder geänderte Packs werden von selbst übernommen.
 
-Das Pack enthält Spiel-Audio: nur für den eigenen Gebrauch, bitte nicht weitergeben. Ohne Pack ist die App leer.
-`python awc_radio.py --export-pack out.dat [--stations "Name" ...]` schreibt ein Pack ohne Fenster. Quelltext und
-Build-Skripte der App liegen in `android/`: `python android\build_apk.py <Ordner des Android SDK>` baut die APK
-(Android SDK und JDK nötig), `python android\test\run_tests.py` testet am PC.
+Die Packs enthalten Spiel-Audio und Bilder: nur für den eigenen Gebrauch, bitte nicht weitergeben. Ohne Pack ist die App leer.
+`python awc_radio.py --export-pack <Ordner> [--stations "Name" ...]` schreibt Packs ohne Fenster.
+
+Quelltext und Build-Skripte der App liegen in `android/`:
+`python android\build_apk.py <Ordner des Android SDK>` baut die APK (Android SDK und JDK nötig).
+`python android\test\run_tests.py [Pack-Ordner]` testet Wiedergabe-, Wecker- und Pack-Logik am PC (JDK und `json.jar`, siehe
+Skript). `python android\test\run_robo.py <Pack-Ordner>` führt Bildschirme und Wecker am PC mit
+[Robolectric](https://robolectric.org/) aus und speichert Screenshots (welche Bibliotheken es braucht, steht im Skript).
 
 ## Selbst bauen
 
@@ -93,8 +108,8 @@ Build-Skripte der App liegen in `android/`: `python android\build_apk.py <Ordner
 radio/
   awc_radio.py          Das Radio-Programm (Fenster, Programmplan, Wiedergabe)
   awc_gamedata.py       Liest die Radiosender und ihre Playlists aus der Audio-Konfiguration des Spiels
-  awc_android.py        Schreibt das Sender-Pack (.dat) für die Android-App, samt Dialog
-  android/              Die Android-App: Java-Quelltext, build_apk.py, make_logo.py, Tests
+  awc_android.py        Schreibt je Sender ein Pack (.radiopak) für die Android-App, samt Dialog
+  android/              Die Android-App: Java-Quelltext, Ressourcen, build_apk.py, make_logo.py, Tests
   Start AWC-Radio.bat   Starter
   build_exe.bat         Baut dist\AWC-Radio.exe mit PyInstaller
   docs/STATIONS.md      Wie die Sender in der Audio-Konfiguration gespeichert sind (englisch)
@@ -118,7 +133,8 @@ Archiv-Scan, AWC-Leser, Credits-Liste und Logos sind die Module des [Extractor](
 
 Das Layout der Audio-Konfiguration folgt den Notizen des Projekts **Leonida** (ItsNotRexed); dessen Textur-Leser hat
 auch geholfen, den Pool mit den Sender-Logos zu verstehen (`awc_logos.py`). Das Startbild-Symbol der Android-App wurde mit der
-Fan-Schrift *GTA Art Deco* gezeichnet (nicht Teil dieses Repositorys). Die Wiedergabe übernimmt
+Fan-Schrift *GTA Art Deco* gezeichnet (nicht Teil dieses Repositorys). Überschriften und Uhrzeiten in der App nutzen
+[Poiret One](https://github.com/alexeiva/poiretone) (SIL Open Font License, Text in `android/assets/`). Die Wiedergabe übernimmt
 [FFmpeg](https://ffmpeg.org/).
 
 [MIT](../LICENSE) – gilt nur für den Quellcode, nicht für Spieldaten.

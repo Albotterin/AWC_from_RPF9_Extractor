@@ -10,14 +10,15 @@ final class PackPlayer implements Engine.Player {
     private boolean prepared, failed, finished, seeking, wantStart, released;
     private final String name;
 
-    PackPlayer(Pack pack, String path) {
+    /** `usage` says on which volume it plays: USAGE_MEDIA for the radio, USAGE_ALARM for the alarm. */
+    PackPlayer(Pack pack, String path, int usage) {
         this.name = path;
         try {
             Pack.Entry entry = pack.entry(path);
             if (entry == null) throw new IllegalStateException("not in the pack");
             mp = new MediaPlayer();
             mp.setAudioAttributes(new AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setUsage(usage)
                     .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build());
             mp.setDataSource(pack.fd(), entry.offset, entry.length);
             mp.setVolume(0f, 0f);
@@ -45,6 +46,19 @@ final class PackPlayer implements Engine.Player {
             failed = true;
             release();
         }
+    }
+
+    /** Sound is coming out right now (the alarm checks this). */
+    boolean isPlaying() {
+        try {
+            return mp != null && !failed && mp.isPlaying();
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
+    boolean isReleased() {
+        return released;
     }
 
     @Override

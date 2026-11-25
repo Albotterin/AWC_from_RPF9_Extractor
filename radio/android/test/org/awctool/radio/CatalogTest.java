@@ -1,0 +1,150 @@
+package org.awctool.radio;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Runs the real Pack and Catalog code on a folder of station packs (no Android needed).
+ *
+ *   java CatalogTest synthetic <folder A> <folder B>   the folders written by run_tests.py: merging, updating, damage
+ *   java CatalogTest real <folder>                     every pack of a folder must load and hold all its files
+ */
+public final class CatalogTest {
+    private static int checks;
+
+    private static void check(boolean ok, String what) {
+        checks++;
+        if (!ok) throw new AssertionError(what);
+    }
+
+    private static final List<File> opened = new ArrayList<>();
+
+    private static Catalog load(File folder, Catalog old) {
+        List<Catalog.Source> files = new ArrayList<>();
+        File[] list = folder.listFiles();
+        if (list != null) {
+            for (File f : list) files.add(new Catalog.Source(f.getPath(), f.getName(), f.length(), f.lastModified()));
+        }
+        return Catalog.load(files, old, source -> {
+            File f = new File(source.id);
+            opened.add(f);
+            FileInputStream in = new FileInputStream(f);
+            try {
+                return new Pack(in.getChannel(), in.getFD(), in);
+            } catch (Exception e) {
+                in.close();
+                throw e;
+            }
+        });
+    }
+
+    private static String names(Catalog c) {
+        StringBuilder b = new StringBuilder();
+        for (Library.Station s : c.stations) b.append(s.name).append('|');
+        return b.toString();
+    }
+
+    private static Library.Station station(Catalog c, String name) {
+        int i = Catalog.indexOf(c.stations, name);
+        check(i >= 0, "station " + name + " missing in " + names(c));
+        return c.stations.get(i);
+    }
+
+    private static void synthetic(File a, File b) throws Exception {
+        Catalog first = load(a, null);
+        // order like the PC program: without "The", club mixes last; the newer of two Alpha packs wins; .part, .dat and a
+        // half copied pack are not stations
+        check(names(first).equals("Alpha|The Bravo|Charlie Talk|Clubmixes|"), "order " + names(first));
+        check(station(first, "Alpha").songs.get(0).title.equals("new song"), "the pack made later wins");
+        check(station(first, "Charlie Talk").talk && !station(first, "Alpha").talk, "talk flag");
+        check(first.problems.size() == 1 && first.problems.get(0).startsWith("broken.radiopak: "), "problems " + first.problems);
+        check(first.packCount() == 5, "packs " + first.packCount());
+        for (Library.Station s : first.stations) {
+            check(s.pack != null && s.schedule != null, "pack and programme of " + s.name);
+            check(s.pack.read(s.logo)[1] == 'P', "logo of " + s.name);
+            for (Schedule.Track t : s.songs) check(s.pack.read("t/" + t.key).length > 0, "song file " + t.key);
+        }
+
+        // nothing changed: nothing is opened again (only the broken file is tried again), same list object
+        opened.clear();
+        Catalog again = load(a, first);
+        check(again.sameAs(first) && again.stations == first.stations, "unchanged folder");
+        check(opened.size() == 1 && opened.get(0).getName().equals("broken.radiopak"), "reopened " + opened);
+
+        // a pack that is being overwritten (changed, but unreadable): the station stays as it was
+        List<Catalog.Source> copying = new ArrayList<>();
+        for (File f : a.listFiles()) {
+            long size = f.length() - (f.getName().equals("alpha.radiopak") ? 7 : 0);
+            copying.add(new Catalog.Source(f.getPath(), f.getName(), size, f.lastModified()));
+        }
+        Catalog during = Catalog.load(copying, first, s -> {
+            throw new java.io.IOException("the pack file is incomplete");
+        });
+        check(names(during).equals(names(first)), "stations during a copy " + names(during));
+        check(station(during, "Alpha") == station(first, "Alpha") && during.stations == first.stations, "old pack kept");
+        check(during.problems.size() == 2 && !during.sameAs(first), "the problem is reported");
+        first.closeUnused(during);
+        check(station(during, "Alpha").pack.read(station(during, "Alpha").logo)[1] == 'P', "kept pack stays open");
+        first = during;
+
+        // folder B: Alpha updated, Bravo removed, Delta added, Charlie untouched (same file)
+        File keep = new File(b, "charlie_talk.radiopak");
+        List<Catalog.Source> files = new ArrayList<>();
+        for (File f : b.listFiles()) files.add(new Catalog.Source(f.getName(), f.getName(), f.length(), 1000));
+        List<Catalog.Source> before = new ArrayList<>();
+        for (File f : a.listFiles()) {
+            if (f.getName().equals(keep.getName())) before.add(new Catalog.Source(f.getName(), f.getName(), keep.length(), 1000));
+        }
+        Catalog.Opener inB = s -> {
+            FileInputStream in = new FileInputStream(new File(b, s.name));
+            return new Pack(in.getChannel(), in.getFD(), in);
+        };
+        Catalog one = Catalog.load(before, null, inB);
+        Library.Station charlie = station(one, "Charlie Talk");
+        Catalog two = Catalog.load(files, one, inB);
+        check(names(two).equals("Alpha|Charlie Talk|Delta|"), "after the update " + names(two));
+        check(!two.sameAs(one), "change is noticed");
+        check(station(two, "Charlie Talk") == charlie, "an untouched pack keeps its station (the radio plays on)");
+        check(station(two, "Alpha").songs.get(0).title.equals("updated song"), "updated pack");
+        one.closeUnused(two);
+        check(charlie.pack.read(charlie.logo).length > 0, "a pack that is still used stays open");
+        two.closeUnused(null);
+        boolean closed = false;
+        try {
+            charlie.pack.read(charlie.logo);
+        } catch (Exception e) {
+            closed = true;
+        }
+        check(closed, "closeUnused(null) closes everything");
+        check(Catalog.empty().stations.isEmpty() && Catalog.isPack("X.RadioPak") && !Catalog.isPack("x.dat")
+                && !Catalog.isPack("x.radiopak.part"), "file names");
+    }
+
+    private static void real(File folder) throws Exception {
+        Catalog c = load(folder, null);
+        check(c.problems.isEmpty(), "problems " + c.problems);
+        check(!c.stations.isEmpty(), "no station");
+        long items = 0;
+        for (Library.Station s : c.stations) {
+            check(s.logo.isEmpty() || s.pack.read(s.logo)[1] == 'P', "logo of " + s.name);      // not every station has one
+            List<Schedule.Track> all = new ArrayList<>(s.songs);
+            all.addAll(s.jingles);
+            for (Schedule.Track t : all) {
+                Pack.Entry e = s.pack.entry("t/" + t.key);
+                check(e != null && e.length > 1000, s.name + ": file of " + t.key);
+                items++;
+            }
+            check(s.schedule.itemsFrom(System.currentTimeMillis() / 1000.0, 5).size() == 5, "programme of " + s.name);
+            System.out.println("  " + s.name + (s.talk ? " [talk]" : "") + (s.logo.isEmpty() ? " [no logo]" : "") + ": " + s.songs.size() + " + " + s.jingles.size());
+        }
+        System.out.println(c.stations.size() + " stations in " + c.packCount() + " packs, " + items + " recordings");
+    }
+
+    public static void main(String[] args) throws Exception {
+        if (args[0].equals("real")) real(new File(args[1]));
+        else synthetic(new File(args[1]), new File(args[2]));
+        System.out.println("Catalog: ALL OK (" + checks + " checks)");
+    }
+}

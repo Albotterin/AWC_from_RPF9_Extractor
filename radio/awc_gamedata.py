@@ -57,6 +57,16 @@ TALK_STATIONS = {
 
 Track = collections.namedtuple("Track", "wave title artists music")          # wave = (bank hash, stream hash)
 
+# DJ sets of venues: the track list "core.radiostation.<name>_music" holds what the club plays.
+# (track list name, station name, resident DJ)
+CLUB_SETS = (("club_joh_bodega", "Jack of Hearts", "Bodega The DJ"), ("club_vyb_stevie_j", "VYB", "DJ Stevie J"),
+             ("dj_mixes_the_vault", "The Vault (Club)", ""))
+# venues that play a playlist of songs: (station object, station name)
+VENUE_PLAYLISTS = (("radio_mudclub", "Thrillbilly Mud Club"),)
+# A club sound can have three layers that play together in the game: the DJ set itself and the quiet rest of the room.
+# The set is the loud layer; these are its stream IDs (found by measuring the layers).
+CLUB_MAIN_LAYERS = frozenset((0x0582dfac, 0x0dbfce2a, 0x16b32680, 0x01ae6157, 0x1d7ca6cc))
+
 
 def _u32(d, o):
     return struct.unpack_from("<I", d, o)[0]
@@ -232,6 +242,193 @@ def read(path):
     """parse() for the archive at `path`. Raises OSError / ValueError."""
     try:
         return parse(config_files(path))
+    except (struct.error, IndexError, zlib.error) as e:
+        raise ValueError("audio config not understood: %s" % e) from e
+
+
+# ------------------------------------------------------------------------------------------------ clubs
+def _layers(sounds, name_hash):
+    """All (bank hash, stream hash) of a sound: one, or several layers that sound together."""
+    d = sounds.get(name_hash)
+    if not d or d[0] != SOUND_WRAPPER:
+        return []
+    for count in range(8, 0, -1):                   # the wrapper ends with: count, count x reference
+        p = len(d) - 1 - 4 * count
+        if p < 1 or d[p] != count or any(_u32(d, p + 1 + 4 * i) >= len(sounds.refs) for i in range(count)):
+            continue
+        out = []
+        for i in range(count):
+            s = sounds.follow(_u32(d, p + 1 + 4 * i))
+            if not s or s[0] != SOUND_SIMPLE:
+                break
+            for n in range(8, -1, -1):
+                q = len(s) - 1 - 4 * n
+                if q >= 10 and s[q] == n and all(_u32(s, q + 1 + 4 * k) < len(sounds.refs) for k in range(n)):
+                    out.append((_u32(s, q - 10), _u32(s, q - 6)))
+                    break
+        if len(out) == count:
+            return out
+    return []
+
+
+def _club_tracks(game, sounds, name_hash, seen, out):
+    d = None if name_hash is None else game.get(name_hash)
+    if not d or name_hash in seen:
+        return
+    seen.add(name_hash)
+    if d[0] == TYPE_TRACK and len(d) >= 16:
+        layers = _layers(sounds, game.hash_at(_u32(d, 12)))
+        if layers:
+            out.append(layers)
+    elif d[0] == TYPE_LIST_OF_LISTS:
+        for k in range(_u32(d, 8)):
+            _club_tracks(game, sounds, game.hash_at(_u32(d, 12 + 4 * k)), seen, out)
+    elif d[0] == TYPE_TRACKLIST:
+        if _u32(d, 68) != NONE:
+            _club_tracks(game, sounds, game.hash_at(_u32(d, 68)), seen, out)
+        for k in range(_u32(d, 72)):
+            _club_tracks(game, sounds, game.hash_at(_u32(d, 76 + 4 * k)), seen, out)
+
+
+def _game_file(files):
+    """(all metadata files, the one with the radio stations or None)."""
+    metas = []
+    for data in files:
+        try:
+            metas.append(MetaFile(data))
+        except (ValueError, struct.error):
+            continue
+    return metas, next((m for m in metas if (m.get(joaat("radio_flash_fm")) or b"\0")[0] == TYPE_STATION), None)
+
+
+def parse_venues(files):
+    """-> {station name: [Track, ...]} for the venues of VENUE_PLAYLISTS."""
+    metas, game = _game_file(files)
+    if game is None:
+        return {}
+    wanted = {}
+    for key, name in VENUE_PLAYLISTS:
+        d = game.get(joaat(key))
+        if d and d[0] == TYPE_STATION:
+            wanted[name] = [_u32(d, 64 + 12 * k) for k in range(_u32(d, 60))]
+    probe = []
+    for refs in wanted.values():
+        for ref in refs:
+            lst = game.follow(ref)
+            if lst and lst[0] == TYPE_TRACKLIST:
+                for i in range(_u32(lst, 72)):
+                    tr = game.follow(_u32(lst, 76 + 4 * i))
+                    if tr and tr[0] == TYPE_TRACK:
+                        probe.append(game.hash_at(_u32(tr, 12)))
+    if not probe:
+        return {}
+    sounds = max(metas, key=lambda m: sum(1 for h in probe if h in m.index))
+    out = {}
+    for name, refs in wanted.items():
+        found, seen = [], set()
+        for ref in refs:
+            _tracks(game, sounds, ref, True, seen, found)
+        if found:
+            out[name] = found
+    return out
+
+
+def build_venues(items, venues, songs, found, cfg_names):
+    """-> {station: {"songs": [track], "jingles": []}} from the result of parse_venues(). The songs are mostly those of
+    other stations, so they get their names the same way."""
+    by_id = {}
+    for it in items:
+        if not it.get("cues"):
+            for s in it["streams"]:
+                by_id.setdefault(s["id"] & STREAM_ID_MASK, (it, s))
+    spelling = credits.artist_names(songs)
+    out = {}
+    for name, tracks in venues.items():
+        st = {"songs": [], "jingles": []}
+        used = set()
+        for tr in tracks:
+            sid = tr.wave[1] & STREAM_ID_MASK
+            if sid not in by_id or sid in used:
+                continue
+            used.add(sid)
+            item, s = by_id[sid]
+            if s["sec"] >= SONG_MIN:
+                st["songs"].append(_track(item, s, *_song_name(tr, name, sid, songs, found, cfg_names, spelling)))
+        if st["songs"]:
+            out[name] = st
+    return out
+
+
+def parse_clubs(files):
+    """-> {station name: (resident DJ, [[layer, ...] per track of the set])} for the venues of CLUB_SETS."""
+    metas, game = _game_file(files)
+    if game is None:
+        return {}
+    lists = {name: joaat("core.radiostation.%s_music" % key) for key, name, _dj in CLUB_SETS}
+    # which file holds the sounds? the one that knows the sounds of the club tracks
+    probe = []
+    for h in lists.values():
+        seen, todo = set(), [h]
+        while todo:
+            x = todo.pop()
+            d = game.get(x) if x is not None else None
+            if not d or x in seen:
+                continue
+            seen.add(x)
+            if d[0] == TYPE_TRACK and len(d) >= 16:
+                probe.append(game.hash_at(_u32(d, 12)))
+            elif d[0] == TYPE_LIST_OF_LISTS:
+                todo += [game.hash_at(_u32(d, 12 + 4 * k)) for k in range(_u32(d, 8))]
+            elif d[0] == TYPE_TRACKLIST:
+                todo += [game.hash_at(_u32(d, 76 + 4 * k)) for k in range(_u32(d, 72))]
+                if _u32(d, 68) != NONE:
+                    todo.append(game.hash_at(_u32(d, 68)))
+    if not probe:
+        return {}
+    sounds = max(metas, key=lambda m: sum(1 for h in probe if h in m.index))
+    out = {}
+    for _key, name, dj in CLUB_SETS:
+        tracks = []
+        _club_tracks(game, sounds, lists[name], set(), tracks)
+        if tracks:
+            out[name] = (dj, tracks)
+    return out
+
+
+def build_clubs(items, clubs):
+    """-> {station: {"songs": [one DJ set, marked "set"], "jingles": []}} from the result of parse_clubs().
+
+    A set in several tracks is played in the order of the list, as one long item ("parts"). A club is left out when
+    one of its tracks is not among the scanned banks."""
+    by_id = {}
+    for it in items:
+        for s in it["streams"]:
+            by_id.setdefault(s["id"] & STREAM_ID_MASK, (it, s))
+    out = {}
+    for name, (dj, tracks) in clubs.items():
+        found = []
+        for layers in tracks:
+            ids = [w[1] & STREAM_ID_MASK for w in layers]
+            main = next((i for i in ids if i in CLUB_MAIN_LAYERS), ids[0])
+            if main not in by_id:
+                break
+            found.append(by_id[main])
+        if len(found) != len(tracks):
+            continue
+        entry = _track(found[0][0], found[0][1], "DJ set", dj)
+        entry["set"] = True
+        if len(found) > 1:
+            entry["sec"] = round(sum(s["sec"] for _i, s in found), 2)
+            entry["parts"] = [[i["base"], s["i"]] for i, s in found]
+        out[name] = {"songs": [entry], "jingles": []}
+    return out
+
+
+def read_venues(path):
+    """(parse_clubs(), parse_venues()) for the archive at `path`. Raises OSError / ValueError."""
+    try:
+        files = config_files(path)
+        return parse_clubs(files), parse_venues(files)
     except (struct.error, IndexError, zlib.error) as e:
         raise ValueError("audio config not understood: %s" % e) from e
 

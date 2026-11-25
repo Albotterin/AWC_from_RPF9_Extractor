@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- the same colours as in Ui.java -->
+    <color name="night">#FF15122A</color>
+    <color name="surface">#FF211D3C</color>
+    <color name="sun">#FFFF8A6C</color>
+    <color name="text">#FFF5F2FF</color>
+
+    <style name="AppTheme" parent="android:Theme.Material.NoActionBar">
+        <item name="android:colorPrimary">@color/surface</item>
+        <item name="android:colorPrimaryDark">@color/night</item>
+        <item name="android:colorAccent">@color/sun</item>
+        <item name="android:colorBackground">@color/night</item>
+        <item name="android:windowBackground">@color/night</item>
+        <item name="android:textColorPrimary">@color/text</item>
+        <item name="android:statusBarColor">@color/night</item>
+        <item name="android:navigationBarColor">@color/night</item>
+    </style>
+
+    <style name="AppDialog" parent="android:Theme.Material.Dialog.Alert">
+        <item name="android:colorAccent">@color/sun</item>
+        <item name="android:colorBackground">@color/surface</item>
+        <item name="android:colorBackgroundFloating">@color/surface</item>
+    </style>
+
+    <!-- the sheets that slide up from the bottom -->
+    <style name="AppSheet" parent="android:Theme.Material.Dialog">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowMinWidthMajor">100%</item>
+        <item name="android:windowMinWidthMinor">100%</item>
+        <item name="android:backgroundDimAmount">0.6</item>
+        <item name="android:windowAnimationStyle">@android:style/Animation.InputMethod</item>
+        <item name="android:colorAccent">@color/sun</item>
+    </style>
+</resources>

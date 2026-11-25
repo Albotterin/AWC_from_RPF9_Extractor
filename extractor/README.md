@@ -337,6 +337,7 @@ extractor/
   awc_credits.py      Parses the public credits page and matches its songs to stream IDs
   awc_icons.py        Optional: cuts the station logos out of the game
   awc_logos.py        Small reader for the logo textures of the game's UI texture pool
+  logos/              Pictures drawn for stations the programs invent themselves (make_station_logos.py)
   Start AWC-Tool.bat  Launcher
   build_exe.bat       Builds dist\AWC-Tool.exe with PyInstaller
   docs/FORMAT.md      Technical notes on the AWC/RPF9 layout

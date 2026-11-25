@@ -33,7 +33,7 @@ NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 SONG_MIN, SONG_MAX = 60.0, 1500.0          # seconds: shorter is not a song, longer is a mix
 JINGLE_MIN, JINGLE_MAX = 2.0, 25.0         # unnamed short streams of a station are used as jingles
 MIN_SONGS = 5                              # a station needs at least this many songs to be listed
-INDEX_VERSION = 4
+INDEX_VERSION = 6
 
 BG, PANEL, CARD, CARD_SEL, FG, DIM, ACCENT = "#14161c", "#1c1f27", "#232733", "#2f3550", "#eceef4", "#8b91a3", "#ff5a36"
 
@@ -43,7 +43,7 @@ STR = {
         "setup_intro": "Select the game's audio.rpf and its texture file (data\\ttdb\\ui\\ttdb_ui.ttpf). The first start reads the "
                        "archive once; later starts are instant.",
         "lbl_rpf": "audio.rpf", "lbl_pool": "Texture file (ttdb_ui.ttpf)", "btn_browse": "Browse…", "btn_start": "Start radio",
-        "btn_settings": "Files…", "btn_rescan": "Re-read", "btn_android": "Android pack…", "st_scan": "Reading the archive … (the first time takes several minutes)",
+        "btn_settings": "Files…", "btn_rescan": "Re-read", "btn_android": "Android packs…", "st_scan": "Reading the archive … (the first time takes several minutes)",
         "st_credits": "Loading the song list …", "st_names": "Reading names from the game config …",
         "st_build": "Building the stations …", "st_icons": "Reading the station logos …", "st_ready": "{n} stations",
         "err_rpf": "Please choose an existing audio.rpf.", "err_scan": "No music streams found in that file.",
@@ -59,7 +59,7 @@ STR = {
         "setup_intro": "Wähle die audio.rpf des Spiels und seine Textur-Datei (data\\ttdb\\ui\\ttdb_ui.ttpf). Beim ersten Start wird "
                        "das Archiv einmal eingelesen; spätere Starts gehen sofort.",
         "lbl_rpf": "audio.rpf", "lbl_pool": "Textur-Datei (ttdb_ui.ttpf)", "btn_browse": "Durchsuchen…", "btn_start": "Radio starten",
-        "btn_settings": "Dateien…", "btn_rescan": "Neu einlesen", "btn_android": "Android-Pack…", "st_scan": "Lese das Archiv … (beim ersten Mal dauert das mehrere Minuten)",
+        "btn_settings": "Dateien…", "btn_rescan": "Neu einlesen", "btn_android": "Android-Packs…", "st_scan": "Lese das Archiv … (beim ersten Mal dauert das mehrere Minuten)",
         "st_credits": "Lade die Songliste …", "st_names": "Lese Namen aus der Spiel-Konfiguration …",
         "st_build": "Baue die Sender …", "st_icons": "Lese die Sender-Logos …", "st_ready": "{n} Sender",
         "err_rpf": "Bitte eine vorhandene audio.rpf wählen.", "err_scan": "In dieser Datei wurden keine Musik-Streams gefunden.",
@@ -412,6 +412,7 @@ def make_index(rpf, pool, get_songs, status=None, progress=None):
                 hit = credits.lookup(songs, name, tr_["title"], own_only=True)
                 if hit:
                     tr_["title"], tr_["artist"] = hit
+    add_venues(stations, items, rpf, songs, matched, cfg_names)
     stations = dict(sorted(stations.items(), key=lambda kv: sort_key(kv[0])))
     used = {}
     for st in stations.values():
@@ -423,6 +424,28 @@ def make_index(rpf, pool, get_songs, status=None, progress=None):
     with open(index_path(), "w", encoding="utf-8") as f:
         json.dump(idx, f)
     return idx
+
+
+def add_venues(stations, items, rpf, songs, found, cfg_names):
+    """Places of the game that play their own music become stations: venues with a playlist, and clubs whose DJ set
+    leaves the "Clubmixes" collection (that keeps the mixes which belong to no known venue)."""
+    try:
+        sets, playlists = gamedata.read_venues(rpf)
+        clubs = gamedata.build_clubs(items, sets)
+        stations.update(gamedata.build_venues(items, playlists, songs, found, cfg_names))
+    except (OSError, ValueError):
+        return
+    used = {base for st in clubs.values() for tr_ in st["songs"] for base, _i in tr_.get("parts") or [(tr_["base"], tr_["idx"])]}
+    mixes = stations.get(CLUB_STATION)
+    if mixes:
+        left = [tr_ for tr_ in mixes["songs"] if tr_["base"] not in used]
+        for n, tr_ in enumerate(left, 1):
+            tr_["title"] = "Club mix %d" % n if len(left) > 1 else "Club mix"
+        if left:
+            mixes["songs"] = left
+        else:
+            del stations[CLUB_STATION]
+    stations.update(clubs)
 
 
 DAY = 86400.0
@@ -443,6 +466,11 @@ def _tkey(tr_):
     """Identifies an item; the same as awc_android.track_key (the programme hashes it)."""
     parts = tr_.get("parts")
     return "%s_%s" % (tr_["base"], tr_["idx"]) + ("x%d" % len(parts) if parts else "")
+
+
+def _is_show(tr_):
+    """A talk show (made of parts); a club's DJ set is made of parts too but counts as music."""
+    return bool(tr_.get("parts")) and not tr_.get("set")
 
 
 def _h(*parts):
@@ -686,7 +714,7 @@ class RadioApp(tk.Tk):
         self.status.pack(fill="x", side="bottom")
 
     def _android(self):
-        """Dialog that writes a station pack (.dat) for the Android app."""
+        """Dialog that writes the station packs (.radiopak) for the Android app."""
         if not self.stations or not self.index:
             return
         try:
@@ -877,7 +905,7 @@ class RadioApp(tk.Tk):
             box.pack(side="left", fill="x", expand=True)
             lab = tk.Label(box, text=name, bg=CARD, fg=FG, font=("Segoe UI", 11, "bold"), anchor="w")
             lab.pack(fill="x")
-            count = "n_shows" if any(s.get("parts") for s in st["songs"]) else "n_songs"
+            count = "n_shows" if any(_is_show(s) for s in st["songs"]) else "n_songs"
             sub = tk.Label(box, text=t(count, n=len(st["songs"])), bg=CARD, fg=DIM, anchor="w")
             sub.pack(fill="x")
             for w in (card, cv, box, lab, sub):
@@ -940,7 +968,7 @@ class RadioApp(tk.Tk):
     def _show_next(self):
         if self.upcoming:
             _s, _e, kind, tr_, _fi, _fo = self.upcoming[0]
-            pair = (tr_["title"], tr_["artist"]) if tr_.get("parts") else (tr_["artist"], tr_["title"])
+            pair = (tr_["title"], tr_["artist"]) if _is_show(tr_) else (tr_["artist"], tr_["title"])
             label = t("kind_jingle") if kind == "jingle" else "%s - %s" % pair if tr_["artist"] else tr_["title"]
             self.lbl_next.config(text="%s %s" % (t("lbl_next"), label))
 
@@ -949,7 +977,7 @@ class RadioApp(tk.Tk):
         self.cur_item = item
         self.cur_start, self.cur_end, kind, tr_, _fi, _fo = item
         self.cur = (kind, tr_)
-        self.lbl_kind.config(text=t("kind_jingle" if kind == "jingle" else "kind_show" if tr_.get("parts") else "kind_song"))
+        self.lbl_kind.config(text=t("kind_jingle" if kind == "jingle" else "kind_show" if _is_show(tr_) else "kind_song"))
         self.lbl_title.config(text=("♪ " + t("kind_jingle")) if kind == "jingle" else tr_["title"])
         self.lbl_artist.config(text=tr_["artist"] if kind == "song" else self.station or "")
         self.lbl_len.config(text=fmt_time(tr_["sec"]))
@@ -1191,7 +1219,7 @@ def main():
                          lambda f: print("scan %3d%%" % (f * 100 / 0.7), flush=True) if int(f * 1000) % 50 == 0 else None)
         print("stations:", len(idx["stations"]) if idx else 0)
         return
-    if len(sys.argv) > 1 and sys.argv[1] == "--export-pack":           # no window: python awc_radio.py --export-pack out.dat [...]
+    if len(sys.argv) > 1 and sys.argv[1] == "--export-pack":           # no window: python awc_radio.py --export-pack <folder> [...]
         import awc_android  # noqa: PLC0415
         awc_android.main(sys.argv[2:])
         return

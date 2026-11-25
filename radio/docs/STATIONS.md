@@ -38,3 +38,17 @@ its own DJ links); the banks of one station lie together in the archive, so the 
 category with name hash `0x2BE42A81` hold the music; short streams that only one station uses are idents and DJ talk.
 The talk stations have one track list per show episode with its parts in order; the stream names follow the pattern
 `<station>_<show>_ep<n>_pt<m>`.
+
+## Places that play their own music
+
+Some objects of the game file are named `joaat("core.radiostation.<name>_music")`: track lists of places of the game. For
+`club_joh_bodega`, `club_vyb_stevie_j` and `dj_mixes_the_vault` they hold the DJ set of a club. No station object refers to
+them. A set can have several tracks in order, and a track's sound wrapper (type 8) can end with `u8 count, count x reference`
+instead of a single reference: layers that sound together, the set itself and the quiet rest of the room. AWC Radio plays the
+loud layer (its stream IDs are listed in `awc_gamedata.CLUB_MAIN_LAYERS`) and joins the tracks of a set into one item.
+
+The station object `radio_mudclub` is a playlist of 20 songs, most of them shared with two radio stations; AWC Radio lists it
+as the Thrillbilly Mud Club (name and logo assigned by the matching internal name).
+
+One long mix (about 61 minutes) is referenced by no track list; it lies in another part of the archive among short sounds
+with the same property and is left in "Clubmixes".

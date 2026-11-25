@@ -1,10 +1,10 @@
-"""AWC Radio station pack for the Android app.
+"""AWC Radio station packs for the Android app.
 
 The Android app (AWC-Radio.apk, the same file for everybody, no game data in it) plays the stations live by the UTC
-clock, exactly like AWC Radio on the PC. Its music comes from ONE file next to it: the station pack (.dat) that is made
-here from the user's own audio.rpf - the songs of the chosen stations in the game's own quality (about 128 kbit/s,
-not re-encoded), their logos and the programme data. On the first start the app asks for that file; the songs are played
-straight out of it, the huge audio.rpf never goes to the phone.
+clock, exactly like AWC Radio on the PC. Its music comes from station packs in a folder on the phone: one file per
+station (<station>.radiopak), made here from the user's own audio.rpf - the station's songs in the game's own quality
+(about 128 kbit/s, not re-encoded), its logo and its programme data. The app reads every pack of the folder, so a
+station is added or updated by copying just its file. Packs that would come out the same are not written again.
 
 Pack layout (little endian), read by android/java/org/awctool/radio/Pack.java:
     0   8 bytes  magic "AWCPACK1"
@@ -12,14 +12,17 @@ Pack layout (little endian), read by android/java/org/awctool/radio/Pack.java:
     12  u32      reserved
     16  u64      offset of the index
     24  u64      length of the index
-    32  ...      files back to back: Ogg Opus songs and PNG logos
-    idx          UTF-8 JSON {"v":1,"created":..,"stations":[..],"files":{"t/<key>":[offset,length],"logos/<n>.png":[..]}}
-                 a song of a station may carry "m": [[start second, title, artist], ...], the parts of a long DJ mix (optional,
-                 older apps ignore it)
+    32  ...      files back to back: Ogg Opus songs and the PNG logo
+    idx          UTF-8 JSON {"v":1,"created":..,"sig":..,"stations":[one station],
+                             "files":{"t/<key>":[offset,length],"logos/<name>.png":[..]}}
+                 a talk station carries "kind":"talk"; a song may carry "m": [[start second, title, artist], ...], the
+                 parts of a long DJ mix
+"sig" is a fingerprint of the content: it tells whether an existing file is still up to date.
 
-The pack contains game audio: for personal use only, do not share it.
+A pack contains game audio: for personal use only, do not share it.
 """
 import datetime
+import hashlib
 import json
 import os
 import shutil
@@ -39,6 +42,7 @@ NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 MAGIC = b"AWCPACK1"
 VERSION = 1
 HEADER = 32
+EXTENSION = ".radiopak"
 BYTES_PER_SEC = 16200                       # the game's Opus streams are about 129 kbit/s
 
 
@@ -52,29 +56,39 @@ class ExportError(Exception):
 
 STR = {
     "en": {
-        "title": "AWC Radio station pack for Android",
-        "intro": "Makes ONE file (.dat) with the stations you pick: their songs in the game's own quality (about 128 kbit/s), "
-                 "the logos and the programme. Install AWC-Radio.apk on the phone (same file for everybody, from the GitHub release), "
-                 "copy the .dat to the phone and pick it when the app starts for the first time. For your own use only: the pack contains game audio.",
-        "stations": "Stations (Ctrl/Shift for several)", "all": "All", "none": "None", "size": "Estimated size: {s}",
-        "create": "Create pack…", "cancel": "Cancel", "close": "Close", "save_title": "Save the station pack as",
-        "st_extract": "Reading songs … {i}/{n}", "st_write": "Writing the pack … {i}/{n}", "st_done": "Finishing …",
-        "done": "The station pack is ready:\n{p}\n\nSize: {s}\n\nOn the phone: install AWC-Radio.apk (from the GitHub release), copy this file "
-                "to the phone, start the app and pick the file. Please do not share it: it contains game audio.",
+        "title": "AWC Radio station packs for Android",
+        "intro": "Makes one file (.radiopak) per station: its songs in the game's own quality (about 128 kbit/s), the logo and "
+                 "the programme. Install AWC-Radio.apk on the phone, copy the packs into one folder there (for example "
+                 "\"AWC-Radio\") and choose that folder in the app. Later you only copy the new or changed files. For your own use "
+                 "only: the packs contain game audio.",
+        "folder": "Folder for the packs on this PC", "browse": "Browse…", "stations": "Stations (Ctrl/Shift for several)",
+        "all": "All", "none": "None", "changed_only": "New and changed",
+        "new": "new", "changed": "changed", "current": "up to date",
+        "size": "{n} pack(s) to write, about {s}. Up to date and skipped: {c}",
+        "create": "Write packs", "cancel": "Cancel", "close": "Close",
+        "st_extract": "{station}: reading … {i}/{n}",
+        "done": "{w} pack(s) written, {c} already up to date.\n\nFolder:\n{p}\n\nCopy the new files into the pack folder on the "
+                "phone (same names replace the old ones). Please do not share them: they contain game audio.",
         "err_space": "Not enough free disk space in the target folder (about {s} needed).", "err_pick": "Pick at least one station.",
+        "err_folder": "Choose an existing folder for the packs.",
         "err": "Something went wrong:\n{e}", "cancelled": "Cancelled.",
     },
     "de": {
-        "title": "AWC Radio Sender-Pack für Android",
-        "intro": "Erzeugt EINE Datei (.dat) mit den gewählten Sendern: ihre Songs in der Originalqualität des Spiels (ca. 128 kbit/s), "
-                 "die Logos und das Programm. Auf dem Handy AWC-Radio.apk installieren (für alle dieselbe Datei, aus dem GitHub-Release), "
-                 "die .dat aufs Handy kopieren und beim ersten Start der App auswählen. Nur für den eigenen Gebrauch: das Pack enthält Spiel-Audio.",
-        "stations": "Sender (Strg/Umschalt für mehrere)", "all": "Alle", "none": "Keine", "size": "Geschätzte Größe: {s}",
-        "create": "Pack erstellen…", "cancel": "Abbrechen", "close": "Schließen", "save_title": "Sender-Pack speichern unter",
-        "st_extract": "Lese Songs … {i}/{n}", "st_write": "Schreibe das Pack … {i}/{n}", "st_done": "Schließe ab …",
-        "done": "Das Sender-Pack ist fertig:\n{p}\n\nGröße: {s}\n\nAuf dem Handy: AWC-Radio.apk installieren (aus dem GitHub-Release), diese Datei "
-                "aufs Handy kopieren, die App starten und die Datei auswählen. Bitte nicht weitergeben: sie enthält Spiel-Audio.",
+        "title": "AWC Radio Sender-Packs für Android",
+        "intro": "Erzeugt pro Sender eine Datei (.radiopak): seine Songs in der Originalqualität des Spiels (ca. 128 kbit/s), das "
+                 "Logo und das Programm. Auf dem Handy AWC-Radio.apk installieren, die Packs dort in einen Ordner kopieren (zum "
+                 "Beispiel „AWC-Radio“) und diesen Ordner in der App wählen. Später kopierst du nur die neuen oder geänderten "
+                 "Dateien. Nur für den eigenen Gebrauch: die Packs enthalten Spiel-Audio.",
+        "folder": "Ordner für die Packs auf diesem PC", "browse": "Durchsuchen…", "stations": "Sender (Strg/Umschalt für mehrere)",
+        "all": "Alle", "none": "Keine", "changed_only": "Neue und geänderte",
+        "new": "neu", "changed": "geändert", "current": "aktuell",
+        "size": "{n} Pack(s) zu schreiben, etwa {s}. Aktuell und übersprungen: {c}",
+        "create": "Packs schreiben", "cancel": "Abbrechen", "close": "Schließen",
+        "st_extract": "{station}: lese … {i}/{n}",
+        "done": "{w} Pack(s) geschrieben, {c} waren schon aktuell.\n\nOrdner:\n{p}\n\nDie neuen Dateien in den Pack-Ordner auf dem "
+                "Handy kopieren (gleiche Namen ersetzen die alten). Bitte nicht weitergeben: sie enthalten Spiel-Audio.",
         "err_space": "Im Zielordner ist nicht genug Platz frei (es werden etwa {s} gebraucht).", "err_pick": "Bitte mindestens einen Sender wählen.",
+        "err_folder": "Bitte einen vorhandenen Ordner für die Packs wählen.",
         "err": "Es ist ein Fehler aufgetreten:\n{e}", "cancelled": "Abgebrochen.",
     },
 }
@@ -113,12 +127,76 @@ def track_key(tr):
 
 
 def estimate_bytes(stations):
-    """Rough size of the pack for the given stations ({name: station dict})."""
-    total = 300_000
+    """Rough size of the packs for the given stations ({name: station dict})."""
+    total = 0
     for st in stations.values():
+        total += 150_000
         for tr in st["songs"] + st["jingles"]:
             total += tr["sec"] * BYTES_PER_SEC + 200
     return int(total)
+
+
+# ------------------------------------------------------------------------------------------------ what a pack holds
+def pack_file(name):
+    """File name of a station's pack: 'The Chamber 106.6' -> 'the_chamber_106_6.radiopak'."""
+    return icons.slug(name) + EXTENSION
+
+
+def _logo(name):
+    p = icons.icon_path(name)
+    if p and os.path.isfile(p):
+        with open(p, "rb") as fh:
+            return fh.read()
+    return b""
+
+
+def station_entry(name, st, has_logo):
+    """The station as it stands in the pack index."""
+    entry = {"name": name, "logo": "logos/%s.png" % icons.slug(name) if has_logo else "",
+             "songs": [dict({"k": track_key(s), "t": s["title"], "a": s["artist"], "s": s["sec"]}, **({"m": s["m"]} if s.get("m") else {}))
+                       for s in st["songs"]],
+             "jingles": [{"k": track_key(j), "s": j["sec"]} for j in st["jingles"]]}
+    if any(s.get("parts") and not s.get("set") for s in st["songs"]):      # talk radio, not a club's DJ set
+        entry["kind"] = "talk"
+    return entry
+
+
+def signature(name, st, index):
+    """Fingerprint of everything that goes into the pack of a station: programme, titles, source streams and logo."""
+    logo = _logo(name)
+    sources = [[(index["items"].get(str(base)) or {}).get("length"), base, i]
+               for tr in st["songs"] + st["jingles"] for base, i in tr.get("parts") or [(tr["base"], tr["idx"])]]
+    h = hashlib.sha1(json.dumps([VERSION, station_entry(name, st, bool(logo)), sources], sort_keys=True,
+                                ensure_ascii=False).encode("utf-8"))
+    h.update(logo)
+    return h.hexdigest()
+
+
+def read_signature(path):
+    """The fingerprint stored in a complete pack file, or "" (no file, damaged, or only partly written)."""
+    try:
+        with open(path, "rb") as f:
+            head = f.read(HEADER)
+            if head[:8] != MAGIC:
+                return ""
+            off, length = struct.unpack_from("<QQ", head, 16)
+            if off < HEADER or not 0 < length <= 64 << 20 or off + length != os.fstat(f.fileno()).st_size:
+                return ""
+            f.seek(off)
+            return str(json.loads(f.read(length).decode("utf-8")).get("sig", ""))
+    except (OSError, ValueError, struct.error, AttributeError):
+        return ""
+
+
+def plan(stations, index, folder):
+    """-> {station: (path, signature, "new" | "changed" | "current")} for the packs in `folder`."""
+    out = {}
+    for name, st in stations.items():
+        path = os.path.join(folder, pack_file(name))
+        sig = signature(name, st, index)
+        state = "new" if not os.path.isfile(path) else "current" if read_signature(path) == sig else "changed"
+        out[name] = (path, sig, state)
+    return out
 
 
 class PackWriter:
@@ -169,36 +247,13 @@ def _remux(ffmpeg, src, dst):
     shutil.copyfile(src, dst)
 
 
-def export_pack(stations, index, rpf, out_path, progress=None, cancel=None, cache_dirs=()):
-    """Write the station pack. stations: {name: {"songs": [...], "jingles": [...]}} (the chosen ones); index: the radio
-    index (it knows where each song lies in audio.rpf); rpf: path of audio.rpf. progress(fraction, text); cancel: Event.
-    Returns the size of the pack in bytes."""
+# ------------------------------------------------------------------------------------------------ writing
+def _write_tracks(writer, tracks, index, rpf, work, pool, workers, cache_dirs, cancel, step):
+    """Cut the tracks out of the archive and add them to the pack. step() is called before each one."""
     import awc_radio as radio  # noqa: PLC0415  (awc_radio imports this module only on demand)
-    progress = progress or (lambda f, s: None)
-    cancel = cancel or threading.Event()
-    if not stations:
-        raise ExportError(t("err_pick"))
-    out_dir = os.path.dirname(os.path.abspath(out_path))
-    need = estimate_bytes(stations)
-    if shutil.disk_usage(out_dir).free < need * 1.15 + 50_000_000:
-        raise ExportError(t("err_space", s=human(need * 1.15)))
     ffmpeg = find_ffmpeg()
-    work = os.path.join(out_dir, ".awc_pack_work")
-    shutil.rmtree(work, ignore_errors=True)
-    os.makedirs(work)
-    tracks = {}
-    for st in stations.values():
-        for tr in st["songs"] + st["jingles"]:
-            tracks[track_key(tr)] = tr
-    keys = sorted(tracks)
-    n = len(keys)
-    tmp = out_path + ".part"
-    writer = PackWriter(tmp)
-    done = [0]
-    lock = threading.Lock()
-    workers = max(1, min(8, os.cpu_count() or 2))
     ahead = threading.Semaphore(workers * 2)           # extraction may run only a few files ahead of the writing
-    errors = []
+    futures = []
 
     def finish_one(key, src, own):
         try:
@@ -211,82 +266,109 @@ def export_pack(stations, index, rpf, out_path, progress=None, cancel=None, cach
                         os.remove(p)
                     except OSError:
                         pass
-            with lock:
-                done[0] += 1
-                progress(0.95 * done[0] / n, t("st_write", i=done[0], n=n))
         finally:
             ahead.release()
 
+    errors = []
+    try:
+        for key in sorted(tracks):
+            if cancel.is_set() or any(x.done() and x.exception() for x in futures):
+                break
+            while not ahead.acquire(timeout=0.5):
+                if cancel.is_set():
+                    raise Cancelled()
+            src = next((os.path.join(d, "r_%s.opus" % key) for d in cache_dirs
+                        if os.path.isfile(os.path.join(d, "r_%s.opus" % key))), None)
+            own = src is None
+            try:
+                step()
+                if own:
+                    src = os.path.join(work, key + ".orig")
+                    radio.extract_track(index, rpf, tracks[key], src + ".part")
+                    os.replace(src + ".part", src)
+            except BaseException:
+                ahead.release()
+                raise
+            futures.append(pool.submit(finish_one, key, src, own))
+    finally:
+        for fu in futures:                                  # nothing may still be writing when the pack is closed
+            try:
+                fu.result()
+            except Exception as e:  # noqa: BLE001
+                errors.append(e)
+    if cancel.is_set():
+        raise Cancelled()
+    if errors:
+        raise ExportError(str(errors[0]))
+
+
+def export_packs(stations, index, rpf, folder, progress=None, cancel=None, cache_dirs=()):
+    """Write one pack per station into `folder`; packs that are up to date stay as they are.
+
+    stations: {name: {"songs": [...], "jingles": [...]}} (the chosen ones); index: the radio index (it knows where each
+    song lies in audio.rpf); rpf: path of audio.rpf. progress(fraction, text); cancel: Event.
+    Returns {"written": [names], "current": [names], "bytes": size of the written files}."""
+    progress = progress or (lambda f, s: None)
+    cancel = cancel or threading.Event()
+    if not stations:
+        raise ExportError(t("err_pick"))
+    if not os.path.isdir(folder):
+        raise ExportError(t("err_folder"))
+    todo = plan(stations, index, folder)
+    write = [n for n in stations if todo[n][2] != "current"]
+    result = {"written": [], "current": [n for n in stations if todo[n][2] == "current"], "bytes": 0}
+    if not write:
+        progress(1.0, "")
+        return result
+    sizes = [estimate_bytes({n: stations[n]}) for n in write]
+    need = sum(sizes) * 1.05 + max(sizes)                        # an old pack stays until the new one is complete
+    if shutil.disk_usage(folder).free < need + 50_000_000:
+        raise ExportError(t("err_space", s=human(need)))
+    jobs = {n: {track_key(tr): tr for tr in stations[n]["songs"] + stations[n]["jingles"]} for n in write}
+    total, done = sum(len(j) for j in jobs.values()), [0]
+    work = os.path.join(folder, ".awc_pack_work")
+    shutil.rmtree(work, ignore_errors=True)
+    os.makedirs(work)
+    workers = max(1, min(8, os.cpu_count() or 2))
     try:
         with ThreadPoolExecutor(max_workers=workers) as pool:
-            futures = []
-            for i, key in enumerate(keys):
-                if cancel.is_set() or errors:
-                    break
-                while not ahead.acquire(timeout=0.5):
-                    if cancel.is_set():
-                        break
-                if cancel.is_set():
-                    ahead.release()
-                    break
-                tr = tracks[key]
-                src = next((os.path.join(d, "r_%s.opus" % key) for d in cache_dirs
-                            if os.path.isfile(os.path.join(d, "r_%s.opus" % key))), None)
-                own = src is None
+            for name in write:
+                path, sig, _state = todo[name]
+                writer = PackWriter(path + ".part")
+                count = [0]
+
+                def step():
+                    count[0] += 1
+                    done[0] += 1
+                    progress(0.99 * (done[0] - 1) / total, t("st_extract", station=name, i=count[0], n=len(jobs[name])))
+
                 try:
-                    if own:
-                        src = os.path.join(work, key + ".orig")
-                        radio.extract_track(index, rpf, tr, src + ".part")
-                        os.replace(src + ".part", src)
+                    _write_tracks(writer, jobs[name], index, rpf, work, pool, workers, cache_dirs, cancel, step)
+                    logo = _logo(name)
+                    entry = station_entry(name, stations[name], bool(logo))
+                    if logo:
+                        writer.add_bytes(entry["logo"], logo)
+                    writer.finish({"v": VERSION, "created": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                                   "sig": sig, "stations": [entry]})
+                    os.replace(path + ".part", path)
                 except BaseException:
-                    ahead.release()
+                    writer.abort()
+                    try:
+                        os.remove(path + ".part")
+                    except OSError:
+                        pass
                     raise
-                progress(0.95 * done[0] / n, t("st_extract", i=i + 1, n=n))
-                fu = pool.submit(finish_one, key, src, own)
-                futures.append(fu)
-                for x in [x for x in futures if x.done() and x.exception()]:
-                    errors.append(x.exception())
-            for fu in futures:
-                try:
-                    fu.result()
-                except Exception as e:  # noqa: BLE001
-                    errors.append(e)
-        if cancel.is_set():
-            raise Cancelled()
-        if errors:
-            raise ExportError(str(errors[0]))
-        progress(0.96, t("st_done"))
-        meta = {"v": VERSION, "created": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "stations": []}
-        for name, st in stations.items():
-            logo = ""
-            p = icons.icon_path(name)
-            if p and os.path.isfile(p):
-                logo = "logos/%s.png" % icons.slug(name)
-                with open(p, "rb") as fh:
-                    writer.add_bytes(logo, fh.read())
-            meta["stations"].append({
-                "name": name, "logo": logo,
-                "songs": [dict({"k": track_key(s), "t": s["title"], "a": s["artist"], "s": s["sec"]}, **({"m": s["m"]} if s.get("m") else {}))
-                          for s in st["songs"]],
-                "jingles": [{"k": track_key(j), "s": j["sec"]} for j in st["jingles"]]})
-        writer.finish(meta)
-        os.replace(tmp, out_path)
-    except BaseException:
-        writer.abort()
-        try:
-            os.remove(tmp)
-        except OSError:
-            pass
-        raise
+                result["written"].append(name)
+                result["bytes"] += os.path.getsize(path)
     finally:
         shutil.rmtree(work, ignore_errors=True)
     progress(1.0, "")
-    return os.path.getsize(out_path)
+    return result
 
 
 # ------------------------------------------------------------------------------------------------ dialog (used by awc_radio.py)
 def open_dialog(app):
-    """Dialog for AWC Radio: pick the stations, then write the station pack."""
+    """Dialog for AWC Radio: pick the folder and the stations, then write the station packs."""
     import queue
     import tkinter as tk
     from tkinter import filedialog, messagebox, ttk
@@ -296,17 +378,34 @@ def open_dialog(app):
     win = tk.Toplevel(app)
     win.title(t("title"))
     win.configure(bg=radio.BG)
-    win.geometry("640x600")
+    win.geometry("680x660")
     win.transient(app)
     q = queue.Queue()
     cancel = threading.Event()
     busy = [False]
+    state = {}                                      # station -> "new" | "changed" | "current" in the chosen folder
+    var_folder = tk.StringVar(value=app.cfg.get("pack_dir") or "")
 
     tk.Label(win, text=t("title"), bg=radio.BG, fg=radio.ACCENT, font=("Segoe UI", 16, "bold")).pack(anchor="w", padx=16, pady=(14, 2))
-    tk.Label(win, text=t("intro"), bg=radio.BG, fg=radio.DIM, wraplength=600, justify="left").pack(anchor="w", padx=16)
+    tk.Label(win, text=t("intro"), bg=radio.BG, fg=radio.DIM, wraplength=640, justify="left").pack(anchor="w", padx=16)
+    tk.Label(win, text=t("folder"), bg=radio.BG, fg=radio.FG).pack(anchor="w", padx=16, pady=(10, 2))
+    row = tk.Frame(win, bg=radio.BG)
+    row.pack(fill="x", padx=16)
+    entry = ttk.Entry(row, textvariable=var_folder)
+    entry.pack(side="left", fill="x", expand=True)
+    btn_browse = ttk.Button(row, text=t("browse"))
+    btn_browse.pack(side="left", padx=(8, 0))
     top = tk.Frame(win, bg=radio.BG)
     top.pack(fill="x", padx=16, pady=(10, 2))
     tk.Label(top, text=t("stations"), bg=radio.BG, fg=radio.FG).pack(side="left")
+    btns = tk.Frame(win, bg=radio.BG)                # the lower part is packed first: it stays visible in a small window
+    btns.pack(side="bottom", fill="x", padx=16, pady=12)
+    lbl_status = tk.Label(win, text="", bg=radio.BG, fg=radio.DIM, anchor="w", wraplength=640, justify="left")
+    lbl_status.pack(side="bottom", fill="x", padx=16)
+    bar = ttk.Progressbar(win, maximum=1.0)
+    bar.pack(side="bottom", fill="x", padx=16, pady=(10, 2))
+    lbl_size = tk.Label(win, text="", bg=radio.BG, fg=radio.FG, anchor="w", wraplength=640, justify="left")
+    lbl_size.pack(side="bottom", fill="x", padx=16, pady=(8, 0))
     box = tk.Frame(win, bg=radio.BG)
     box.pack(fill="both", expand=True, padx=16)
     lb = tk.Listbox(box, selectmode="multiple", exportselection=False, bg=radio.PANEL, fg=radio.FG, selectbackground=radio.CARD_SEL,
@@ -315,20 +414,6 @@ def open_dialog(app):
     lb.configure(yscrollcommand=sb.set)
     sb.pack(side="right", fill="y")
     lb.pack(side="left", fill="both", expand=True)
-    for nm in names:
-        st = app.stations[nm]
-        lb.insert("end", "%s   –   %s   (%d)" % (nm, human(estimate_bytes({nm: st})), len(st["songs"])))
-    lb.select_set(0, "end")
-    ttk.Button(top, text=t("none"), command=lambda: (lb.select_clear(0, "end"), refresh())).pack(side="right")
-    ttk.Button(top, text=t("all"), command=lambda: (lb.select_set(0, "end"), refresh())).pack(side="right", padx=6)
-    lbl_size = tk.Label(win, text="", bg=radio.BG, fg=radio.FG, anchor="w", wraplength=600, justify="left")
-    lbl_size.pack(fill="x", padx=16, pady=(8, 0))
-    bar = ttk.Progressbar(win, maximum=1.0)
-    bar.pack(fill="x", padx=16, pady=(10, 2))
-    lbl_status = tk.Label(win, text="", bg=radio.BG, fg=radio.DIM, anchor="w", wraplength=600, justify="left")
-    lbl_status.pack(fill="x", padx=16)
-    btns = tk.Frame(win, bg=radio.BG)
-    btns.pack(fill="x", padx=16, pady=12)
     btn_make = ttk.Button(btns, text=t("create"), style="Accent.TButton")
     btn_make.pack(side="left")
     btn_cancel = ttk.Button(btns, text=t("close"))
@@ -339,34 +424,72 @@ def open_dialog(app):
 
     def refresh(*_):
         sel = chosen()
-        lbl_size.config(text=t("size", s=human(estimate_bytes(sel))))
+        write = {n: s for n, s in sel.items() if state.get(n) != "current"}
+        lbl_size.config(text=t("size", n=len(write), s=human(estimate_bytes(write)), c=len(sel) - len(write)))
         if not busy[0]:
             btn_make.config(state="normal" if sel else "disabled")
 
-    lb.bind("<<ListboxSelect>>", refresh)
+    def pick(which):
+        if busy[0]:
+            return
+        lb.select_clear(0, "end")
+        for i, nm in enumerate(names):
+            if which == "all" or (which == "changed" and state.get(nm) != "current"):
+                lb.select_set(i)
+        refresh()
+
+    def fill(select_all=False):
+        """Show what the chosen folder holds already."""
+        selected = set(range(len(names))) if select_all else set(lb.curselection())
+        folder = var_folder.get().strip()
+        state.clear()
+        if os.path.isdir(folder):
+            state.update({n: v[2] for n, v in plan(app.stations, app.index, folder).items()})
+        top_row = lb.yview()[0]
+        lb.delete(0, "end")
+        for nm in names:
+            st = app.stations[nm]
+            line = "%s   –   %s   (%d)" % (nm, human(estimate_bytes({nm: st})), len(st["songs"]))
+            if nm in state:
+                line += "   ·   %s" % t(state[nm])
+            lb.insert("end", line)
+        for i in selected:
+            lb.select_set(i)
+        lb.yview_moveto(top_row)
+        refresh()
+
+    ttk.Button(top, text=t("none"), command=lambda: pick("none")).pack(side="right")
+    ttk.Button(top, text=t("all"), command=lambda: pick("all")).pack(side="right", padx=6)
+    ttk.Button(top, text=t("changed_only"), command=lambda: pick("changed")).pack(side="right")
+
+    def browse():
+        p = filedialog.askdirectory(parent=win, title=t("folder"), initialdir=var_folder.get() or None)
+        if p:
+            var_folder.set(os.path.normpath(p))
+            fill()
 
     def start():
         sel = chosen()
+        folder = var_folder.get().strip()
+        if not os.path.isdir(folder):
+            browse()
+            return
         if not sel:
             messagebox.showwarning(t("title"), t("err_pick"), parent=win)
             return
-        p = filedialog.asksaveasfilename(parent=win, title=t("save_title"), defaultextension=".dat", initialfile="AWC-Radio.dat",
-                                         initialdir=app.cfg.get("pack_dir") or None, filetypes=[("AWC station pack", "*.dat")])
-        if not p:
-            return
-        app.cfg["pack_dir"] = os.path.dirname(p)
+        app.cfg["pack_dir"] = folder
         radio.save_settings(app.cfg)
         busy[0] = True
         cancel.clear()
-        btn_make.config(state="disabled")
+        for w in (btn_make, btn_browse, entry, lb):
+            w.config(state="disabled")
         btn_cancel.config(text=t("cancel"))
-        lb.config(state="disabled")
 
         def work():
             try:
-                size = export_pack(sel, app.index, app.cfg["rpf"], p, lambda f, s: q.put(("prog", f, s)), cancel,
+                res = export_packs(sel, app.index, app.cfg["rpf"], folder, lambda f, s: q.put(("prog", f, s)), cancel,
                                    cache_dirs=(radio.cache_dir(),))
-                q.put(("done", p, size))
+                q.put(("done", folder, res))
             except Cancelled:
                 q.put(("fail", t("cancelled")))
             except Exception as e:  # noqa: BLE001
@@ -376,9 +499,10 @@ def open_dialog(app):
     def finish_ui():
         busy[0] = False
         btn_cancel.config(text=t("close"))
-        lb.config(state="normal")
+        for w in (btn_browse, entry, lb):
+            w.config(state="normal")
         bar["value"] = 0
-        refresh()
+        fill()
 
     def poll():
         try:
@@ -390,7 +514,7 @@ def open_dialog(app):
                 elif m[0] == "done":
                     finish_ui()
                     lbl_status.config(text="")
-                    messagebox.showinfo(t("title"), t("done", p=m[1], s=human(m[2])), parent=win)
+                    messagebox.showinfo(t("title"), t("done", w=len(m[2]["written"]), c=len(m[2]["current"]), p=m[1]), parent=win)
                 elif m[0] == "fail":
                     finish_ui()
                     lbl_status.config(text=m[1])
@@ -407,10 +531,14 @@ def open_dialog(app):
         else:
             win.destroy()
 
+    lb.bind("<<ListboxSelect>>", refresh)
+    entry.bind("<Return>", lambda _e: fill())
+    entry.bind("<FocusOut>", lambda _e: None if busy[0] else fill())
+    btn_browse.config(command=browse)
     btn_make.config(command=start)
     btn_cancel.config(command=close)
     win.protocol("WM_DELETE_WINDOW", close)
-    refresh()
+    fill(select_all=True)
     poll()
 
 
@@ -418,8 +546,8 @@ def open_dialog(app):
 def main(argv=None):
     import argparse
     import awc_radio as radio
-    ap = argparse.ArgumentParser(description="Write an AWC Radio station pack (.dat) for the Android app")
-    ap.add_argument("out", help="output file, e.g. AWC-Radio.dat")
+    ap = argparse.ArgumentParser(description="Write AWC Radio station packs (.radiopak) for the Android app")
+    ap.add_argument("folder", help="folder for the packs (one file per station); up-to-date files are left alone")
     ap.add_argument("--stations", nargs="*", help="station names (default: all)")
     a = ap.parse_args(argv)
     cfg = radio.load_settings()
@@ -427,13 +555,15 @@ def main(argv=None):
     if not idx:
         raise SystemExit("no radio index yet: start AWC Radio once")
     stations = {k: v for k, v in idx["stations"].items() if not a.stations or k in a.stations}
+    os.makedirs(a.folder, exist_ok=True)
     t0 = time.time()
     try:
-        size = export_pack(stations, idx, cfg["rpf"], a.out, lambda f, s: print("\r%3d%% %s" % (f * 100, s), end="   "),
+        res = export_packs(stations, idx, cfg["rpf"], a.folder, lambda f, s: print("\r%3d%% %s" % (f * 100, s), end="   "),
                            cache_dirs=(radio.cache_dir(),))
     except (ExportError, Cancelled) as e:
         raise SystemExit("error: %s" % e) from e                # exit code 1, no error dialog in the windowed exe
-    print("\nOK %s (%s) in %.0fs" % (a.out, human(size), time.time() - t0))
+    print("\nOK %d written (%s), %d up to date, in %.0fs" % (len(res["written"]), human(res["bytes"]), len(res["current"]),
+                                                             time.time() - t0))
 
 
 if __name__ == "__main__":

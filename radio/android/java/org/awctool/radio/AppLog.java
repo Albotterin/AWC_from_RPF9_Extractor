@@ -26,14 +26,16 @@ final class AppLog {
 
     static synchronized void init(Context ctx) {
         if (file != null) return;
-        file = new File(ctx.getFilesDir(), "log.txt");
+        // device protected storage: the alarm writes here also before the phone is unlocked after a restart
+        File dir = ctx.createDeviceProtectedStorageContext().getFilesDir();
+        file = new File(dir, "log.txt");
         if (file.length() > MAX_FILE) {
-            File old = new File(ctx.getFilesDir(), "log.old.txt");
+            File old = new File(dir, "log.old.txt");
             //noinspection ResultOfMethodCallIgnored
             old.delete();
             //noinspection ResultOfMethodCallIgnored
             file.renameTo(old);
-            file = new File(ctx.getFilesDir(), "log.txt");
+            file = new File(dir, "log.txt");
         }
     }
 

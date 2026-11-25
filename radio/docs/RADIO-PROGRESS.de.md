@@ -65,12 +65,23 @@ Ein durchgehender DJ-Mix; seine Songs liegen nicht als einzelne Dateien vor und 
 |---|---|---:|
 | 🎚 The Vault Radio | 1 Mix (84 Min.), läuft als Sender | 24 |
 
+## Orte im Spiel
+
+Was die Audio-Konfiguration diese Orte spielen lässt. Die Aufnahmen stehen nicht in den Credits-Listen und sind oben nicht mitgezählt.
+
+| Sender | Spielt | Länge |
+|---|---|---:|
+| 🎚 Jack of Hearts | DJ-Set des Clubs (Resident: Bodega The DJ) | 100 Min. |
+| 🎚 VYB | DJ-Set des Clubs in vier Teilen (Resident: DJ Stevie J) | 45 Min. |
+| 🎚 The Vault (Club) | das Set des Clubs: dieselben 25 Titelmarken wie The Vault Radio, andere Abmischung | 84 Min. |
+| 🎵 Thrillbilly Mud Club | 20 Songs, meist auch auf The Chamber 106.6 und Dirty South Classics | 84 Min. |
+
 ## Die Lücken
 
 - **Bodega The DJ** und **DJ Stevie J** sind DJ-Sets in Clubs. Die fehlenden Titel haben dort keine zugeordnete Einzeldatei; manche laufen auf anderen Sendern.
 - **Worldwide FM**: zwei gelistete Titel sind nicht zugeordnet, eine Aufnahme der Playlist läuft als „Unknown track“. **Radio On-U**: ein Titel fehlt, sehr wahrscheinlich ist er der „Unknown track“ des Senders.
 - **Honey FM - Liquid City** (8 eigens geschriebene Songs, nicht oben mitgezählt) steht in keiner der Senderlisten.
-- Lange DJ-Mixe laufen zusätzlich als „(Mix)“-Sender: Radio On-U (10 von 24), The Sniper Of La Perle (20 von 22), Worldwide FM (31 von 41). Die Zahlen nennen die Abschnitte mit Titel. Die übrigen langen Club-Mixe laufen als „Clubmixes“.
+- Lange DJ-Mixe laufen zusätzlich als „(Mix)“-Sender: Radio On-U (10 von 24), The Sniper Of La Perle (20 von 22), Worldwide FM (31 von 41). Die Zahlen nennen die Abschnitte mit Titel. Ein weiterer langer Club-Mix, dem sich kein Ort zuordnen lässt, läuft als „Clubmixes“.
 - Die fünf Podcasts, die die Spiel-Konfiguration nennt, sind noch nicht zugeordnet.
 
 ## So wird gemessen
