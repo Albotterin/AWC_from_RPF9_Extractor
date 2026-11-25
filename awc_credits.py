@@ -118,6 +118,67 @@ def _name_tokens(name):
     return [t for t in re.split(r"[_\s]+", _fold(name)) if t]
 
 
+def _compact(text):
+    return "".join(_fwords(text))
+
+
+# titles the game config writes differently from the credits list
+ALIASES = {"htwoo": "h2o", "sixfourfive": "645", "threehundredblackout": "300blackout",
+           "beethovensymphonyseven": "symphonyno7inamajorop92iiallegretto", "getmoneyanthem": "gma", "goshorty": "50bands",
+           "walkingintherain": "chiataytrongmua"}
+
+
+def lookup(songs, station, title, artists=(), own_only=False):
+    """(title, artist) in the spelling of the credits list for a title and artists as the game config writes them
+    ('ADVENTURE_OF_A_LIFETIME', ['COLDPLAY']: upper case, names run together), or None.
+
+    A song of the same station wins: the config sometimes names another song of the same title as the artist. Other
+    sections of the page (music that is no station of its own) only help with the spelling, when the artist fits."""
+    import difflib
+    want = _compact(title.replace("_", " "))
+    if not want:
+        return None
+    who = [a for a in (_compact(x.replace("_", " ")) for x in artists) if len(a) >= 3 and a != "special"]
+    wants = {want, ALIASES.get(want, want)}
+    wants |= {want[len(a):] for a in who if want.startswith(a) and len(want) > len(a)}      # "FUSE_ONE_SILK"
+    best, best_rank = None, 0.0
+    for s in songs:
+        own, radio = s["station"] == station, is_radio(s["station"])
+        if own_only and not own:
+            continue
+        full = _compact(s["title"])
+        plain = _compact(re.sub(r"\(.*?\)|\[.*?\]", " ", s["title"]))
+        same_artist = any(a in _compact(s["artist"]) for a in who)
+        if not radio and not same_artist:
+            continue
+        if full in wants or plain in wants:
+            if who and not same_artist and not own:
+                continue                            # same title by somebody else
+            rank = 3.0 + 0.1 * (full in wants)
+        elif same_artist and plain and (plain.startswith(want) or want.startswith(plain) or full.startswith(want)):
+            rank = 2.0
+        elif same_artist and difflib.SequenceMatcher(None, want, full).ratio() >= 0.8:
+            rank = 1.0
+        else:
+            continue
+        rank += 1.0 * own + 0.6 * same_artist + 0.2 * radio
+        rank += 0.3 * bool(who and who[0] in _compact(s["artist"]))     # two versions: the first artist decides
+        if rank > best_rank:
+            best, best_rank = s, rank
+    return (display_title(best["title"]), best["artist"]) if best else None
+
+
+def artist_names(songs):
+    """{compact name: spelling} of every single artist of the credits list ('tameimpala' -> 'Tame Impala')."""
+    out = {}
+    for s in songs:
+        for part in re.split(r"\s+(?:ft\.?|feat\.?|featuring|with|x)\s+|\s*[,&/]\s*|\s+and\s+", s["artist"], flags=re.I):
+            key = _compact(part)
+            if key:
+                out.setdefault(key, part.strip())
+    return out
+
+
 def _score(title_words, artist_words, name_words):
     """0..1: how well the internal name of a stream fits a title of the credits list."""
     import difflib

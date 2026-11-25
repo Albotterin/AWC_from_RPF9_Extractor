@@ -24,6 +24,12 @@ UPPER_WORDS = {"fm", "dj", "tv", "ig", "ii", "iii", "usa", "uk"}
 
 def inflate_streams(data):
     """Yield the inflated content of every zlib stream that decodes cleanly to its end in `data`."""
+    for _start, _end, out in inflate_blocks(data):
+        yield out
+
+
+def inflate_blocks(data):
+    """Like inflate_streams, but yields (start, end, content): where the stream lies in `data`."""
     pos = 0
     while True:
         m = HDR.search(data, pos)
@@ -38,8 +44,8 @@ def inflate_streams(data):
             pos = start + 1
             continue
         if d.eof and len(out) >= 16:
-            yield out
             pos = start + (len(chunk) - len(d.unused_data))
+            yield start, pos, out
         else:
             pos = start + 1
 

@@ -97,6 +97,40 @@ def _build_aud_metadata_blob(objects, refs=()):
 
 
 class AwcBlockSkipTests(unittest.TestCase):
+    def test_join_streams_reconciles_each_parts_blocks(self):
+        p1, p2, pad, p3, p4 = b"\xfcA", b"\xfcB", b"\xfcP", b"\xfcC", b"\xfcD"
+        with tempfile.TemporaryDirectory() as tmp:
+            first = Path(tmp) / "part1.awc"
+            first.write_bytes(_build_synthetic_music_awc([
+                (0, 3840, [p1, p2, pad]),
+                (1920, 3840, [p2, p3]),
+            ]))
+            second = Path(tmp) / "part2.awc"
+            second.write_bytes(_build_synthetic_music_awc([(0, 3840, [p3, p4])]))
+            parts = [(awc_core.AwcFile(first), 0), (awc_core.AwcFile(second), 0)]
+            output = Path(tmp) / "episode.opus"
+            seconds = awc_core.join_streams(parts, output)
+            self.assertEqual(_extract_ogg_audio_payload(output), p1 + p2 + p3 + p3 + p4)
+            self.assertAlmostEqual(seconds, 0.1)
+
+    def test_join_streams_does_not_reuse_skip_history_across_parts(self):
+        p1, p2 = b"\xfcA", b"\xfcB"
+        for budget, packet in ((1920, p1), (3840, p2)):
+            with self.subTest(budget=budget), tempfile.TemporaryDirectory() as tmp:
+                first = Path(tmp) / "part1.awc"
+                first.write_bytes(_build_synthetic_music_awc([(0, budget, [p1])]))
+                second = Path(tmp) / "part2.awc"
+                second.write_bytes(_build_synthetic_music_awc([(1920, 1920, [packet])]))
+                parts = [(awc_core.AwcFile(first), 0), (awc_core.AwcFile(second), 0)]
+                output = Path(tmp) / "episode.opus"
+                with self.assertRaisesRegex(awc_core.AwcError, "unverified skip"):
+                    awc_core.join_streams(parts, output)
+                self.assertFalse(output.exists())
+                output.write_bytes(b"previous complete episode")
+                with self.assertRaisesRegex(awc_core.AwcError, "unverified skip"):
+                    awc_core.join_streams(parts, output)
+                self.assertEqual(output.read_bytes(), b"previous complete episode")
+
     def test_scan_omits_bank_truncated_before_first_block(self):
         raw = _build_synthetic_music_awc([(0, 1920, [b"\xfcA"])], declared_samples=1920)
         with tempfile.TemporaryDirectory() as tmp:

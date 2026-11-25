@@ -4,7 +4,9 @@
 
 Wie viele der Songs, die die öffentliche Credits-Seite für jeden Sender aufführt, als Dateien in der `audio.rpf` des Spiels gefunden wurden.
 
-**Stand: 2026-11-24** · 766 / 813 (94.2 %)
+**Stand: 2026-11-25** · 792 / 809 (97.9 %)
+
+Seit v2.4.0 kommen die Playlists direkt aus der Audio-Konfiguration des Spiels. Viele Sender spielen deshalb auch Songs, die die Credits nicht nennen (Spalte *Im Radio*).
 
 🟢 ab 90 % · 🟡 70–89 % · 🟠 30–69 % · 🔴 unter 30 %
 
@@ -14,34 +16,46 @@ Wie viele der Songs, die die öffentliche Credits-Seite für jeden Sender auffü
 
 <details><summary>Tabelle</summary>
 
-| Sender | Gefunden / gelistet | Anteil |
-|---|---:|---:|
-| 🟢 Afrobank FM | 31 / 31 | 100.0 % |
-| 🟢 Back Country Radio | 24 / 24 | 100.0 % |
-| 🟢 Circoloco Records Radio | 27 / 27 | 100.0 % |
-| 🟢 Radio La Ola | 25 / 25 | 100.0 % |
-| 🟢 The Chamber 106.6 | 22 / 22 | 100.0 % |
-| 🟢 V-Rock | 70 / 70 | 100.0 % |
-| 🟢 Vice City FM | 70 / 71 | 98.6 % |
-| 🟢 Flash FM | 78 / 80 | 97.5 % |
-| 🟢 Cocoteo FM | 29 / 30 | 96.7 % |
-| 🟢 Dirty South Classics | 37 / 39 | 94.9 % |
-| 🟢 Stockyard FM | 35 / 37 | 94.6 % |
-| 🟢 Kaleidoscope FM | 17 / 18 | 94.4 % |
-| 🟢 Honey FM | 49 / 52 | 94.2 % |
-| 🟢 Radio On-U | 15 / 16 | 93.8 % |
-| 🟢 Emotion 98.3 | 35 / 38 | 92.1 % |
-| 🟢 Vice City Rap Radio | 23 / 25 | 92.0 % |
-| 🟢 Gloriana Blues Radio | 21 / 23 | 91.3 % |
-| 🟢 The Sniper Of La Perle | 20 / 22 | 90.9 % |
-| 🟡 Leonida Jazz Radio | 32 / 36 | 88.9 % |
-| 🟡 Symphony FM | 15 / 17 | 88.2 % |
-| 🟡 Worldwide FM | 36 / 41 | 87.8 % |
-| 🟡 Bodega The DJ | 36 / 45 | 80.0 % |
-| 🟡 DJ Stevie J | 19 / 24 | 79.2 % |
-| **Gesamt** | **766 / 813** | **94.2 %** |
+| Sender | Gefunden / gelistet | Anteil | Im Radio |
+|---|---:|---:|---:|
+| 🟢 Afrobank FM | 31 / 31 | 100.0 % | 31 |
+| 🟢 Back Country Radio | 24 / 24 | 100.0 % | 24 |
+| 🟢 The Chamber 106.6 | 22 / 22 | 100.0 % | 22 |
+| 🟢 Circoloco Records Radio | 27 / 27 | 100.0 % | 27 |
+| 🟢 Cocoteo FM | 30 / 30 | 100.0 % | 30 |
+| 🟢 Dirty South Classics | 39 / 39 | 100.0 % | 39 |
+| 🟢 Emotion 98.3 | 35 / 35 | 100.0 % | 35 |
+| 🟢 Flash FM | 80 / 80 | 100.0 % | 83 |
+| 🟢 Gloriana Blues Radio | 23 / 23 | 100.0 % | 23 |
+| 🟢 Honey FM | 52 / 52 | 100.0 % | 54 |
+| 🟢 Kaleidoscope FM | 18 / 18 | 100.0 % | 18 |
+| 🟢 Leonida Jazz Radio | 36 / 36 | 100.0 % | 36 |
+| 🟢 Radio La Ola | 25 / 25 | 100.0 % | 25 |
+| 🟢 The Sniper Of La Perle | 22 / 22 | 100.0 % | 22 |
+| 🟢 Stockyard FM | 37 / 37 | 100.0 % | 37 |
+| 🟢 Symphony FM | 16 / 16 | 100.0 % | 16 |
+| 🟢 V-Rock | 70 / 70 | 100.0 % | 70 |
+| 🟢 Vice City FM | 71 / 71 | 100.0 % | 72 |
+| 🟢 Vice City Rap Radio | 25 / 25 | 100.0 % | 82 |
+| 🟢 Worldwide FM | 39 / 41 | 95.1 % | 40 |
+| 🟢 Radio On-U | 15 / 16 | 93.8 % | 16 |
+| 🟡 Bodega The DJ | 36 / 45 | 80.0 % | 36 |
+| 🟡 DJ Stevie J | 19 / 24 | 79.2 % | 19 |
+| **Gesamt** | **792 / 809** | **97.9 %** | **857** |
 
 </details>
+
+## Talk-Radio
+
+Die Credits nennen hier Sprecher statt Songs. Alle dort genannten Sendungen sind gefunden; die Teile einer Folge laufen am Stück.
+
+| Sender | Sendung | Folgen | Länge |
+|---|---|---:|---:|
+| 🎙 WKTT Talk Radio | Hit the Bricks | 2 | 28 Min. |
+| 🎙 WKTT Talk Radio | The Richard Bastion Show | 2 | 44 Min. |
+| 🎙 The Wipe Talk Radio | Ask Dr. Nita | 4 | 49 Min. |
+| 🎙 The Wipe Talk Radio | El Otro Lado | 3 | 54 Min. |
+| 🎙 The Wipe Talk Radio | She Got Assets | 4 | 52 Min. |
 
 ## Sender, der ein einziger Mix ist
 
@@ -49,27 +63,19 @@ Ein durchgehender DJ-Mix; seine Songs liegen nicht als einzelne Dateien vor und 
 
 | Sender | Gefunden | Gelistete Songs darin |
 |---|---|---:|
-| 🎚 The Vault Radio | 1 Mix (83 Min.), läuft als Sender | 24 |
-
-## Talk-Radio und Shows
-
-Die Credits führen hier Sprecher und Sendungen, keine Songs; die Zahlen sagen daher wenig.
-
-| Sender | Gefunden / gelistet | Anteil |
-|---|---:|---:|
-| 🔴 Honey FM - Liquid City | 0 / 8 | 0.0 % |
-| 🔴 The Wipe Talk Radio | 0 / 40 | 0.0 % |
-| 🔴 WKTT Talk Radio | 0 / 26 | 0.0 % |
+| 🎚 The Vault Radio | 1 Mix (84 Min.), läuft als Sender | 24 |
 
 ## Die Lücken
 
-- **The Vault Radio** steht nicht in der Grafik: Der Sender ist ein einziger langer DJ-Mix ohne Einzeldateien, seine 24 gelisteten Songs lassen sich deshalb nicht als Dateien zählen. Der Mix selbst (83 Minuten) ist gefunden und läuft als Sender. **Symphony FM** steht bei 15 von 17: die Namen stehen in der Config mit einem Längenbyte davor, das jetzt abgeschnitten wird; das Stück von Beethoven hat keine eigene Datei.
-- Titel werden zuerst über den Hash gefunden, dann über die Ähnlichkeit des internen Spiel-Namens ("IM_IN_LUV" für "I'm N Luv (Wit a Stripper)"); so kommen 64 Songs dazu.
-- Lange DJ-Mixe laufen als Sender: The Vault Radio, und zusätzliche „(Mix)“-Sender für Radio On-U, Worldwide FM und The Sniper Of La Perle. Der Sender eines Mixes ergibt sich aus den Song-Markern darin oder (The Vault) aus der Ordnerreihenfolge im Archiv. Während ein Mix läuft, wird der Titel des aktuellen Abschnitts angezeigt (20 von 22, 27 von 41 und 10 von 24 Abschnitten haben einen Namen). Die übrigen langen Mixe (Club- und DJ-Musik) laufen zusammen als Sender „Clubmixes“, bis sie einem Sender zugeordnet werden können.
-- Den übrigen Sendern fehlen je wenige Songs (andere Schreibweise oder keine eigene Datei).
+- **Bodega The DJ** und **DJ Stevie J** sind DJ-Sets in Clubs. Die fehlenden Titel haben dort keine zugeordnete Einzeldatei; manche laufen auf anderen Sendern.
+- **Worldwide FM**: zwei gelistete Titel sind nicht zugeordnet, eine Aufnahme der Playlist läuft als „Unknown track“. **Radio On-U**: ein Titel fehlt, sehr wahrscheinlich ist er der „Unknown track“ des Senders.
+- **Honey FM - Liquid City** (8 eigens geschriebene Songs, nicht oben mitgezählt) steht in keiner der Senderlisten.
+- Lange DJ-Mixe laufen zusätzlich als „(Mix)“-Sender: Radio On-U (10 von 24), The Sniper Of La Perle (20 von 22), Worldwide FM (31 von 41). Die Zahlen nennen die Abschnitte mit Titel. Die übrigen langen Club-Mixe laufen als „Clubmixes“.
+- Die fünf Podcasts, die die Spiel-Konfiguration nennt, sind noch nicht zugeordnet.
 
 ## So wird gemessen
 
-- Die Credits-Seite nennt die Songs jedes Senders. Jeder Titel wird gehasht (`joaat`, so benennt das Spiel seine Streams) und mit den Stream-IDs aus dem Archiv-Scan verglichen.
-- Ein Song gilt als *gefunden*, wenn genau ein Stream diese ID hat, oder wenn der interne Spiel-Name eines sonst nicht zugeordneten Streams eindeutig am besten zu ihm passt. Songs, die nicht als eigene Datei vorliegen, gelten als fehlend.
-- Gezeigt werden nur Zahlen zu öffentlichen Credits-Einträgen; Spieldaten und Songdateien sind nicht Teil dieses Repositorys.
+- Gezählt werden die Einträge, die die Credits-Seite unter *Songs* führt. (Frühere Stände zählten auch Komponisten- und Sänger-Angaben mit.)
+- Für die meisten Sender nennt die Audio-Konfiguration des Spiels jede Aufnahme ihrer Playlist samt Titel und Interpret. Ein Song gilt als *gefunden*, wenn eine Aufnahme des Senders zu dem Credits-Eintrag passt (gleicher Titel oder eine bekannte andere Schreibweise).
+- Für Club-DJs und Mixe werden die Titel wie bisher über den Hash (`joaat`) und die Ähnlichkeit der internen Namen zugeordnet.
+- Gezeigt werden nur Zahlen und Sendungsnamen zu öffentlichen Credits-Einträgen; Spieldaten und Songdateien sind nicht Teil dieses Repositorys.

@@ -294,16 +294,114 @@ class AwcFile:
                 st.est_seconds = st.header_samples / float(st.sample_rate * st.opus_channels)
 
     # -- extraction -------------------------------------------------------------
+    def feed(self, writers, progress=None, cancel=None):
+        """Hand the Opus packets of the wanted streams to their writers ({stream_index: OggOpusWriter})."""
+        nch = len(self.streams)
+        prev_kept = {i: [] for i in writers}
+        prev_deficit = {i: 0 for i in writers}
+        with open(self.path, "rb") as f:
+            for b in range(self.n_blocks):
+                if cancel and cancel():
+                    raise InterruptedError()
+                off = self.data_off + b * self.block_size
+                f.seek(self.base + off)
+                blk = f.read(min(self.block_size, self.data_off + self.data_size - off))
+                if len(blk) < 0x18 * nch:
+                    break
+                recs = [struct.unpack_from("<iII", blk, 0x18 * c + 4) for c in range(nch)]
+                ents = [r[0] for r in recs]
+                if any(e < 0 or e > 4096 for e in ents):
+                    break  # corrupt block (e.g. truncated file)
+                pos = ((0x18 * nch + 4 * sum(ents)) + 0x7FF) & ~0x7FF
+                for c in range(nch):
+                    if c in writers:
+                        w = writers[c]
+                        _, skip_samples, block_samples = recs[c]
+                        pkts = []
+                        for e in range(ents[c]):
+                            ent = blk[pos + e * 0x800: pos + (e + 1) * 0x800]
+                            p = 0
+                            while p + 2 <= len(ent):
+                                n = struct.unpack_from("<H", ent, p)[0]
+                                if n == 0 or p + 2 + n > len(ent):
+                                    break
+                                pkts.append(ent[p + 2:p + 2 + n])
+                                p += 2 + n
+                        if skip_samples and not pkts:
+                            raise AwcError(f"Channel {c}: skip without packets")
+                        pch = self.streams[c].opus_channels
+                        if block_samples % pch:
+                            raise AwcError(f"Channel {c}: invalid interleaved block sample count")
+                        target_f = block_samples // pch
+                        if pkts:
+                            kept = pkts
+                            deficit = 0
+                            if target_f > 0:
+                                tot_f = sum(opus_packet_samples(pkt) for pkt in pkts)
+                                if tot_f > target_f:
+                                    acc = 0
+                                    trim = len(pkts)
+                                    for idx, pkt in enumerate(pkts):
+                                        acc += opus_packet_samples(pkt)
+                                        if acc >= target_f:
+                                            trim = idx + 1
+                                            break
+                                    kept = pkts[:trim]
+                                else:
+                                    deficit = target_f - tot_f
+                            drop = 0
+                            if skip_samples > 0:
+                                skip_f = skip_samples // pch
+                                matched = False
+                                candidates = ((skip_f, skip_samples)
+                                              if pch > 1 and skip_samples % pch == 0 else (skip_samples,))
+                                for cand in candidates:
+                                    if cand <= 0:
+                                        continue
+                                    acc = 0
+                                    for idx, pkt in enumerate(kept, 1):
+                                        acc += opus_packet_samples(pkt)
+                                        if acc == cand and kept[:idx] == prev_kept[c][-idx:]:
+                                            drop = idx
+                                            matched = True
+                                            break
+                                        if acc >= cand:
+                                            break
+                                    if matched:
+                                        break
+                                if not matched:
+                                    if not prev_deficit[c] or skip_samples % pch or skip_f < prev_deficit[c]:
+                                        raise AwcError(f"Channel {c}: unverified skip of {skip_samples} samples")
+                                    net_skip = skip_f - prev_deficit[c]
+                                    if net_skip > 0:
+                                        acc = 0
+                                        for idx, pkt in enumerate(kept, 1):
+                                            acc += opus_packet_samples(pkt)
+                                            if acc == net_skip:
+                                                drop = idx
+                                                break
+                                            if acc > net_skip:
+                                                break
+                                        if not drop:
+                                            raise AwcError(f"Channel {c}: skip cuts through or exceeds the block")
+                            for pkt in (kept[drop:] if drop else kept):
+                                w.add(pkt)
+                            prev_kept[c] = kept
+                            prev_deficit[c] = deficit
+                        else:
+                            prev_kept[c] = []
+                            prev_deficit[c] = target_f
+                    pos += ents[c] * 0x800
+                if progress:
+                    progress((b + 1) / float(self.n_blocks))
+
     def extract(self, jobs, progress=None, cancel=None, tags=None):
         """jobs: {stream_index: out_path.opus}; tags: optional {stream_index: {"TITLE": ...}} written as
         Opus comments. Returns {stream_index: seconds}."""
         tags = tags or {}
-        nch = len(self.streams)
         for idx in jobs:
             if not self.streams[idx].supported:
                 raise AwcError(tr("err_codec", c=self.streams[idx].codec_name))
-        prev_kept = {i: [] for i in jobs}
-        prev_deficit = {i: 0 for i in jobs}
         with ExitStack() as cleanup:
             writers = {}
             staged = {}
@@ -314,106 +412,30 @@ class AwcFile:
                 writer = OggOpusWriter(staged[i], 0x4157 + i, self.streams[i].sample_rate, tags.get(i))
                 cleanup.callback(writer.fh.close)
                 writers[i] = writer
-            with open(self.path, "rb") as f:
-                for b in range(self.n_blocks):
-                    if cancel and cancel():
-                        raise InterruptedError()
-                    off = self.data_off + b * self.block_size
-                    f.seek(self.base + off)
-                    blk = f.read(min(self.block_size, self.data_off + self.data_size - off))
-                    if len(blk) < 0x18 * nch:
-                        break
-                    recs = [struct.unpack_from("<iII", blk, 0x18 * c + 4) for c in range(nch)]
-                    ents = [r[0] for r in recs]
-                    if any(e < 0 or e > 4096 for e in ents):
-                        break  # corrupt block (e.g. truncated file)
-                    pos = ((0x18 * nch + 4 * sum(ents)) + 0x7FF) & ~0x7FF
-                    for c in range(nch):
-                        if c in writers:
-                            w = writers[c]
-                            _, skip_samples, block_samples = recs[c]
-                            pkts = []
-                            for e in range(ents[c]):
-                                ent = blk[pos + e * 0x800: pos + (e + 1) * 0x800]
-                                p = 0
-                                while p + 2 <= len(ent):
-                                    n = struct.unpack_from("<H", ent, p)[0]
-                                    if n == 0 or p + 2 + n > len(ent):
-                                        break
-                                    pkts.append(ent[p + 2:p + 2 + n])
-                                    p += 2 + n
-                            if skip_samples and not pkts:
-                                raise AwcError(f"Channel {c}: skip without packets")
-                            pch = self.streams[c].opus_channels
-                            if block_samples % pch:
-                                raise AwcError(f"Channel {c}: invalid interleaved block sample count")
-                            target_f = block_samples // pch
-                            if pkts:
-                                kept = pkts
-                                deficit = 0
-                                if target_f > 0:
-                                    tot_f = sum(opus_packet_samples(pkt) for pkt in pkts)
-                                    if tot_f > target_f:
-                                        acc = 0
-                                        trim = len(pkts)
-                                        for idx, pkt in enumerate(pkts):
-                                            acc += opus_packet_samples(pkt)
-                                            if acc >= target_f:
-                                                trim = idx + 1
-                                                break
-                                        kept = pkts[:trim]
-                                    else:
-                                        deficit = target_f - tot_f
-                                drop = 0
-                                if skip_samples > 0:
-                                    skip_f = skip_samples // pch
-                                    matched = False
-                                    candidates = ((skip_f, skip_samples)
-                                                  if pch > 1 and skip_samples % pch == 0 else (skip_samples,))
-                                    for cand in candidates:
-                                        if cand <= 0:
-                                            continue
-                                        acc = 0
-                                        for idx, pkt in enumerate(kept, 1):
-                                            acc += opus_packet_samples(pkt)
-                                            if acc == cand and kept[:idx] == prev_kept[c][-idx:]:
-                                                drop = idx
-                                                matched = True
-                                                break
-                                            if acc >= cand:
-                                                break
-                                        if matched:
-                                            break
-                                    if not matched:
-                                        if not prev_deficit[c] or skip_samples % pch or skip_f < prev_deficit[c]:
-                                            raise AwcError(f"Channel {c}: unverified skip of {skip_samples} samples")
-                                        net_skip = skip_f - prev_deficit[c]
-                                        if net_skip > 0:
-                                            acc = 0
-                                            for idx, pkt in enumerate(kept, 1):
-                                                acc += opus_packet_samples(pkt)
-                                                if acc == net_skip:
-                                                    drop = idx
-                                                    break
-                                                if acc > net_skip:
-                                                    break
-                                            if not drop:
-                                                raise AwcError(f"Channel {c}: skip cuts through or exceeds the block")
-                                for pkt in (kept[drop:] if drop else kept):
-                                    w.add(pkt)
-                                prev_kept[c] = kept
-                                prev_deficit[c] = deficit
-                            else:
-                                prev_kept[c] = []
-                                prev_deficit[c] = target_f
-                        pos += ents[c] * 0x800
-                    if progress:
-                        progress((b + 1) / float(self.n_blocks))
+            self.feed(writers, progress, cancel)
             for w in writers.values():
                 w.close()
             for i, path in jobs.items():
                 os.replace(staged[i], path)
             return {i: w.seconds for i, w in writers.items()}
+
+
+def join_streams(parts, path, cancel=None):
+    """Write several streams one after the other into ONE Ogg Opus file (the parts of a talk show).
+    parts: [(AwcFile, stream index)]. Returns the length in seconds."""
+    for awc, idx in parts:
+        if not awc.streams[idx].supported:
+            raise AwcError(tr("err_codec", c=awc.streams[idx].codec_name))
+    parent = os.path.dirname(os.path.abspath(path))
+    with tempfile.TemporaryDirectory(dir=parent, prefix=".awc-") as tempdir:
+        staged = os.path.join(tempdir, "joined.opus")
+        writer = OggOpusWriter(staged, 0x4157, parts[0][0].streams[parts[0][1]].sample_rate)
+        with writer.fh:
+            for awc, idx in parts:
+                awc.feed({idx: writer}, cancel=cancel)
+            writer.close()
+        os.replace(staged, path)
+    return writer.seconds
 
 
 # --------------------------------------------------------------------------- scanner

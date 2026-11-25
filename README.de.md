@@ -195,20 +195,29 @@ Unter Windows geht auch ein Doppelklick auf `Start AWC-Tool.bat`.
 
 `awc_radio.py` (oder `Start AWC-Radio.bat` / `AWC-Radio.exe`) ist ein kleiner Webradio-Player auf Basis desselben
 Codes. Beim ersten Start wählst du die `audio.rpf` des Spiels und die Textur-Datei (`data\ttdb\ui\ttdb_ui.ttpf`).
-Die App liest das Archiv einmal ein (derselbe Scan-Cache wie das Hauptprogramm; beim ersten Mal mehrere Minuten),
-lädt die Songliste der öffentlichen Credits-Seite und zeigt dann jeden Sender, zu dem Songs gefunden wurden, mit
-seinem Logo. Ein Klick auf einen Sender schaltet ihn ein: seine Songs laufen nacheinander, nach jeweils 2-4 Songs
-kommt ein kurzer Jingle. Das Programm wird aus der **UTC-Uhrzeit** berechnet (jeden UTC-Tag eine neue Reihenfolge,
-Jingles inklusive), jeder Sender „läuft“ also im Hintergrund weiter: Wer zu einem anderen Sender und zurück wechselt,
-landet dort, wo der erste Sender inzwischen ist. Alle mit denselben Spieldateien und derselben Uhrzeit hören denselben
-Song zur selben Sekunde (auf etwa eine Sekunde genau; der Song, der über Mitternacht UTC laufen würde, wird
-abgeschnitten). Aufeinanderfolgende Songs und Jingles werden 3 Sekunden lang **überblendet** (um kurze Jingles herum kürzer), für alle
-im selben Moment. Es gibt keinen Überspringen-Knopf – wie bei einem echten Radio; nach einer Pause geht es live weiter.
-Spätere Starts gehen sofort. Die Songs kommen aus der Credits-Liste; als **Jingles**
-dienen die kurzen unbenannten Streams, die im Archiv zwischen den Tracks des Senders liegen (eine begründete
-Vermutung - manche können Sprecher-Ansagen o. Ä. sein). Braucht wie das Hauptprogramm `ffplay`.
+Die App liest das Archiv einmal ein (derselbe Scan-Cache wie das Hauptprogramm; beim ersten Mal mehrere Minuten) und
+zeigt dann jeden Sender mit seinem Logo.
 
-**Fortschritt:** 766 von 813 gelisteten Songs (94,2 %) wurden als Dateien gefunden; alle Sender in [Fortschritt der Sender](docs/RADIO-PROGRESS.de.md).
+**Woher die Sender kommen:** Die Audio-Konfiguration des Spiels (der zlib-Teil am Anfang der `audio.rpf`) beschreibt
+jeden Radiosender mit seiner kompletten Playlist samt Titeln und Interpreten. Die Musiksender und die beiden
+**Talk-Radio**-Sender (**WKTT** und **The Wipe**) werden direkt daraus gelesen. Die Songliste der öffentlichen
+Credits-Seite liefert die Schreibweise der Namen und die Club-DJ-Sets und Mixe, die weiterhin über ihre Namen zugeordnet
+werden. Siehe [docs/FORMAT.md](docs/FORMAT.md) (englisch).
+
+Ein Klick auf einen Sender schaltet ihn ein: seine Songs laufen nacheinander, nach jeweils 2-4 Songs kommt ein kurzer
+Jingle. Beim Talk-Radio ist ein „Titel“ eine ganze Sendungsfolge (ihre Teile am Stück, 10-23 Minuten). Das Programm wird
+aus der **UTC-Uhrzeit** berechnet (jeden UTC-Tag eine neue Reihenfolge, Jingles inklusive), jeder Sender „läuft“ also im
+Hintergrund weiter: Wer zu einem anderen Sender und zurück wechselt, landet dort, wo der erste Sender inzwischen ist.
+Alle mit denselben Spieldateien und derselben Uhrzeit hören denselben Song zur selben Sekunde (auf etwa eine Sekunde
+genau; der Song, der über Mitternacht UTC laufen würde, wird abgeschnitten). Aufeinanderfolgende Songs und Jingles werden
+3 Sekunden lang **überblendet** (um kurze Jingles herum kürzer), für alle im selben Moment. Es gibt keinen
+Überspringen-Knopf – wie bei einem echten Radio; nach einer Pause geht es live weiter. Spätere Starts gehen sofort. Als
+**Jingles** dienen die kurzen Aufnahmen (Senderkennungen und DJ-Ansagen), die nur dieser Sender benutzt; bei den
+Club-DJ-Sets ist das eine begründete Vermutung. Die Werbung, die sich mehrere Sender teilen, wird nicht gespielt. Braucht
+wie das Hauptprogramm `ffplay`.
+
+**Fortschritt:** 792 von 809 Songs, die die Credits für die Musiksender nennen (97,9 %), sind gefunden, dazu alle 15 Folgen
+der Talk-Sendungen; alle Sender in [Fortschritt der Sender](docs/RADIO-PROGRESS.de.md).
 Lange DJ-Mixe laufen auch als Sender: **The Vault Radio**, zusätzliche „(Mix)“-Sender für Radio On-U, Worldwide FM und The Sniper Of La Perle sowie **Clubmixes** (die Club- und DJ-Mixe, die noch keinem Sender zugeordnet werden können). Während ein Mix läuft, wird der Titel des aktuellen Abschnitts angezeigt (aus den Markern im Mix; ein Abschnitt hat nur dann einen Namen, wenn der Marker auf einen bekannten Song zeigt).
 
 ### AWC Radio für Android
@@ -221,7 +230,7 @@ Es sind zwei Dateien:
   Sperrbildschirm- und Kopfhörertasten (voriger / nächster Sender, Pause) und hat einen Einschlaftimer. **Android Auto** wird unterstützt: Die Sender erscheinen als Raster mit ihren Logos, der Player-Bildschirm zeigt Song und Sender, und Sprachbefehle („Spiele Radio On-U auf AWC Radio“) funktionieren. Da die App nicht aus dem Play Store kommt, muss in den Entwicklereinstellungen von Android Auto zuerst „Unbekannte Quellen“ aktiviert werden.
 * **Ein Sender-Pack (`.dat`)** - wird am PC erzeugt: in AWC Radio auf **Android-Pack...** klicken, Sender ankreuzen und
   speichern. Darin liegen die Songs dieser Sender in der Originalqualität des Spiels (ca. 128 kbit/s, nicht neu kodiert;
-  etwa 3,6 GB für alle 28 Sender), ihre Logos und das Programm. Aufs Handy kopieren, die App starten und die Datei
+  etwa 4 GB für alle 30 Sender), ihre Logos und das Programm. Aufs Handy kopieren, die App starten und die Datei
   einmal auswählen; die Songs werden direkt daraus abgespielt.
 
 Das Pack enthält Spiel-Audio: nur für den eigenen Gebrauch, bitte nicht weitergeben. Ohne Pack ist die App leer.
