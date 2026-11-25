@@ -8,6 +8,9 @@
 |:---:|:---:|
 | ![AWC Audio Extractor](extractor/docs/screenshots/01-main.png) | ![AWC Radio](radio/docs/screenshots/06-radio.png) |
 
+> ⚠️ **Please read the [disclaimer](DISCLAIMER.md).** No game data is included: you need your own copy of the game.
+> Nothing is decrypted, no copy protection is circumvented and nothing in the game is changed.
+
 ## Two projects in one repository
 
 | | 🎛 AWC Audio Extractor | 📻 AWC Radio |
@@ -22,6 +25,10 @@ The extractor is the base: it reads the archive and the AWC files. AWC Radio bui
 folders next to each other when you run from source.
 
 ## Quick start
+
+> The newest [release](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/latest) is **v2.4.1**: its Windows programs and app 1.3 still work with
+> the single `.dat` pack. For what is described here (v2.5.0: `.radiopak` packs, app 1.5) run and build from source until
+> the next release.
 
 1. Download `AWC-Tool-…-win64.zip` from the [latest release](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/latest) and unzip it. It holds both Windows programs.
 2. Put `ffmpeg.exe` and `ffplay.exe` ([ffmpeg.org](https://ffmpeg.org/download.html)) next to them, or into your `PATH`.
@@ -140,11 +147,14 @@ Details for every station: [radio progress](radio/docs/RADIO-PROGRESS.md).
 extractor/     AWC Audio Extractor: program, shared modules, format notes, screenshots
 radio/         AWC Radio: program, station reader, progress, screenshots
   android/     the Android app (source, build script, tests)
+DISCLAIMER.md  what the programs do and do not do, and your duties (DISCLAIMER.de.md in German)
 LICENSE        MIT
 README.md      this overview (README.de.md in German)
 ```
 
 ## Legal notice – please read
+
+**The full text is in the [disclaimer](DISCLAIMER.md).** In short:
 
 * This repository contains **only source code and documentation**. It contains **no game files, no archives
   and no extracted audio**, and it never will.

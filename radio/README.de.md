@@ -67,9 +67,7 @@ Lange DJ-Mixe laufen auch als Sender: **The Vault Radio**, zusätzliche „(Mix)
 
 Alle Zahlen je Sender: [Fortschritt der Sender](docs/RADIO-PROGRESS.de.md).
 
-Senderübersicht von v2.4.0 (ohne die später ergänzten Orte):
-
-![Sender, Songs und Länge](docs/screenshots/awc_radio_stations_table.png)
+Die aktuelle Liste aller Sender mit Inhalt und Länge: [alle Sender](docs/RADIO-PROGRESS.de.md#alle-sender).
 
 ## AWC Radio für Android
 
@@ -120,6 +118,8 @@ radio/
 Archiv-Scan, AWC-Leser, Credits-Liste und Logos sind die Module des [Extractor](../extractor/README.de.md).
 
 ## Rechtlicher Hinweis
+
+**Bitte lies den ausführlichen [Disclaimer](../DISCLAIMER.de.md).** Kurz gesagt:
 
 * Dieses Repository enthält **nur Quellcode und Dokumentation**. Es enthält **keine Spieldateien, keine Archive und
   keine extrahierten Audiodaten** – und wird das auch nie.

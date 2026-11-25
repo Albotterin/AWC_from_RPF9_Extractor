@@ -64,9 +64,7 @@ Long DJ mixes are played as stations too: **The Vault Radio**, extra "(Mix)" sta
 
 All numbers per station: [station progress](docs/RADIO-PROGRESS.md).
 
-Station overview of v2.4.0 (before the places of the game were added):
-
-![Stations, songs and length](docs/screenshots/awc_radio_stations_table.png)
+The current list of all stations with their content and length: [all stations](docs/RADIO-PROGRESS.md#all-stations).
 
 ## AWC Radio for Android
 
@@ -116,6 +114,8 @@ radio/
 The archive scan, the AWC reader, the credits list and the logos are the modules of the [extractor](../extractor/README.md).
 
 ## Legal notice
+
+**Please read the full [disclaimer](../DISCLAIMER.md).** In short:
 
 * This repository contains **only source code and documentation**. It contains **no game files, no archives
   and no extracted audio**, and it never will.

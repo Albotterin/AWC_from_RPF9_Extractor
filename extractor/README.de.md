@@ -58,6 +58,8 @@ Du kannst eine einzelne `.awc`, eine `.rpf` oder einen **ganzen Ordner** angeben
 
 ## Rechtlicher Hinweis
 
+**Bitte lies den ausführlichen [Disclaimer](../DISCLAIMER.de.md).** Kurz gesagt:
+
 * Dieses Repository enthält **nur Quellcode und Dokumentation**. Es enthält **keine Spieldateien, keine Archive und
   keine extrahierten Audiodaten** – und wird das auch nie.
 * Du brauchst deine eigenen Dateien aus einem Spiel, das du rechtmäßig besitzt. Für extrahiertes Audio bist du selbst

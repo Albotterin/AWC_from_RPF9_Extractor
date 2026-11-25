@@ -8,6 +8,9 @@
 |:---:|:---:|
 | ![AWC Audio Extractor](extractor/docs/screenshots/04-german.png) | ![AWC Radio](radio/docs/screenshots/06-radio.png) |
 
+> ⚠️ **Bitte lies den [Disclaimer](DISCLAIMER.de.md).** Es sind keine Spieldaten enthalten: Du brauchst dein eigenes
+> Exemplar des Spiels. Nichts wird entschlüsselt, kein Kopierschutz umgangen und nichts am Spiel verändert.
+
 ## Zwei Projekte in einem Repository
 
 | | 🎛 AWC Audio Extractor | 📻 AWC Radio |
@@ -22,6 +25,10 @@ Der Extractor ist die Basis: Er liest das Archiv und die AWC-Dateien. AWC Radio 
 Start aus dem Quellcode müssen deshalb beide Ordner nebeneinander liegen.
 
 ## Schnellstart
+
+> Das neueste [Release](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/latest) ist **v2.4.1**: Seine Windows-Programme und die App 1.3 arbeiten noch
+> mit dem einzelnen `.dat`-Pack. Für das hier Beschriebene (v2.5.0: `.radiopak`-Packs, App 1.5) bis zum nächsten Release
+> aus dem Quellcode starten und bauen.
 
 1. `AWC-Tool-…-win64.zip` aus dem [neuesten Release](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/latest) laden und entpacken. Darin liegen beide Windows-Programme.
 2. `ffmpeg.exe` und `ffplay.exe` ([ffmpeg.org](https://ffmpeg.org/download.html)) daneben oder in den `PATH` legen.
@@ -140,11 +147,14 @@ Details zu jedem Sender: [Fortschritt des Radios](radio/docs/RADIO-PROGRESS.de.m
 extractor/     AWC Audio Extractor: Programm, gemeinsame Module, Format-Notizen, Screenshots
 radio/         AWC Radio: Programm, Sender-Leser, Fortschritt, Screenshots
   android/     die Android-App (Quelltext, Build-Skript, Tests)
+DISCLAIMER.md  was die Programme tun und nicht tun, und deine Pflichten (auf Deutsch: DISCLAIMER.de.md)
 LICENSE        MIT
 README.md      diese Übersicht auf Englisch (README.de.md auf Deutsch)
 ```
 
 ## Rechtlicher Hinweis
+
+**Der vollständige Text steht im [Disclaimer](DISCLAIMER.de.md).** Kurz gesagt:
 
 * Dieses Repository enthält **nur Quellcode und Dokumentation**. Es enthält **keine Spieldateien, keine Archive und
   keine extrahierten Audiodaten** – und wird das auch nie.

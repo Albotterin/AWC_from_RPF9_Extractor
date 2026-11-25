@@ -59,6 +59,8 @@ every `.rpf` and `.awc` file and lists all music streams it finds.
 
 ## Legal notice – please read
 
+**Please read the full [disclaimer](../DISCLAIMER.md).** In short:
+
 * This repository contains **only source code and documentation**. It contains **no game files, no archives
   and no extracted audio**, and it never will.
 * You need to supply your own files, from a game you legally own. What you do with extracted audio is your
