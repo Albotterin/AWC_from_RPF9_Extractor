@@ -145,7 +145,6 @@ class App(tk.Tk):
             messagebox.showwarning(tr("dlg_ffmpeg_title"), tr("dlg_ffmpeg_body"))
         if paths:
             self.after(300, lambda: self.start_scan(paths))
-        self.after(900, self._maybe_icon_prompt)
 
     # ------------------------------------------------------------ i18n helpers
     def _reg(self, widget, option, key):
@@ -485,7 +484,7 @@ class App(tk.Tk):
             self.set_status("st_scan_none", n=len(files))
         else:
             self.set_status("st_scan_done", c=len(res), a=n_awc, s=n_str)
-            if icons.installed() and icons.missing_stations() and self._icons_pools():
+            if icons.missing_stations() and self._icons_pools():
                 self._icons_start(quiet=True)
 
     def _update_count(self):
@@ -604,45 +603,9 @@ class App(tk.Tk):
         return res[0] if res else None
 
     # ------------------------------------------------------------------ station logos
-    def _maybe_icon_prompt(self):
-        """First start: offer to download the texture decoder (once; 'Not now' asks again next time)."""
-        if icons.installed() or awc_i18n.get_setting("icons_prompt") == "never":
-            return
-        self._icon_dialog(first=True)
-
-    def _icon_dialog(self, first=False):
-        dlg = tk.Toplevel(self)
-        dlg.title(tr("dlg_icons_title"))
-        dlg.transient(self)
-        dlg.resizable(False, False)
-        ttk.Label(dlg, text=tr("dlg_icons_text", folder=icons.decoder_dir()), wraplength=480, justify="left"
-                  ).pack(padx=16, pady=(14, 8))
-        row = ttk.Frame(dlg)
-        row.pack(fill="x", padx=16, pady=(0, 14))
-
-        def close(choice):
-            if choice == "never" and first:
-                awc_i18n.set_setting("icons_prompt", "never")
-            dlg.destroy()
-            if choice == "go":
-                self._icons_start()
-
-        ttk.Button(row, text=tr("btn_icons_download"), command=lambda: close("go")).pack(side="left")
-        ttk.Button(row, text=tr("btn_icons_later"), command=lambda: close("later")).pack(side="left", padx=6)
-        if first:
-            ttk.Button(row, text=tr("btn_icons_never"), command=lambda: close("never")).pack(side="left")
-        dlg.protocol("WM_DELETE_WINDOW", lambda: close("later"))
-        dlg.update_idletasks()
-        x = self.winfo_rootx() + max(0, (self.winfo_width() - dlg.winfo_width()) // 2)
-        y = self.winfo_rooty() + 80
-        dlg.geometry("+%d+%d" % (x, y))
-        dlg.grab_set()
-
     def icons_button(self):
         if self.busy:
             messagebox.showinfo(tr("dlg_busy_title"), tr("dlg_busy"))
-        elif not icons.installed():
-            self._icon_dialog()
         else:
             self._icons_start(report=True)
 
@@ -654,21 +617,17 @@ class App(tk.Tk):
         return [p for p in pools.values() if p]
 
     def _icons_start(self, report=False, quiet=False):
-        """Download the decoder if needed, then cut the logos out of the game's texture pool (background thread)."""
+        """Cut the logos out of the game's texture pool (background thread)."""
         if self.icons_busy:
             return
         self.icons_busy = True
         if not quiet:
-            self.set_status("st_icons_downloading" if not icons.installed() else "st_icons_extracting")
+            self.set_status("st_icons_extracting")
         threading.Thread(target=self._icons_worker, args=(self._icons_pools(), report), daemon=True).start()
 
     def _icons_worker(self, pools, report):
-        n, err, fresh = 0, "", False
+        n, err = 0, ""
         try:
-            if not icons.installed():
-                fresh = True
-                icons.download(progress=lambda f: self.q.put(("statuskey", "st_icons_dl_progress", {"p": int(f * 100)})))
-            self.q.put(("statuskey", "st_icons_extracting", {}))
             for p in pools:
                 if icons.missing_stations():
                     n += icons.extract(p)
@@ -676,18 +635,18 @@ class App(tk.Tk):
             err = tr("dlg_icons_pillow")
         except Exception as e:  # noqa: BLE001
             err = str(e)
-        self.q.put(("icons", n, err, report, bool(pools), fresh))
+        self.q.put(("icons", n, err, report, bool(pools)))
 
-    def _icons_done(self, n, err, report, had_pool, fresh=False):
+    def _icons_done(self, n, err, report, had_pool):
         self.icons_busy = False
-        # always leave the "downloading ..." status, whatever happened
+        # always leave the "reading ..." status, whatever happened
         if err:
             self.set_status("st_ready")
             messagebox.showerror(tr("dlg_icons_title"), tr("dlg_icons_error", e=err))
         elif not had_pool and not n:
             self.set_status("st_icons_wait")
-            if fresh or report:
-                messagebox.showinfo(tr("dlg_icons_title"), tr("dlg_icons_installed" if fresh else "dlg_icons_nopool"))
+            if report:
+                messagebox.showinfo(tr("dlg_icons_title"), tr("dlg_icons_nopool"))
         else:
             self.set_status("st_icons_done", n=n)
             if report or n:

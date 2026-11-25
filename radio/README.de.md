@@ -116,8 +116,8 @@ Archiv-Scan, AWC-Leser, Credits-Liste und Logos sind die Module des [Extractor](
 
 ## Credits und Lizenz
 
-Das Layout der Audio-Konfiguration folgt den Notizen von [**Leonida**](https://github.com/ItsNotRexed/Leonida); dessen
-Texturdecoder wird für die optionalen Sender-Logos genutzt. Das Startbild-Symbol der Android-App wurde mit der
+Das Layout der Audio-Konfiguration folgt den Notizen des Projekts **Leonida** (ItsNotRexed); dessen Textur-Leser hat
+auch geholfen, den Pool mit den Sender-Logos zu verstehen (`awc_logos.py`). Das Startbild-Symbol der Android-App wurde mit der
 Fan-Schrift *GTA Art Deco* gezeichnet (nicht Teil dieses Repositorys). Die Wiedergabe übernimmt
 [FFmpeg](https://ffmpeg.org/).
 

@@ -114,8 +114,8 @@ The archive scan, the AWC reader, the credits list and the logos are the modules
 
 ## Credits and license
 
-The layout of the game's audio config follows the notes of [**Leonida**](https://github.com/ItsNotRexed/Leonida); its
-texture decoder is used for the optional station logos. The Android app's launcher icon was drawn with the fan-made
+The layout of the game's audio config follows the notes of the **Leonida** project (ItsNotRexed), whose texture reader
+also helped to understand the pool the station logos come from (`awc_logos.py`). The Android app's launcher icon was drawn with the fan-made
 typeface *GTA Art Deco* (not part of this repository). Playback uses [FFmpeg](https://ffmpeg.org/).
 
 [MIT](../LICENSE) – applies to the source code in this repository only, not to any game data.

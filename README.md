@@ -89,7 +89,7 @@ the same time.
 
 ## Progress
 
-Status **2026-11-25** (v2.4.0), measured with a 28.5 GB `audio.rpf`.
+Status **2026-11-25** (v2.4.1), measured with a 28.5 GB `audio.rpf`.
 
 | Area | State | |
 |---|---|---|
@@ -111,7 +111,6 @@ Details for every station: [radio progress](radio/docs/RADIO-PROGRESS.md).
 - [ ] The five podcasts the game config names
 - [ ] The Android app counts the episodes of the talk stations as "songs"
 - [ ] Extractor: only music containers with the Opus codec; the RPF9 table of contents is not read, so there are no file names
-- [ ] Station logos for new users: the Leonida repository with the texture decoder is currently unreachable
 
 ### Milestones
 
@@ -127,6 +126,7 @@ Details for every station: [radio progress](radio/docs/RADIO-PROGRESS.md).
 | [v2.2.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.2.0) | 2026-11-24 | 📻 The Vault Radio, Clubmixes, titles inside mixes |
 | [v2.3.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.3.0) | 2026-11-24 | 📻 Android Auto, new app design |
 | [v2.4.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.4.0) | 2026-11-25 | 📻 Talk radio and complete station playlists |
+| [v2.4.1](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.4.1) | 2026-11-25 | 🎛 📻 Own station logo reader, no download needed |
 
 ## Repository layout
 
@@ -154,7 +154,7 @@ README.md      this overview (README.de.md in German)
 
 The AWC block layout was worked out with the help of [**vgmstream**](https://github.com/vgmstream/vgmstream); general
 AWC/RPF knowledge comes from the community, notably [**CodeWalker**](https://github.com/dexyfex/CodeWalker). The layout
-of the game's audio config follows the notes of [**Leonida**](https://github.com/ItsNotRexed/Leonida). Playback and
+of the game's audio config follows the notes of the **Leonida** project (ItsNotRexed). Playback and
 conversion use [FFmpeg](https://ffmpeg.org/).
 
 [MIT](LICENSE) – applies to the source code in this repository only, not to any game data.

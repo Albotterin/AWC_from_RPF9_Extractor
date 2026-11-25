@@ -89,7 +89,7 @@ PC zur selben Zeit denselben Song.
 
 ## Fortschritt
 
-Stand **2026-11-25** (v2.4.0), gemessen an einer 28,5 GB großen `audio.rpf`.
+Stand **2026-11-25** (v2.4.1), gemessen an einer 28,5 GB großen `audio.rpf`.
 
 | Bereich | Stand | |
 |---|---|---|
@@ -111,7 +111,6 @@ Details zu jedem Sender: [Fortschritt des Radios](radio/docs/RADIO-PROGRESS.de.m
 - [ ] Die fünf Podcasts, die die Spiel-Konfiguration nennt
 - [ ] Die Android-App zählt die Folgen der Talk-Sender als „Songs“
 - [ ] Extractor: nur Musik-Container mit Opus-Codec; das RPF9-Inhaltsverzeichnis wird nicht gelesen, es gibt also keine Dateinamen
-- [ ] Sender-Logos für neue Nutzer: Das Leonida-Repository mit dem Texturdecoder ist derzeit nicht erreichbar
 
 ### Meilensteine
 
@@ -127,6 +126,7 @@ Details zu jedem Sender: [Fortschritt des Radios](radio/docs/RADIO-PROGRESS.de.m
 | [v2.2.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.2.0) | 2026-11-24 | 📻 The Vault Radio, Clubmixes, Titel innerhalb der Mixe |
 | [v2.3.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.3.0) | 2026-11-24 | 📻 Android Auto, neues App-Design |
 | [v2.4.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.4.0) | 2026-11-25 | 📻 Talk-Radio und vollständige Sender-Playlists |
+| [v2.4.1](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.4.1) | 2026-11-25 | 🎛 📻 Eigener Leser für die Sender-Logos, kein Download nötig |
 
 ## Aufbau des Repositorys
 
@@ -155,7 +155,7 @@ README.md      diese Übersicht auf Englisch (README.de.md auf Deutsch)
 
 Das AWC-Block-Layout wurde mit Hilfe von [**vgmstream**](https://github.com/vgmstream/vgmstream) erarbeitet; allgemeines
 AWC/RPF-Wissen stammt aus der Community, v. a. von [**CodeWalker**](https://github.com/dexyfex/CodeWalker). Das Layout der
-Audio-Konfiguration folgt den Notizen von [**Leonida**](https://github.com/ItsNotRexed/Leonida). Abspielen und
+Audio-Konfiguration folgt den Notizen des Projekts **Leonida** (ItsNotRexed). Abspielen und
 Konvertieren übernimmt [FFmpeg](https://ffmpeg.org/).
 
 [MIT](LICENSE) – gilt nur für den Quellcode, nicht für Spieldaten.

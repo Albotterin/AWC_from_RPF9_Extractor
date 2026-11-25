@@ -167,14 +167,13 @@ Unter Windows geht auch ein Doppelklick auf `Start AWC-Tool.bat` in diesem Ordne
    * Benannte Streams bekommen beim Export `Interpret - Titel` als Dateinamen und Opus/FLAC/MP3-Tags, optional
      `.m3u8`-Playlists. Die Namen bleiben auf deinem PC (`%APPDATA%\AWC-Tool\track_names.json`), das Tool liefert
      keine mit.
-8. **Sender-Logos** (optional): beim Abspielen wird das Logo des Radiosenders angezeigt. Die Logos liegen im Textur-Pool
-   des Spiels (`data\ttdb\ui\ttdb_ui.ttpf`, neben der `audio.rpf`) in einem Format, das dieses Tool nicht selbst
-   dekodiert. Beim ersten Start bietet ein Dialog an, den Decoder des Projekts
-   [Leonida](https://github.com/ItsNotRexed/Leonida) herunterzuladen (ein paar Dateien von GitHub, GPL-3, mit seiner
-   LICENSE nach `%APPDATA%\AWC-Tool\leonida\`; sie sind nicht Teil dieses Tools). Danach werden die Logos aus deinen
-   eigenen Spieldateien nach `%APPDATA%\AWC-Tool\icons\` geschnitten. Der Knopf **Sender-Logos…** wiederholt den
-   Schritt. Die Logos werden in voller Spielgröße (256 × 256) gespeichert. *Hinweis (24.11.2026): Das Leonida-Repository ist auf GitHub derzeit nicht erreichbar (404), der Download des Decoders schlägt für neue Nutzer deshalb fehl; früher ausgelesene Logos funktionieren weiter.* Bekannt sind 23 Sender; den Sender liefert die Credits-Liste (siehe Punkt 7). Gruppen-Zeilen bekommen ein kleines Logo, und FLAC/MP3-Exporte tragen das Logo als Cover-Bild.
-   Vom Spiel wird nichts mitgeliefert.
+8. **Sender-Logos** (optional): beim Abspielen wird das Logo des Radiosenders angezeigt. Die Logos werden aus dem
+   UI-Textur-Pool des Spiels (`data\ttdb\ui\ttdb_ui.ttpf`, neben der `audio.rpf`) nach `%APPDATA%\AWC-Tool\icons\`
+   geschnitten. Der kleine Leser `awc_logos.py` kann genau diese Texturen (BC1 / BC7 in zlib-Blöcken, nichts wird
+   entschlüsselt), es muss also nichts heruntergeladen werden. Das passiert nach einem Scan; der Knopf **Sender-Logos…**
+   wiederholt den Schritt. Die Logos werden in voller Spielgröße (256 × 256) gespeichert. Bekannt sind 23 Sender; den
+   Sender liefert die Credits-Liste (siehe Punkt 7). Gruppen-Zeilen bekommen ein kleines Logo, und FLAC/MP3-Exporte
+   tragen das Logo als Cover-Bild. Vom Spiel wird nichts mitgeliefert.
 9. **Sender-Mixe** (optional): ein paar sehr lange Streams (40-120 Min.) sind komplette Radio-Mixe. Das Spiel legt
    für jeden gespielten Track einen `trackid`-Marker ab; das Tool zeigt sie als Kapitel unter dem Stream (Doppelklick
    spielt ab dort) und benennt sie, wenn der passende Einzel-Track einen Titel hat. Mit **Sender-Mixe an
@@ -295,7 +294,8 @@ extractor/
   awc_names.py        Namensspeicher für Tracks/Sender, Import/Export, Tags, Playlists
   awc_config.py       Liest interne Namen aus der Audio-Konfiguration des Spiels
   awc_credits.py      Liest die öffentliche Credits-Seite und ordnet ihre Songs Stream-IDs zu
-  awc_icons.py        Optional: lädt den Leonida-Texturdecoder und schneidet die Sender-Logos aus
+  awc_icons.py        Optional: schneidet die Sender-Logos aus dem Spiel
+  awc_logos.py        Kleiner Leser für die Logo-Texturen im UI-Textur-Pool des Spiels
   Start AWC-Tool.bat  Starter
   build_exe.bat       Baut dist\AWC-Tool.exe mit PyInstaller
   docs/FORMAT.md      Technische Notizen zum AWC/RPF9-Aufbau (englisch)
@@ -315,5 +315,5 @@ erarbeitet; allgemeines AWC/RPF-Wissen stammt aus der Community, v. a. von
 Abspielen und Konvertieren übernimmt [FFmpeg](https://ffmpeg.org/).
 
 Das Layout der Audio-Konfiguration des Spiels (Namensliste, die 29-Bit-Stream-IDs als `joaat`-Hashes) folgt den Notizen
-von [Leonida](https://github.com/ItsNotRexed/Leonida) (`docs/audio_config.md`, `docs/audio.md`). Die Funde zu den
+von Leonida (ItsNotRexed; `docs/audio_config.md`, `docs/audio.md`). Die Funde zu den
 `0xBD`-Markern in `docs/FORMAT.md` wurden dort zurückgemeldet.

@@ -50,7 +50,6 @@ STR = {
         "err_ffplay": "ffplay was not found. Put ffplay.exe next to the program or into your PATH.",
         "err_credits": "The credits page could not be downloaded:\n{e}\n\nPick the page saved from your browser instead?",
         "err_html": "HTML page", "err_generic": "Something went wrong:\n{e}", "err_nostations": "No station with songs was found.",
-        "ask_decoder": "Station logos need the Leonida texture decoder (a few files from GitHub, GPL-3; they are saved to\n{folder}\nand are not part of this program). Download it now?",
         "kind_song": "SONG", "kind_jingle": "JINGLE", "btn_play": "▶ Play (live)", "btn_pause": "⏸ Pause",
         "sync_hint": "Live: the stations run by the UTC clock, everyone with the same time hears the same song.", "lbl_volume": "Volume", "n_songs": "{n} songs", "n_shows": "{n} shows", "kind_show": "SHOW", "st_loading": "Loading …",
         "lbl_next": "Up next:", "tune": "Tune in to a station on the left", "no_logo_hint": "",
@@ -67,7 +66,6 @@ STR = {
         "err_ffplay": "ffplay wurde nicht gefunden. ffplay.exe neben das Programm legen oder in den PATH aufnehmen.",
         "err_credits": "Die Credits-Seite konnte nicht geladen werden:\n{e}\n\nStattdessen die im Browser gespeicherte Seite wählen?",
         "err_html": "HTML-Seite", "err_generic": "Es ist ein Fehler aufgetreten:\n{e}", "err_nostations": "Es wurde kein Sender mit Songs gefunden.",
-        "ask_decoder": "Für die Sender-Logos wird der Leonida-Texturdecoder gebraucht (ein paar Dateien von GitHub, GPL-3; sie werden nach\n{folder}\ngespeichert und sind nicht Teil dieses Programms). Jetzt herunterladen?",
         "kind_song": "SONG", "kind_jingle": "JINGLE", "btn_play": "▶ Abspielen (live)", "btn_pause": "⏸ Pause",
         "sync_hint": "Live: Die Sender laufen nach der UTC-Uhrzeit, alle mit derselben Zeit hören denselben Song.", "lbl_volume": "Lautstärke", "n_songs": "{n} Songs", "n_shows": "{n} Sendungen", "kind_show": "SENDUNG", "st_loading": "Lade …",
         "lbl_next": "Als Nächstes:", "tune": "Links einen Sender wählen", "no_logo_hint": "",
@@ -749,12 +747,9 @@ class RadioApp(tk.Tk):
             if idx:
                 self._open_index(idx, pool, background_icons=True)
                 return
-        allow_dl = False
-        if pool and not icons.installed():
-            allow_dl = messagebox.askyesno(t("title"), t("ask_decoder", folder=icons.decoder_dir()))
         self.btn_start.config(state="disabled")
         self._setup_status(t("st_scan"), 0)
-        threading.Thread(target=self._setup_worker, args=(rpf, pool, allow_dl, self.pending_html), daemon=True).start()
+        threading.Thread(target=self._setup_worker, args=(rpf, pool, self.pending_html), daemon=True).start()
 
     def _setup_status(self, text, frac=None):
         self.setup_status.config(text=text)
@@ -779,7 +774,7 @@ class RadioApp(tk.Tk):
             json.dump(songs, f, ensure_ascii=False)
         return songs
 
-    def _setup_worker(self, rpf, pool, allow_dl, html_path):
+    def _setup_worker(self, rpf, pool, html_path):
         q = self.q
         try:
             songs = []
@@ -796,7 +791,7 @@ class RadioApp(tk.Tk):
                 q.put(("setup_fail", t("err_nostations")))
                 return
             q.put(("setup_status", t("st_icons"), 0.94))
-            self._make_icons(pool, allow_dl)
+            self._make_icons(pool)
             q.put(("setup_done", idx, pool))
         except NeedCredits as e:
             q.put(("need_credits", str(e)))
@@ -806,16 +801,10 @@ class RadioApp(tk.Tk):
             q.put(("setup_fail", t("err_generic", e=e)))
 
     @staticmethod
-    def _make_icons(pool, allow_dl):
-        """Download the decoder (if allowed) and cut the logos out of the texture pool; failures are not fatal."""
+    def _make_icons(pool):
+        """Cut the logos out of the texture pool; failures are not fatal."""
         try:
-            if not pool or not os.path.isfile(pool):
-                return
-            if not icons.installed():
-                if not allow_dl:
-                    return
-                icons.download()
-            if icons.missing_stations():
+            if pool and os.path.isfile(pool) and icons.missing_stations():
                 icons.extract(pool)
         except Exception:  # noqa: BLE001
             pass
@@ -826,9 +815,9 @@ class RadioApp(tk.Tk):
         self._fill_stations()
         self._show_radio()
         self.status.config(text=t("st_ready", n=len(self.stations)))
-        if background_icons and pool and os.path.isfile(pool) and icons.installed() and icons.missing_stations():
+        if background_icons and pool and os.path.isfile(pool) and icons.missing_stations():
             def work():
-                self._make_icons(pool, False)
+                self._make_icons(pool)
                 self.q.put(("icons_ready",))
             threading.Thread(target=work, daemon=True).start()
 
