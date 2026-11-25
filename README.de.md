@@ -135,7 +135,6 @@ Details zu jedem Sender: [Fortschritt des Radios](radio/docs/RADIO-PROGRESS.de.m
 - [ ] Die 8 eigens geschriebenen Songs von „Honey FM – Liquid City“ (ebenfalls nicht gefunden)
 - [ ] Die Titel der Podcast-Folgen sind nicht bekannt (sie sind nummeriert)
 - [ ] Ein 61 Minuten langer Club-Mix bleibt in „Clubmixes“: Keine Titelliste und kein Ort der Konfiguration spielt ihn
-- [ ] Die Produktnamen der Werbespots sind nicht bekannt
 - [x] AWC Radio am PC spielt die Podcasts
 - [x] Das Radio spricht die DJ-Intros und -Outros über die Songs (PC und App)
 - [x] Die Android-App läuft auf einem echten Handy
