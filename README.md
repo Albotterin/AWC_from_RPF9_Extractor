@@ -2,7 +2,7 @@
 
 **Music from RAGE-engine `audio.rpf` archives: extract the audio, or listen to the game's radio stations – on the PC and on Android.**
 
-🇩🇪 [Deutsche Version](README.de.md) · ⬇️ [**Download (Releases)**](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/latest) · 📊 [Radio progress](radio/docs/RADIO-PROGRESS.md)
+🇩🇪 [Deutsche Version](README.de.md) · ⬇️ [**Download (Releases)**](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/latest) · 📱 [Android app](#-awc-radio-app-for-android) · 📊 [Radio progress](radio/docs/RADIO-PROGRESS.md)
 
 | 🎛 AWC Audio Extractor | 📻 AWC Radio |
 |:---:|:---:|
@@ -54,9 +54,38 @@ python radio/awc_radio.py        # the radio
 * **30 stations**, among them the talk stations **WKTT** and **The Wipe**, read with their playlists from the game's own audio config.
 * A live programme by the UTC clock: every station keeps running, everybody with the same time hears the same song.
 * Jingles, DJ talk and crossfades between the songs; long DJ mixes show the title of the current part.
-* **Android app** with background playback, Android Auto and sleep timer, fed by a station pack from your own files.
+* An [**Android app**](#-awc-radio-app-for-android) plays the same programme on the phone and in the car.
 
 ➡️ [**Radio guide**](radio/README.md)
+
+## 📱 AWC Radio app for Android
+
+The radio for your pocket and your car. **`AWC-Radio.apk`** (version 1.3) plays the same live programme as the PC: same
+UTC clock, same order, same crossfades – with a station pack from the same version, phone and PC play the same song at
+the same time.
+
+| | |
+|---|---|
+| 🎧 **Listening** | Keeps playing in the background. Media notification with the station logo, previous / next station, pause and stop; lock screen, headset and Bluetooth buttons |
+| 🚗 **Android Auto** | The stations as a grid with their logos, song and station on the player screen, voice commands such as *"play Radio On-U on AWC Radio"* |
+| 😴 **Sleep timer** | Stops the radio after the time you choose |
+| 🔒 **Offline** | The app has no internet permission: everything comes from the station pack on the phone |
+| 🌍 **Languages** | English and German |
+| 📋 **Needs** | Android 7.0 or newer |
+
+**Set it up**
+
+1. Download `AWC-Radio.apk` from the [latest release](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/latest) and install it (Android asks you to allow the installation from this source).
+2. On the PC, click **Android pack…** in AWC Radio, tick the stations and save the `.dat` file (original quality, about 4 GB for all 30 stations).
+3. Copy the file to the phone, start the app and pick it once.
+4. For Android Auto: in the Android Auto settings tap *Version* about ten times, open the developer settings in the three-dot menu and switch on *Unknown sources*.
+
+**Good to know**
+
+* The APK contains **no game data** and is the same file for everybody. The station pack contains audio from your own game: for your own use only, do not share it.
+* New stations arrive with a **new pack**, for example the talk radio of v2.4.0. The app lists the episodes of the talk stations as "songs".
+* A newer APK installs over the old one.
+* Source code and build instructions: [`radio/android/`](radio/README.md#awc-radio-for-android).
 
 ## Progress
 
@@ -68,6 +97,7 @@ Status **2026-11-25** (v2.4.0), measured with a 28.5 GB `audio.rpf`.
 | Songs the credits page lists for the music stations | **792 of 809** found (97.9 %) | 🟢 |
 | Talk radio | all 5 shows the credits name, **15 episodes** | ✅ |
 | Stations in AWC Radio | 30 (including 3 "(Mix)" stations and "Clubmixes") | ✅ |
+| Android app | version 1.3: live programme, background playback, Android Auto | ✅ |
 | The Vault Radio | plays as one long mix; its 24 listed songs are not separate files | 🎚 |
 
 ![AWC Radio – station progress](radio/docs/radio-progress.svg)
@@ -102,7 +132,8 @@ Details for every station: [radio progress](radio/docs/RADIO-PROGRESS.md).
 
 ```
 extractor/     AWC Audio Extractor: program, shared modules, format notes, screenshots
-radio/         AWC Radio: program, station reader, Android app, progress, screenshots
+radio/         AWC Radio: program, station reader, progress, screenshots
+  android/     the Android app (source, build script, tests)
 LICENSE        MIT
 README.md      this overview (README.de.md in German)
 ```

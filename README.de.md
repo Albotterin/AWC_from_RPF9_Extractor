@@ -2,7 +2,7 @@
 
 **Musik aus RAGE-Engine-`audio.rpf`-Archiven: das Audio extrahieren oder die Radiosender des Spiels hören – am PC und auf Android.**
 
-🇬🇧 [English version](README.md) · ⬇️ [**Download (Releases)**](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/latest) · 📊 [Fortschritt des Radios](radio/docs/RADIO-PROGRESS.de.md)
+🇬🇧 [English version](README.md) · ⬇️ [**Download (Releases)**](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/latest) · 📱 [Android-App](#-die-awc-radio-app-für-android) · 📊 [Fortschritt des Radios](radio/docs/RADIO-PROGRESS.de.md)
 
 | 🎛 AWC Audio Extractor | 📻 AWC Radio |
 |:---:|:---:|
@@ -54,9 +54,38 @@ python radio/awc_radio.py        # das Radio
 * **30 Sender**, darunter die Talk-Sender **WKTT** und **The Wipe**, samt Playlists aus der Audio-Konfiguration des Spiels gelesen.
 * Ein Live-Programm nach der UTC-Uhr: Jeder Sender läuft weiter, alle mit derselben Uhrzeit hören denselben Song.
 * Jingles, DJ-Ansagen und Überblendungen zwischen den Songs; lange DJ-Mixe zeigen den Titel des aktuellen Abschnitts.
-* **Android-App** mit Hintergrundwiedergabe, Android Auto und Einschlaftimer, gespeist aus einem Sender-Pack deiner eigenen Dateien.
+* Eine [**Android-App**](#-die-awc-radio-app-für-android) spielt dasselbe Programm auf dem Handy und im Auto.
 
 ➡️ [**Radio-Anleitung**](radio/README.de.md)
+
+## 📱 Die AWC-Radio-App für Android
+
+Das Radio für die Hosentasche und fürs Auto. **`AWC-Radio.apk`** (Version 1.3) spielt dasselbe Live-Programm wie der PC:
+gleiche UTC-Uhr, gleiche Reihenfolge, gleiche Überblendungen – mit einem Sender-Pack derselben Version spielen Handy und
+PC zur selben Zeit denselben Song.
+
+| | |
+|---|---|
+| 🎧 **Hören** | Spielt im Hintergrund weiter. Medien-Benachrichtigung mit Senderlogo, voriger / nächster Sender, Pause und Stopp; Sperrbildschirm-, Kopfhörer- und Bluetooth-Tasten |
+| 🚗 **Android Auto** | Die Sender als Raster mit ihren Logos, Song und Sender auf dem Player-Bildschirm, Sprachbefehle wie *„Spiele Radio On-U auf AWC Radio“* |
+| 😴 **Einschlaftimer** | Stoppt das Radio nach der gewählten Zeit |
+| 🔒 **Offline** | Die App hat keine Internet-Berechtigung: Alles kommt aus dem Sender-Pack auf dem Handy |
+| 🌍 **Sprachen** | Deutsch und Englisch |
+| 📋 **Voraussetzung** | Android 7.0 oder neuer |
+
+**Einrichten**
+
+1. `AWC-Radio.apk` aus dem [neuesten Release](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/latest) laden und installieren (Android fragt, ob die Installation aus dieser Quelle erlaubt werden soll).
+2. Am PC in AWC Radio auf **Android-Pack…** klicken, Sender ankreuzen und die `.dat`-Datei speichern (Originalqualität, etwa 4 GB für alle 30 Sender).
+3. Die Datei aufs Handy kopieren, die App starten und die Datei einmal auswählen.
+4. Für Android Auto: in den Einstellungen von Android Auto etwa zehnmal auf *Version* tippen, im Drei-Punkte-Menü die Entwicklereinstellungen öffnen und *Unbekannte Quellen* aktivieren.
+
+**Gut zu wissen**
+
+* Die APK enthält **keine Spieldaten** und ist für alle dieselbe Datei. Das Sender-Pack enthält Audio aus deinem eigenen Spiel: nur für den eigenen Gebrauch, bitte nicht weitergeben.
+* Neue Sender kommen mit einem **neuen Pack**, zum Beispiel das Talk-Radio aus v2.4.0. Die App führt die Folgen der Talk-Sender als „Songs“.
+* Eine neuere APK lässt sich über die alte installieren.
+* Quelltext und Build-Anleitung: [`radio/android/`](radio/README.de.md#awc-radio-für-android).
 
 ## Fortschritt
 
@@ -68,6 +97,7 @@ Stand **2026-11-25** (v2.4.0), gemessen an einer 28,5 GB großen `audio.rpf`.
 | Songs, die die Credits für die Musiksender nennen | **792 von 809** gefunden (97,9 %) | 🟢 |
 | Talk-Radio | alle 5 in den Credits genannten Sendungen, **15 Folgen** | ✅ |
 | Sender in AWC Radio | 30 (darunter 3 „(Mix)“-Sender und „Clubmixes“) | ✅ |
+| Android-App | Version 1.3: Live-Programm, Hintergrundwiedergabe, Android Auto | ✅ |
 | The Vault Radio | läuft als ein langer Mix; seine 24 gelisteten Songs sind keine Einzeldateien | 🎚 |
 
 ![AWC Radio – Fortschritt der Sender](radio/docs/radio-progress.svg)
@@ -102,7 +132,8 @@ Details zu jedem Sender: [Fortschritt des Radios](radio/docs/RADIO-PROGRESS.de.m
 
 ```
 extractor/     AWC Audio Extractor: Programm, gemeinsame Module, Format-Notizen, Screenshots
-radio/         AWC Radio: Programm, Sender-Leser, Android-App, Fortschritt, Screenshots
+radio/         AWC Radio: Programm, Sender-Leser, Fortschritt, Screenshots
+  android/     die Android-App (Quelltext, Build-Skript, Tests)
 LICENSE        MIT
 README.md      diese Übersicht auf Englisch (README.de.md auf Deutsch)
 ```
