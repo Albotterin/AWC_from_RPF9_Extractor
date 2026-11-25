@@ -31,7 +31,6 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import awc_core as core  # noqa: E402
 import awc_i18n  # noqa: E402
 import awc_icons as icons  # noqa: E402
 
@@ -107,7 +106,9 @@ def find_ffmpeg():
 
 
 def track_key(tr):
-    return "%s_%s" % (tr["base"], tr["idx"])
+    """The same as awc_radio._tkey: the programme of the app hashes it."""
+    parts = tr.get("parts")
+    return "%s_%s" % (tr["base"], tr["idx"]) + ("x%d" % len(parts) if parts else "")
 
 
 def estimate_bytes(stations):
@@ -171,6 +172,7 @@ def export_pack(stations, index, rpf, out_path, progress=None, cancel=None, cach
     """Write the station pack. stations: {name: {"songs": [...], "jingles": [...]}} (the chosen ones); index: the radio
     index (it knows where each song lies in audio.rpf); rpf: path of audio.rpf. progress(fraction, text); cancel: Event.
     Returns the size of the pack in bytes."""
+    import awc_radio as radio  # noqa: PLC0415  (awc_radio imports this module only on demand)
     progress = progress or (lambda f, s: None)
     cancel = cancel or threading.Event()
     if not stations:
@@ -233,8 +235,7 @@ def export_pack(stations, index, rpf, out_path, progress=None, cancel=None, cach
                 try:
                     if own:
                         src = os.path.join(work, key + ".orig")
-                        ref = core.AwcRef(dict(index["items"][str(tr["base"])], path=rpf))
-                        ref.extract({tr["idx"]: src + ".part"})
+                        radio.extract_track(index, rpf, tr, src + ".part")
                         os.replace(src + ".part", src)
                 except BaseException:
                     ahead.release()

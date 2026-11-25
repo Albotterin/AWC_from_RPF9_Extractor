@@ -201,19 +201,27 @@ On Windows you can also double-click `Start AWC-Tool.bat`.
 
 `awc_radio.py` (or `Start AWC-Radio.bat` / `AWC-Radio.exe`) is a small web-radio style player on top of the same
 code. On the first start you pick the game's `audio.rpf` and its texture file (`data\ttdb\ui\ttdb_ui.ttpf`). The app
-reads the archive once (the same scan cache as the main tool; several minutes the first time), loads the song list
-of the public credits page, and then lists every station it found songs for, with its logo. Click a station to tune
-in: its songs play one after the other, and after every 2-4 songs a short jingle is played. The programme is
-calculated from the **UTC clock** (a new order every UTC day, jingles included), so every station keeps "running" in
-the background: switch to another station and back and you land where the first one is by now. Everybody with the same
-game files and the same clock hears the same song at the same second (accurate to about a second; the one song that
-would cross midnight UTC is cut). Neighbouring songs and jingles are **crossfaded** for 3 seconds (shorter around short jingles), at the same moment
-for everybody. There is no skip button - like on a real radio; after a pause, play resumes live.
-Later starts are instant.
-Songs come from the credits list; **jingles** are the short unnamed streams that lie in the archive among the
-station's tracks (an educated guess - some may be station voice-overs or similar). Needs `ffplay` like the main tool.
+reads the archive once (the same scan cache as the main tool; several minutes the first time) and then lists every
+station with its logo.
 
-**Progress:** 766 of 813 credited songs (94.2 %) are found as files; see [station progress](docs/RADIO-PROGRESS.md) for every station.
+**Where the stations come from:** the game's own audio config (the zlib part at the start of `audio.rpf`) defines each
+radio station with its complete playlist, including titles and artists, so the music stations and the two **talk radio**
+stations (**WKTT** and **The Wipe**) are read straight from there. The song list of the public credits page is used for
+the spelling of the names and for the club DJ sets and mixes, which are still matched by their names. See
+[docs/FORMAT.md](docs/FORMAT.md).
+
+Click a station to tune in: its songs play one after the other, and after every 2-4 songs a short jingle is played. On
+talk radio an "item" is a whole show episode (its parts joined, 10-23 minutes). The programme is calculated from the
+**UTC clock** (a new order every UTC day, jingles included), so every station keeps "running" in the background: switch
+to another station and back and you land where the first one is by now. Everybody with the same game files and the same
+clock hears the same song at the same second (accurate to about a second; the one song that would cross midnight UTC is
+cut). Neighbouring songs and jingles are **crossfaded** for 3 seconds (shorter around short jingles), at the same moment
+for everybody. There is no skip button - like on a real radio; after a pause, play resumes live. Later starts are
+instant. **Jingles** are the short recordings (idents and DJ talk) that only this station uses; for the club DJ sets they
+are an educated guess. The adverts that several stations share are not played. Needs `ffplay` like the main tool.
+
+**Progress:** 792 of 809 songs the credits list for the music stations (97.9 %) are found, and all 15 talk show episodes;
+see [station progress](docs/RADIO-PROGRESS.md) for every station.
 Long DJ mixes are played as stations too: **The Vault Radio**, extra "(Mix)" stations for Radio On-U, Worldwide FM and The Sniper Of La Perle, and **Clubmixes** (the club and DJ-venue mixes that cannot be assigned to a station yet). While a mix plays, the title of the current part is shown (from the markers in the mix; the part is only named where the marker points to a known song).
 
 ### AWC Radio for Android
@@ -224,7 +232,7 @@ The phone app plays the same live programme as the PC: same UTC clock, same orde
   inside. Android 7.0 or newer, English and German. It keeps playing in the background with a media notification,
   lock-screen and headset buttons (previous / next station, pause) and has a sleep timer. **Android Auto** is supported: the stations show up as a grid with their logos, the player screen shows the song and station, and voice commands ("play Radio On-U on AWC Radio") work. Because the app does not come from the Play Store, switch on *Unknown sources* in Android Auto's developer settings first.
 * **A station pack (`.dat`)** - made on the PC: in AWC Radio click **Android pack...**, tick the stations and save. It holds
-  the songs of those stations in the game's own quality (about 128 kbit/s, not re-encoded; about 3.6 GB for all 28 stations),
+  the songs of those stations in the game's own quality (about 128 kbit/s, not re-encoded; about 4 GB for all 30 stations),
   their logos and the programme. Copy it to the phone, start the app and pick the file once; the songs are played straight
   out of it.
 
@@ -378,6 +386,7 @@ awc_core.py        AWC parser, RPF scanner, Ogg Opus writer (no GUI dependencies
 awc_i18n.py        Translations (English, Deutsch) + settings
 awc_names.py       Track/station name store, import/export, tags, playlists
 awc_config.py      Reads internal names from the game's audio config
+awc_gamedata.py    Reads the radio stations and their playlists from that config
 awc_credits.py     Parses the public credits page and matches its songs to stream IDs
 awc_icons.py       Optional: downloads the Leonida texture decoder and cuts the station logos out of the game
 awc_radio.py       AWC Radio: web-radio style player for the game's stations (separate program)

@@ -24,6 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import awc_config as gamecfg  # noqa: E402
 import awc_core as core  # noqa: E402
 import awc_credits as credits  # noqa: E402
+import awc_gamedata as gamedata  # noqa: E402
 import awc_i18n  # noqa: E402
 import awc_icons as icons  # noqa: E402
 
@@ -31,7 +32,7 @@ NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 SONG_MIN, SONG_MAX = 60.0, 1500.0          # seconds: shorter is not a song, longer is a mix
 JINGLE_MIN, JINGLE_MAX = 2.0, 25.0         # unnamed short streams of a station are used as jingles
 MIN_SONGS = 5                              # a station needs at least this many songs to be listed
-INDEX_VERSION = 3
+INDEX_VERSION = 4
 
 BG, PANEL, CARD, CARD_SEL, FG, DIM, ACCENT = "#14161c", "#1c1f27", "#232733", "#2f3550", "#eceef4", "#8b91a3", "#ff5a36"
 
@@ -50,7 +51,7 @@ STR = {
         "err_html": "HTML page", "err_generic": "Something went wrong:\n{e}", "err_nostations": "No station with songs was found.",
         "ask_decoder": "Station logos need the Leonida texture decoder (a few files from GitHub, GPL-3; they are saved to\n{folder}\nand are not part of this program). Download it now?",
         "kind_song": "SONG", "kind_jingle": "JINGLE", "btn_play": "▶ Play (live)", "btn_pause": "⏸ Pause",
-        "sync_hint": "Live: the stations run by the UTC clock, everyone with the same time hears the same song.", "lbl_volume": "Volume", "n_songs": "{n} songs", "st_loading": "Loading …",
+        "sync_hint": "Live: the stations run by the UTC clock, everyone with the same time hears the same song.", "lbl_volume": "Volume", "n_songs": "{n} songs", "n_shows": "{n} shows", "kind_show": "SHOW", "st_loading": "Loading …",
         "lbl_next": "Up next:", "tune": "Tune in to a station on the left", "no_logo_hint": "",
     },
     "de": {
@@ -67,7 +68,7 @@ STR = {
         "err_html": "HTML-Seite", "err_generic": "Es ist ein Fehler aufgetreten:\n{e}", "err_nostations": "Es wurde kein Sender mit Songs gefunden.",
         "ask_decoder": "Für die Sender-Logos wird der Leonida-Texturdecoder gebraucht (ein paar Dateien von GitHub, GPL-3; sie werden nach\n{folder}\ngespeichert und sind nicht Teil dieses Programms). Jetzt herunterladen?",
         "kind_song": "SONG", "kind_jingle": "JINGLE", "btn_play": "▶ Abspielen (live)", "btn_pause": "⏸ Pause",
-        "sync_hint": "Live: Die Sender laufen nach der UTC-Uhrzeit, alle mit derselben Zeit hören denselben Song.", "lbl_volume": "Lautstärke", "n_songs": "{n} Songs", "st_loading": "Lade …",
+        "sync_hint": "Live: Die Sender laufen nach der UTC-Uhrzeit, alle mit derselben Zeit hören denselben Song.", "lbl_volume": "Lautstärke", "n_songs": "{n} Songs", "n_shows": "{n} Sendungen", "kind_show": "SENDUNG", "st_loading": "Lade …",
         "lbl_next": "Als Nächstes:", "tune": "Links einen Sender wählen", "no_logo_hint": "",
     },
 }
@@ -151,6 +152,17 @@ def load_index(rpf, pool):
     except (OSError, ValueError, KeyError):
         pass
     return None
+
+
+def extract_track(index, rpf, tr_, dst):
+    """Cut one item of a station out of the archive (a talk show: all its parts into one file)."""
+    def ref(base):
+        return core.AwcRef(dict(index["items"][str(base)], path=rpf))
+    parts = tr_.get("parts")
+    if parts:
+        core.join_streams([(ref(b).open(), i) for b, i in parts], dst)
+    else:
+        ref(tr_["base"]).extract({tr_["idx"]: dst})
 
 
 # ------------------------------------------------------------------------------------------------ model
@@ -374,17 +386,39 @@ def make_index(rpf, pool, get_songs, status=None, progress=None):
     # streams whose game name only resembles a title of the credits list ("IM_IN_LUV" ~ "I'm N Luv (Wit a Stripper)")
     similar = credits.match_names(songs, found, {i: n for i, n in cfg_names.items() if i not in found})
     found.update(similar)
+    matched = dict(found)
+    # the stations as the game config itself defines them: complete track lists, also for talk radio
+    try:
+        game = gamedata.read(rpf)
+    except (OSError, ValueError):
+        game = {}
+    for sid, (title, artists, station) in gamedata.hits(game).items():
+        if sid not in found:                                      # for the parts of the long mixes
+            hit = credits.lookup(songs, station, title, artists)
+            found[sid] = (hit or (gamecfg.pretty(title), ", ".join(gamecfg.pretty(a) for a in artists))) + (station,)
     if status:
         status(t("st_build"), 0.88)
     unnamed = {}
     stations = build_stations(items, found, cfg_names, unnamed)
     fill_unnamed(stations, unnamed, songs, found)
     stations.update(build_mixes(items, found, songs))
+    for name, st in gamedata.build(items, game, songs, matched, cfg_names).items():
+        if not st["jingles"] and name in stations:                # a bare playlist: keep the jingles found for the station
+            songs_ = {_tkey(x) for x in st["songs"]}
+            st["jingles"] = [j for j in stations[name]["jingles"] if _tkey(j) not in songs_]
+        stations[name] = st                                       # replaces the guessed station of the same name
+    for name, st in stations.items():
+        for tr_ in st["songs"]:                                   # "Six Four Five" -> "6:45" with its artist
+            if not tr_["artist"] and not tr_.get("parts"):
+                hit = credits.lookup(songs, name, tr_["title"], own_only=True)
+                if hit:
+                    tr_["title"], tr_["artist"] = hit
     stations = dict(sorted(stations.items(), key=lambda kv: sort_key(kv[0])))
     used = {}
     for st in stations.values():
         for tr_ in st["songs"] + st["jingles"]:
-            used[tr_["base"]] = None
+            for base, _idx in tr_.get("parts") or [(tr_["base"], tr_["idx"])]:
+                used[base] = None
     by_base = {it["base"]: it for it in items}
     idx = {"fp": fingerprint(rpf, pool), "stations": stations, "items": {str(b): by_base[b] for b in used}}
     with open(index_path(), "w", encoding="utf-8") as f:
@@ -407,7 +441,9 @@ def segment_at(tr_, pos):
 
 
 def _tkey(tr_):
-    return "%s_%s" % (tr_["base"], tr_["idx"])
+    """Identifies an item; the same as awc_android.track_key (the programme hashes it)."""
+    parts = tr_.get("parts")
+    return "%s_%s" % (tr_["base"], tr_["idx"]) + ("x%d" % len(parts) if parts else "")
 
 
 def _h(*parts):
@@ -851,7 +887,8 @@ class RadioApp(tk.Tk):
             box.pack(side="left", fill="x", expand=True)
             lab = tk.Label(box, text=name, bg=CARD, fg=FG, font=("Segoe UI", 11, "bold"), anchor="w")
             lab.pack(fill="x")
-            sub = tk.Label(box, text=t("n_songs", n=len(st["songs"])), bg=CARD, fg=DIM, anchor="w")
+            count = "n_shows" if any(s.get("parts") for s in st["songs"]) else "n_songs"
+            sub = tk.Label(box, text=t(count, n=len(st["songs"])), bg=CARD, fg=DIM, anchor="w")
             sub.pack(fill="x")
             for w in (card, cv, box, lab, sub):
                 w.bind("<Button-1>", lambda e, n=name: self._tune(n))
@@ -913,7 +950,8 @@ class RadioApp(tk.Tk):
     def _show_next(self):
         if self.upcoming:
             _s, _e, kind, tr_, _fi, _fo = self.upcoming[0]
-            label = t("kind_jingle") if kind == "jingle" else "%s - %s" % (tr_["artist"], tr_["title"]) if tr_["artist"] else tr_["title"]
+            pair = (tr_["title"], tr_["artist"]) if tr_.get("parts") else (tr_["artist"], tr_["title"])
+            label = t("kind_jingle") if kind == "jingle" else "%s - %s" % pair if tr_["artist"] else tr_["title"]
             self.lbl_next.config(text="%s %s" % (t("lbl_next"), label))
 
     def _set_cur(self, item):
@@ -921,7 +959,7 @@ class RadioApp(tk.Tk):
         self.cur_item = item
         self.cur_start, self.cur_end, kind, tr_, _fi, _fo = item
         self.cur = (kind, tr_)
-        self.lbl_kind.config(text=t("kind_jingle") if kind == "jingle" else t("kind_song"))
+        self.lbl_kind.config(text=t("kind_jingle" if kind == "jingle" else "kind_show" if tr_.get("parts") else "kind_song"))
         self.lbl_title.config(text=("♪ " + t("kind_jingle")) if kind == "jingle" else tr_["title"])
         self.lbl_artist.config(text=tr_["artist"] if kind == "song" else self.station or "")
         self.lbl_len.config(text=fmt_time(tr_["sec"]))
@@ -1059,9 +1097,7 @@ class RadioApp(tk.Tk):
             dst = os.path.join(cache_dir(), "r_%s.opus" % key)
             try:
                 if not (os.path.isfile(dst) and os.path.getsize(dst) > 0):
-                    item = self.index["items"][str(tr_["base"])]
-                    ref = core.AwcRef(dict(item, path=self.cfg["rpf"]))
-                    ref.extract({tr_["idx"]: dst + ".part"})
+                    extract_track(self.index, self.cfg["rpf"], tr_, dst + ".part")
                     os.replace(dst + ".part", dst)
                 self.ready[key] = dst
             except Exception:  # noqa: BLE001

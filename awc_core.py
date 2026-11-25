@@ -264,6 +264,38 @@ class AwcFile:
             pos += ents[c] * 0x800
 
     # -- extraction -------------------------------------------------------------
+    def feed(self, writers, progress=None, cancel=None):
+        """Hand the Opus packets of the wanted streams to their writers ({stream_index: OggOpusWriter})."""
+        nch = len(self.streams)
+        with open(self.path, "rb") as f:
+            for b in range(self.n_blocks):
+                if cancel and cancel():
+                    raise InterruptedError()
+                off = self.data_off + b * self.block_size
+                f.seek(self.base + off)
+                blk = f.read(min(self.block_size, self.data_off + self.data_size - off))
+                if len(blk) < 0x18 * nch:
+                    break
+                ents = [struct.unpack_from("<i", blk, 0x18 * c + 4)[0] for c in range(nch)]
+                if any(e < 0 or e > 4096 for e in ents):
+                    break  # corrupt block (e.g. truncated file)
+                pos = ((0x18 * nch + 4 * sum(ents)) + 0x7FF) & ~0x7FF
+                for c in range(nch):
+                    if c in writers:
+                        w = writers[c]
+                        for e in range(ents[c]):
+                            ent = blk[pos + e * 0x800: pos + (e + 1) * 0x800]
+                            p = 0
+                            while p + 2 <= len(ent):
+                                n = struct.unpack_from("<H", ent, p)[0]
+                                if n == 0 or p + 2 + n > len(ent):
+                                    break
+                                w.add(ent[p + 2:p + 2 + n])
+                                p += 2 + n
+                    pos += ents[c] * 0x800
+                if progress:
+                    progress((b + 1) / float(self.n_blocks))
+
     def extract(self, jobs, progress=None, cancel=None, tags=None):
         """jobs: {stream_index: out_path.opus}; tags: optional {stream_index: {"TITLE": ...}} written as
         Opus comments. Returns {stream_index: seconds}."""
@@ -276,34 +308,7 @@ class AwcFile:
                    for i, p in jobs.items()}
         ok = False
         try:
-            with open(self.path, "rb") as f:
-                for b in range(self.n_blocks):
-                    if cancel and cancel():
-                        raise InterruptedError()
-                    off = self.data_off + b * self.block_size
-                    f.seek(self.base + off)
-                    blk = f.read(min(self.block_size, self.data_off + self.data_size - off))
-                    if len(blk) < 0x18 * nch:
-                        break
-                    ents = [struct.unpack_from("<i", blk, 0x18 * c + 4)[0] for c in range(nch)]
-                    if any(e < 0 or e > 4096 for e in ents):
-                        break  # corrupt block (e.g. truncated file)
-                    pos = ((0x18 * nch + 4 * sum(ents)) + 0x7FF) & ~0x7FF
-                    for c in range(nch):
-                        if c in writers:
-                            w = writers[c]
-                            for e in range(ents[c]):
-                                ent = blk[pos + e * 0x800: pos + (e + 1) * 0x800]
-                                p = 0
-                                while p + 2 <= len(ent):
-                                    n = struct.unpack_from("<H", ent, p)[0]
-                                    if n == 0 or p + 2 + n > len(ent):
-                                        break
-                                    w.add(ent[p + 2:p + 2 + n])
-                                    p += 2 + n
-                        pos += ents[c] * 0x800
-                    if progress:
-                        progress((b + 1) / float(self.n_blocks))
+            self.feed(writers, progress, cancel)
             ok = True
         finally:
             for w in writers.values():
@@ -315,6 +320,28 @@ class AwcFile:
                     except OSError:
                         pass
         return {i: w.seconds for i, w in writers.items()}
+
+
+def join_streams(parts, path, cancel=None):
+    """Write several streams one after the other into ONE Ogg Opus file (the parts of a talk show).
+    parts: [(AwcFile, stream index)]. Returns the length in seconds."""
+    for awc, idx in parts:
+        if not awc.streams[idx].supported:
+            raise AwcError(tr("err_codec", c=awc.streams[idx].codec_name))
+    writer = OggOpusWriter(path, 0x4157, parts[0][0].streams[parts[0][1]].sample_rate)
+    ok = False
+    try:
+        for awc, idx in parts:
+            awc.feed({idx: writer}, cancel=cancel)
+        ok = True
+    finally:
+        writer.close()
+        if not ok:
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+    return writer.seconds
 
 
 # --------------------------------------------------------------------------- scanner
