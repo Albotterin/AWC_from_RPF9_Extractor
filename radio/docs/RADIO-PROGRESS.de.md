@@ -76,13 +76,25 @@ Was die Audio-Konfiguration diese Orte spielen lässt. Die Aufnahmen stehen nich
 | 🎚 The Vault (Club) | das Set des Clubs: dieselben 25 Titelmarken wie The Vault Radio, andere Abmischung | 84 Min. |
 | 🎵 Thrillbilly Mud Club | 20 Songs, meist auch auf The Chamber 106.6 und Dirty South Classics | 84 Min. |
 
+## Podcasts
+
+Die fünf Podcasts der Credits-Liste, alle gefunden: 20 Folgen, zusammen 3 Std. 36 Min. Sie laufen auf Abruf in der Android-App und sind in den Zahlen zu den Sendern nicht mitgezählt.
+
+| Podcast | Folgen | Längen in Reihenfolge | Gesamt |
+|---|---:|---|---:|
+| 🎙 Drunk Kings | 5 | 11:43 · 10:09 · 6:57 · 5:32 · 5:46 | 40 Min. |
+| 🎙 Final Act | 4 | 13:17 · 10:52 · 12:38 · 14:10 | 51 Min. |
+| 🎙 Fuck Marry Murder | 6 | 11:05 · 12:15 · 10:40 · 10:23 · 10:42 · 10:31 | 66 Min. |
+| 🎙 The Safe Trap | 3 | 8:47 · 14:24 · 12:01 | 35 Min. |
+| 🎙 Vice City True Stories | 2 | 14:06 · 10:12 | 24 Min. |
+
 ## Die Lücken
 
 - **Bodega The DJ** und **DJ Stevie J** sind DJ-Sets in Clubs. Die fehlenden Titel haben dort keine zugeordnete Einzeldatei; manche laufen auf anderen Sendern.
 - **Worldwide FM**: zwei gelistete Titel sind nicht zugeordnet, eine Aufnahme der Playlist läuft als „Unknown track“. **Radio On-U**: ein Titel fehlt, sehr wahrscheinlich ist er der „Unknown track“ des Senders.
 - **Honey FM - Liquid City** (8 eigens geschriebene Songs, nicht oben mitgezählt) steht in keiner der Senderlisten.
 - Lange DJ-Mixe laufen zusätzlich als „(Mix)“-Sender: Radio On-U (10 von 24), The Sniper Of La Perle (20 von 22), Worldwide FM (31 von 41). Die Zahlen nennen die Abschnitte mit Titel. Ein weiterer langer Club-Mix, dem sich kein Ort zuordnen lässt, läuft als „Clubmixes“.
-- Die fünf Podcasts, die die Spiel-Konfiguration nennt, sind noch nicht zugeordnet.
+- Die Podcast-Folgen sind nummeriert; ihre Titel aus dem Spiel sind nicht bekannt.
 
 ## Alle Sender
 

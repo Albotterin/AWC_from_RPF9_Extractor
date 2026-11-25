@@ -45,17 +45,17 @@ import java.util.Locale;
 import java.util.TimeZone;
 
 /**
- * The two tabs of the app (the stations and the alarms), the small player at the bottom and the large one over the
- * whole screen. All the playing is done by RadioService.
+ * The three tabs of the app (the stations, the podcasts and the alarms), the small player at the bottom and the large
+ * ones over the whole screen. All the playing is done by RadioService.
  */
 public class MainActivity extends Activity implements PackStore.Listener {
     static final String ACTION_SHOW_ALARMS = "org.awctool.radio.SHOW_ALARMS";
     private static final int REQ_PICK = 42;
     private static final int[] SLEEP_MINUTES = {0, 15, 30, 45, 60, 90};
-    private static final int TAB_RADIO = 0, TAB_ALARMS = 1;
+    private static final int TAB_RADIO = 0, TAB_ALARMS = 1, TAB_PODCASTS = 2;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
-    private List<Library.Station> stations;
+    private List<Library.Station> stations, podcasts;
     private RadioService service;
     private boolean bound;
     private int tab = TAB_RADIO;
@@ -66,6 +66,10 @@ public class MainActivity extends Activity implements PackStore.Listener {
     private StationAdapter adapter;
     private AlarmList alarms;
     private PlayerScreen player;
+    private EpisodeScreen episodePlayer;
+    private View overlay;                                  // the large player that is shown: one of the two above
+    private PodcastList podcastList;
+    private String podcastShown;                           // podcasts tab: whose episodes are listed, or null
     private TextView headline, alarmHint;
     private LinearLayout alarmChip;
 
@@ -73,6 +77,7 @@ public class MainActivity extends Activity implements PackStore.Listener {
     private ImageView miniLogo;
     private TextView miniTitle, miniSub;
     private ImageButton miniToggle, miniNext;
+    private boolean miniPodcast;
     private ProgressBar miniBar;
     private Object miniShown;
     private int scrolledTo = -1, ticks;
@@ -112,6 +117,7 @@ public class MainActivity extends Activity implements PackStore.Listener {
         if (state != null) {
             tab = state.getInt("tab", TAB_RADIO);
             playerOpen = state.getBoolean("player", false);
+            podcastShown = state.getString("podcast");
         }
         if (ACTION_SHOW_ALARMS.equals(getIntent().getAction())) tab = TAB_ALARMS;
         buildScreen();
@@ -123,10 +129,11 @@ public class MainActivity extends Activity implements PackStore.Listener {
         super.onSaveInstanceState(out);
         out.putInt("tab", tab);
         out.putBoolean("player", playerOpen);
+        out.putString("podcast", podcastShown);
     }
 
     private void askForNotifications() {
-        if (!stations.isEmpty() || !Alarms.list(this).isEmpty()) AlarmList.askForNotifications(this);
+        if (!stations.isEmpty() || !podcasts.isEmpty() || !Alarms.list(this).isEmpty()) AlarmList.askForNotifications(this);
     }
 
     /** The whole screen for the current station list; called again when packs come or go. */
@@ -137,9 +144,14 @@ public class MainActivity extends Activity implements PackStore.Listener {
         mini = null;
         miniShown = null;
         player = null;
+        episodePlayer = null;
+        overlay = null;
+        podcastList = null;
+        miniPodcast = false;
         alarmChip = null;
         scrolledTo = -1;
         stations = PackStore.get(this).stations;
+        podcasts = PackStore.get(this).podcasts;
 
         root = new FrameLayout(this);
         root.setBackgroundColor(Ui.NIGHT);
@@ -155,7 +167,8 @@ public class MainActivity extends Activity implements PackStore.Listener {
         LinearLayout titles = new LinearLayout(this);
         titles.setOrientation(low ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL);
         titles.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
-        headline = Ui.display(this, getString(tab == TAB_ALARMS ? R.string.tab_alarms : R.string.app_name), low ? 26 : 34, Ui.TEXT);
+        headline = Ui.display(this, getString(tab == TAB_ALARMS ? R.string.tab_alarms : tab == TAB_PODCASTS ? R.string.tab_podcasts
+                : R.string.app_name), low ? 26 : 34, Ui.TEXT);
         headline.setIncludeFontPadding(true);
         titles.addView(headline);
         if (tab == TAB_RADIO) {
@@ -187,6 +200,21 @@ public class MainActivity extends Activity implements PackStore.Listener {
         if (tab == TAB_ALARMS) {
             alarms = new AlarmList(this);
             main.addView(alarms, fill);
+        } else if (tab == TAB_PODCASTS && !(stations.isEmpty() && podcasts.isEmpty())) {
+            int at = Catalog.indexOf(podcasts, podcastShown);
+            if (at < 0) podcastShown = null;
+            podcastList = new PodcastList(this, podcasts, at < 0 ? null : podcasts.get(at), new PodcastList.Actions() {
+                @Override
+                public void show(String podcast) {
+                    showPodcast(podcast);
+                }
+
+                @Override
+                public void play(String podcast, int episode) {
+                    playEpisode(podcast, episode);
+                }
+            });
+            main.addView(podcastList, fill);
         } else if (stations.isEmpty()) {
             main.addView(buildSetup(), fill);
         } else {
@@ -206,7 +234,7 @@ public class MainActivity extends Activity implements PackStore.Listener {
             grid.setOnItemClickListener((p, v, pos, id) -> play(pos));
             main.addView(grid, fill);
         }
-        if (!stations.isEmpty()) main.addView(buildMini());
+        if (!stations.isEmpty() || !podcasts.isEmpty()) main.addView(buildMini());
         main.addView(buildTabs(low));
 
         if (!stations.isEmpty()) {
@@ -242,15 +270,81 @@ public class MainActivity extends Activity implements PackStore.Listener {
                     AlarmEditActivity.open(MainActivity.this, 0, st == null ? null : st.name);
                 }
             });
-            player.setVisibility(playerOpen ? View.VISIBLE : View.GONE);
+            player.setVisibility(View.GONE);
             root.addView(player);
-        } else {
-            playerOpen = false;
         }
+        if (!podcasts.isEmpty()) {
+            episodePlayer = new EpisodeScreen(this, low, new EpisodeScreen.Actions() {
+                @Override
+                public void close() {
+                    openPlayer(false);
+                }
+
+                @Override
+                public void toggle() {
+                    MainActivity.this.toggle();
+                }
+
+                @Override
+                public void jump(int seconds) {
+                    MainActivity.this.jump(seconds);
+                }
+
+                @Override
+                public void seek(double seconds) {
+                    if (service == null || !service.isPodcast()) return;
+                    startService(new Intent(MainActivity.this, RadioService.class).setAction(RadioService.ACTION_SEEK)
+                            .putExtra(RadioService.EXTRA_SECONDS, seconds));
+                }
+
+                @Override
+                public void skip(int delta) {
+                    command(delta < 0 ? RadioService.ACTION_PREV : RadioService.ACTION_NEXT);
+                }
+
+                @Override
+                public void sleep() {
+                    showSleepSheet();
+                }
+
+                @Override
+                public void episodes(String podcast) {
+                    openPlayer(false);
+                    tab = TAB_PODCASTS;
+                    podcastShown = podcast;
+                    buildScreen();
+                }
+            });
+            episodePlayer.setVisibility(View.GONE);
+            root.addView(episodePlayer);
+        }
+        overlay = playerOpen ? wantedPlayer() : null;
+        if (overlay != null) overlay.setVisibility(View.VISIBLE);
+        else playerOpen = false;
         setContentView(root);
         update();
-        getWindow().setStatusBarColor(playerOpen && player != null ? player.color() : Ui.NIGHT);
+        getWindow().setStatusBarColor(playerOpen ? colorOf(overlay) : Ui.NIGHT);
         getWindow().setNavigationBarColor(playerOpen ? Ui.NIGHT : Ui.SURFACE);
+    }
+
+    /** A podcast is on (playing or paused). */
+    private boolean podcastOn() {
+        return service != null && service.state != RadioService.STOPPED && service.isPodcast()
+                && Catalog.indexOf(podcasts, service.stationName) >= 0;
+    }
+
+    /** The large player for what is on: the one of the podcasts, else the radio's; null if there is none. */
+    private View wantedPlayer() {
+        return podcastOn() && episodePlayer != null ? episodePlayer : podcastArea() ? null : player;
+    }
+
+    private int colorOf(View v) {
+        return v == episodePlayer && episodePlayer != null ? episodePlayer.color() : player != null ? player.color() : Ui.NIGHT;
+    }
+
+    private void showPodcast(String name) {
+        podcastShown = name;
+        buildScreen();
     }
 
     private void showTab(int which) {
@@ -263,6 +357,7 @@ public class MainActivity extends Activity implements PackStore.Listener {
         LinearLayout bar = new LinearLayout(this);
         bar.setBackgroundColor(Ui.SURFACE);
         bar.addView(tabButton(TAB_RADIO, R.drawable.ic_radio, R.string.tab_radio, low), new LinearLayout.LayoutParams(0, dp(low ? 48 : 68), 1f));
+        bar.addView(tabButton(TAB_PODCASTS, R.drawable.ic_podcast, R.string.tab_podcasts, low), new LinearLayout.LayoutParams(0, dp(low ? 48 : 68), 1f));
         bar.addView(tabButton(TAB_ALARMS, R.drawable.ic_alarm, R.string.tab_alarms, low), new LinearLayout.LayoutParams(0, dp(low ? 48 : 68), 1f));
         return bar;
     }
@@ -290,6 +385,18 @@ public class MainActivity extends Activity implements PackStore.Listener {
         return t;
     }
 
+    /** The podcast one can go on with (the one played last), or null. */
+    private Library.Station resumable() {
+        if (podcasts == null || podcasts.isEmpty()) return null;
+        int i = Catalog.indexOf(podcasts, new Heard(this).lastShow());
+        return i < 0 ? null : podcasts.get(i);
+    }
+
+    /** Nothing is playing and the podcasts are open: the small player belongs to them, not to the radio. */
+    private boolean podcastArea() {
+        return tab == TAB_PODCASTS && (service == null || service.state == RadioService.STOPPED);
+    }
+
     /** The small player: what is on (or what was on last), play/pause, next; a tap opens the large one. */
     private View buildMini() {
         mini = new LinearLayout(this);
@@ -297,7 +404,11 @@ public class MainActivity extends Activity implements PackStore.Listener {
         Ui.clip(mini, 20);
         mini.setClickable(true);
         mini.setFocusable(true);
-        mini.setOnClickListener(v -> openPlayer(true));
+        mini.setOnClickListener(v -> {
+            Library.Station p = podcastArea() ? resumable() : null;
+            if (p != null) showPodcast(p.name);
+            else openPlayer(true);
+        });
         LinearLayout line = new LinearLayout(this);
         line.setGravity(Gravity.CENTER_VERTICAL);
         line.setPadding(dp(10), dp(9), dp(4), dp(7));
@@ -315,7 +426,10 @@ public class MainActivity extends Activity implements PackStore.Listener {
         miniToggle.setOnClickListener(v -> toggle());
         line.addView(miniToggle, new LinearLayout.LayoutParams(dp(48), dp(48)));
         miniNext = Ui.icon(this, R.drawable.ic_next, getString(R.string.act_next), 48, Color.WHITE);
-        miniNext.setOnClickListener(v -> skip(1));
+        miniNext.setOnClickListener(v -> {
+            if (podcastOn()) jump(RadioService.FORWARD_SECONDS);
+            else skip(1);
+        });
         line.addView(miniNext, new LinearLayout.LayoutParams(dp(48), dp(48)));
         mini.addView(line);
         miniBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
@@ -331,28 +445,55 @@ public class MainActivity extends Activity implements PackStore.Listener {
     }
 
     private void openPlayer(boolean open) {
-        if (player == null || open == playerOpen) return;
+        if (open == playerOpen || (open && wantedPlayer() == null)) return;
         playerOpen = open;
-        player.animate().cancel();
         if (open) {
-            player.setVisibility(View.VISIBLE);
-            player.setTranslationY(root.getHeight());
-            player.animate().translationY(0).setDuration(240).setInterpolator(new android.view.animation.DecelerateInterpolator()).start();
+            overlay = wantedPlayer();
+            final View v = overlay;
+            v.animate().cancel();
+            v.setVisibility(View.VISIBLE);
+            v.setTranslationY(root.getHeight());
+            v.animate().translationY(0).setDuration(240).setInterpolator(new android.view.animation.DecelerateInterpolator()).start();
             update();
-            getWindow().setStatusBarColor(player.color());
+            getWindow().setStatusBarColor(colorOf(v));
             getWindow().setNavigationBarColor(Ui.NIGHT);
         } else {
-            player.animate().translationY(root.getHeight()).setDuration(200).withEndAction(() -> {
-                if (!playerOpen && player != null) player.setVisibility(View.GONE);
-            }).start();
+            final View v = overlay;
+            if (v != null) {
+                v.animate().cancel();
+                v.animate().translationY(root.getHeight()).setDuration(200).withEndAction(() -> {
+                    if (!playerOpen || overlay != v) v.setVisibility(View.GONE);
+                }).start();
+            }
             getWindow().setStatusBarColor(Ui.NIGHT);
             getWindow().setNavigationBarColor(Ui.SURFACE);
         }
     }
 
+    /** What is on changed from radio to podcast or back (e.g. from the car) while the large player is open. */
+    private void switchPlayer() {
+        View want = wantedPlayer();
+        if (want == overlay) return;
+        boolean over = overlay != null && overlay == episodePlayer && (service == null || service.state == RadioService.STOPPED);
+        if (want == null || over) {                          // the podcast is over: nothing to switch to
+            openPlayer(false);
+            return;
+        }
+        if (overlay != null) {
+            overlay.animate().cancel();
+            overlay.setVisibility(View.GONE);
+        }
+        overlay = want;
+        want.animate().cancel();
+        want.setTranslationY(0);
+        want.setVisibility(View.VISIBLE);
+        getWindow().setStatusBarColor(colorOf(want));
+    }
+
     @Override
     public void onBackPressed() {
         if (playerOpen) openPlayer(false);
+        else if (tab == TAB_PODCASTS && podcastShown != null) showPodcast(null);
         else if (tab != TAB_RADIO) showTab(TAB_RADIO);
         else super.onBackPressed();
     }
@@ -485,6 +626,19 @@ public class MainActivity extends Activity implements PackStore.Listener {
     }
 
     // ------------------------------------------------------------------------------------------ commands
+    private void playEpisode(String podcast, int episode) {
+        Intent i = new Intent(this, RadioService.class).setAction(RadioService.ACTION_EPISODE)
+                .putExtra(RadioService.EXTRA_STATION, podcast).putExtra(RadioService.EXTRA_EPISODE, episode);
+        if (Build.VERSION.SDK_INT >= 26) startForegroundService(i);
+        else startService(i);
+    }
+
+    private void jump(int seconds) {
+        if (service == null || !service.isPodcast()) return;
+        startService(new Intent(this, RadioService.class).setAction(RadioService.ACTION_JUMP)
+                .putExtra(RadioService.EXTRA_SECONDS, seconds));
+    }
+
     private void play(int index) {
         if (index < 0 || index >= stations.size()) return;
         Intent i = new Intent(this, RadioService.class).setAction(RadioService.ACTION_PLAY)
@@ -501,6 +655,9 @@ public class MainActivity extends Activity implements PackStore.Listener {
     private void toggle() {
         if (service != null && service.state != RadioService.STOPPED) {
             command(RadioService.ACTION_TOGGLE);
+        } else if (tab == TAB_PODCASTS) {                                              // go on with the podcast
+            Library.Station p = resumable();
+            if (p != null) playEpisode(p.name, Math.max(0, new Heard(this).resumeAt(p)));
         } else if (stations != null && !stations.isEmpty()) {
             play(Math.max(0, lastIndex()));                                            // continue with the last station
         }
@@ -549,7 +706,9 @@ public class MainActivity extends Activity implements PackStore.Listener {
         List<Ui.Choice> m = new ArrayList<>();
         m.add(new Ui.Choice(getString(R.string.menu_sleep), null, false, this::showSleepSheet));
         boolean ads = RadioService.adverts(this);
-        m.add(new Ui.Choice(getString(ads ? R.string.menu_adverts_off : R.string.menu_adverts_on), null, false, () -> setAdverts(!ads)));
+        if (tab == TAB_RADIO) {
+            m.add(new Ui.Choice(getString(ads ? R.string.menu_adverts_off : R.string.menu_adverts_on), null, false, () -> setAdverts(!ads)));
+        }
         m.add(new Ui.Choice(getString(R.string.menu_reload), null, false, this::reload));
         m.add(new Ui.Choice(getString(R.string.menu_folder), null, false, this::pickFolder));
         m.add(new Ui.Choice(getString(R.string.menu_battery), null, false, this::openBatterySettings));
@@ -589,6 +748,7 @@ public class MainActivity extends Activity implements PackStore.Listener {
         Catalog c = PackStore.get(this);
         StringBuilder info = new StringBuilder(getString(R.string.info_body, version, PackStore.folderName(this), c.packCount(),
                 stations.size(), songs, f.format(new Date())));
+        if (!podcasts.isEmpty()) info.append('\n').append(getString(R.string.info_podcasts, podcasts.size()));
         for (String p : c.problems) info.append('\n').append(getString(R.string.info_skipped, p));
         final String body = info.toString();
         final String log = AppLog.text();
@@ -622,7 +782,7 @@ public class MainActivity extends Activity implements PackStore.Listener {
     private void reload() {
         PackStore.refresh(this, () -> {
             Catalog c = PackStore.get(this);
-            Toast.makeText(this, getString(R.string.reloaded, c.stations.size(), c.problems.size()), Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, getString(R.string.reloaded, c.stations.size(), c.podcasts.size(), c.problems.size()), Toast.LENGTH_SHORT).show();
         });
     }
 
@@ -653,13 +813,20 @@ public class MainActivity extends Activity implements PackStore.Listener {
             alarmChip.setVisibility(at == 0 ? View.GONE : View.VISIBLE);
             if (at != 0) set(alarmHint, getString(R.string.alarm_chip, Ui.until(this, at, System.currentTimeMillis())));
         }
-        if (stations == null || stations.isEmpty()) return;
+        if (podcastList != null) podcastList.update(service);
+        if (stations == null || (stations.isEmpty() && podcasts.isEmpty())) return;
         RadioService s = service;
         int state = s == null ? RadioService.STOPPED : s.state;
         boolean active = s != null && state != RadioService.STOPPED;
         boolean playing = active && state == RadioService.PLAYING;
-        int cur = active ? Catalog.indexOf(stations, s.stationName) : -1;
-        Library.Station st = shownStation();
+        boolean pod = podcastOn();
+        int cur = active && !pod ? Catalog.indexOf(stations, s.stationName) : -1;
+        boolean area = podcastArea();
+        Library.Station st = pod ? podcasts.get(Catalog.indexOf(podcasts, s.stationName)) : area ? resumable() : shownStation();
+        if (mini != null) {
+            mini.setVisibility(st == null ? View.GONE : View.VISIBLE);
+            miniNext.setVisibility(area ? View.GONE : View.VISIBLE);
+        }
         if (mini != null && st != null) {
             if (st != miniShown) {
                 miniShown = st;
@@ -668,14 +835,25 @@ public class MainActivity extends Activity implements PackStore.Listener {
                 mini.setBackground(Ui.ripple(bg, Ui.rounded(this, Color.WHITE, 20)));
             }
             set(miniTitle, !active ? st.name : s.title.isEmpty() ? getString(R.string.loading) : s.title);
-            set(miniSub, !active ? getString(R.string.tap_play) : s.artist.isEmpty() ? st.name : st.name + " • " + s.artist);
+            int go = area ? new Heard(this).resumeAt(st) : -1;
+            set(miniSub, area ? (go < 0 ? getString(R.string.podcast_all_heard) : getString(R.string.podcast_continue, go + 1))
+                    : !active ? getString(R.string.tap_play)
+                    : s.artist.isEmpty() ? st.name : st.name + " • " + s.artist);
             miniToggle.setImageResource(playing ? R.drawable.ic_pause : R.drawable.ic_play);
-            miniToggle.setContentDescription(getString(playing ? R.string.act_pause : R.string.act_play));
-            double len = active && s.itemStart > 0 ? Math.max(1.0, s.itemEnd - s.itemStart) : 0;
-            miniBar.setProgress(len > 0 ? (int) Math.min(1000, 1000 * Math.max(0, System.currentTimeMillis() / 1000.0 - s.itemStart) / len) : 0);
+            miniToggle.setContentDescription(getString(playing ? R.string.act_pause : pod || area ? R.string.act_resume : R.string.act_play));
+            double len = pod ? s.duration() : active && s.itemStart > 0 ? Math.max(1.0, s.itemEnd - s.itemStart) : 0;
+            double at = pod ? s.position() : len > 0 ? Math.max(0, System.currentTimeMillis() / 1000.0 - s.itemStart) : 0;
+            miniBar.setProgress(len > 0 ? (int) Math.min(1000, 1000 * at / len) : 0);
             miniBar.setVisibility(active ? View.VISIBLE : View.INVISIBLE);
+            if (pod != miniPodcast) {                       // a podcast goes forward, the radio to the next station
+                miniPodcast = pod;
+                miniNext.setImageResource(pod ? R.drawable.ic_forward : R.drawable.ic_next);
+                miniNext.setContentDescription(getString(pod ? R.string.act_forward : R.string.act_next));
+            }
         }
-        if (player != null && playerOpen) player.show(st, s);
+        if (playerOpen) switchPlayer();
+        if (playerOpen && overlay == episodePlayer && pod) episodePlayer.show(st, s);
+        else if (playerOpen && overlay == player && player != null) player.show(shownStation(), s);
         if (adapter != null) {
             adapter.setCurrent(cur, playing);
             if (cur >= 0 && cur != scrolledTo) {                       // keep the station on air in view

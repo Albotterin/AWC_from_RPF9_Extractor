@@ -12,6 +12,7 @@ final class Library {
         final String name;
         final String logo;                 // file name inside the pack, or ""
         final boolean talk;                // talk radio: its items are shows, not songs
+        final boolean podcast;             // played on demand: songs are its episodes, there is no programme
         Pack pack;                         // the file the station comes from
         final List<Schedule.Track> songs = new ArrayList<>();
         final List<Schedule.Track> jingles = new ArrayList<>();
@@ -27,9 +28,28 @@ final class Library {
         }
 
         Station(String name, String logo, boolean talk) {
+            this(name, logo, talk, false);
+        }
+
+        Station(String name, String logo, boolean talk, boolean podcast) {
             this.name = name;
             this.logo = logo;
             this.talk = talk;
+            this.podcast = podcast;
+        }
+    }
+
+    /** The podcasts of a pack: [{"name", "logo", "episodes": [{"k", "s"}]}], the episodes in their order. */
+    static void parsePodcasts(JSONArray arr, List<Station> out) throws Exception {
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject o = arr.getJSONObject(i);
+            Station p = new Station(o.getString("name"), o.optString("logo", ""), false, true);
+            JSONArray episodes = o.getJSONArray("episodes");
+            for (int j = 0; j < episodes.length(); j++) {
+                JSONObject e = episodes.getJSONObject(j);
+                p.songs.add(new Schedule.Track(e.getString("k"), "", p.name, e.getDouble("s")));
+            }
+            if (!p.songs.isEmpty()) out.add(p);
         }
     }
 

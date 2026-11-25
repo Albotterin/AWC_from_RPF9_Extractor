@@ -27,6 +27,7 @@ import java.util.Map;
  *   32  ...      the files (Ogg Opus songs, PNG logos), back to back
  *   idx          UTF-8 JSON: {"v":1,"created":"...","sig":"...","stations":[{name,logo,kind,songs:[{k,t,a,s}],
  *                jingles:[{k,s}]}],"files":{"t/<key>":[offset,length],"logos/<name>.png":[offset,length]}}
+ *        A podcast pack (.podpak, same layout) has "stations": [] and "podcasts":[{name,logo,episodes:[{k,s}]}].
  *
  * The songs are played straight out of this file (MediaPlayer with file descriptor, offset and length), nothing is
  * copied or unpacked on the phone.
@@ -49,6 +50,7 @@ final class Pack {
     private final Closeable owner;
     private final Map<String, Entry> files = new HashMap<>();
     private final List<Library.Station> stations = new ArrayList<>();
+    private final List<Library.Station> podcasts = new ArrayList<>();
     final String created;
 
     /** @param owner closed together with the pack (the ParcelFileDescriptor on Android), may be null */
@@ -85,6 +87,9 @@ final class Pack {
             }
             Library.parse(root.getJSONArray("stations"), stations);
             for (Library.Station st : stations) st.pack = this;
+            JSONArray pods = root.optJSONArray("podcasts");
+            if (pods != null) Library.parsePodcasts(pods, podcasts);
+            for (Library.Station p : podcasts) p.pack = this;
         } catch (IOException e) {
             close();
             throw e;
@@ -104,6 +109,10 @@ final class Pack {
 
     List<Library.Station> stations() {
         return stations;
+    }
+
+    List<Library.Station> podcasts() {
+        return podcasts;
     }
 
     Entry entry(String path) {

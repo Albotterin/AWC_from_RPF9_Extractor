@@ -79,7 +79,7 @@ every `.rpf` and `.awc` file and lists all music streams it finds.
 | 📂 **Folder mode** | Choose a folder – all subfolders are searched for `*.rpf` and `*.awc`. |
 | 🌳 **Tree view** | Container → group → AWC → stream, with stream ID, codec, stereo/mono, duration and size. |
 | 🗂 **Groups** | AWCs are clustered by their position in the archive (≈ one folder / radio station each). Right-click a group → **Rename group…**; the name is used for the export folder. |
-| 📻 **View by radio station** | Station → category → stream, with the station logo: songs, DJ sets, DJ intros/outros and links, adverts, jingles, DJ talk, music beds, talk shows. Extraction writes one folder per station and category. |
+| 📻 **View by radio station** | Station → category → stream, with the station logo: songs, DJ sets, DJ intros/outros and links, adverts, jingles, DJ talk, music beds, talk shows; plus a group with the podcasts. Extraction writes one folder per station and category. |
 | ▶️ **Player** | Play any stream straight from the archive (play/pause/stop, seek bar, volume). Uses `ffplay`. |
 | 💾 **Extraction** | Opus (lossless remux), FLAC, WAV (16-bit PCM) or MP3 (320 kbit/s). Select streams, whole AWCs or whole containers. |
 | ⏱ **Duration filter** | "Only streams longer than N seconds" – skips the many short snippets. |
@@ -177,6 +177,8 @@ by position back.
 * **Adverts** are shared between stations and numbered once for the whole archive (`Advert 001`, …). The config holds no
   product names. Right-click → **Set title / artist…** names one, or list names in
   `%APPDATA%\AWC-Tool\advert_names.json` as `{"<stream ID, hex>": "<name>"}`.
+* The **podcasts** stand in a group of their own, **Podcasts**, each with its cover and episodes; extraction writes
+  the folders `Podcasts/<name>/`.
 * Whatever the config assigns to no station is listed by position under **Not assigned to a station**.
 
 ### Names, logos and mixes
@@ -205,7 +207,7 @@ by position back.
    the game's UI texture pool (`data\ttdb\ui\ttdb_ui.ttpf`, next to `audio.rpf`) into `%APPDATA%\AWC-Tool\icons\`; the
    small reader `awc_logos.py` handles exactly these textures (BC1 / BC7 in zlib chunks, nothing is decrypted), so nothing
    has to be downloaded. This happens after a scan; the button **Station logos…** repeats the step. The logos are saved at
-   the game's full size (256 × 256). 27 station logos are known; the station comes from the credits list (see step 7). Group
+   the game's full size (256 × 256). 32 logos and podcast covers are known; the station comes from the credits list (see step 7). Group
    rows get a small logo, and FLAC/MP3 exports carry the logo as cover picture. Nothing from the game is shipped with the
    tool.
 9. **Station mixes** (optional): a few very long streams (40-120 min) are whole radio mixes. The game stores a

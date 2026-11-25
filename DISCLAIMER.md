@@ -19,8 +19,8 @@ The repository holds the source code and documentation of three programs:
 | Program | What it does |
 |---|---|
 | AWC Audio Extractor (PC) | finds the audio containers in an archive you choose, plays them and can copy them into audio files |
-| AWC Radio (PC) | plays the radio stations of your files as a live programme and writes station packs for your phone |
-| AWC Radio app (Android) | plays those station packs, including a radio alarm |
+| AWC Radio (PC) | plays the radio stations of your files as a live programme and writes station and podcast packs for your phone |
+| AWC Radio app (Android) | plays those packs, including a radio alarm |
 
 It is a private, non-commercial hobby project. It is not a game, not a mod loader and not a tool to run, port or
 recompile a game.
@@ -74,8 +74,8 @@ Audio files, logos and station packs made from your files remain protected by th
 the game's publisher, the artists, composers, labels and other rights holders.
 
 * Use them **only privately**, and only as far as the law where you live allows it.
-* **Do not share, upload, sell, stream or publicly play** them. This includes the station packs.
-* The Android app itself contains no game data; a station pack on your phone does.
+* **Do not share, upload, sell, stream or publicly play** them. This includes the station and podcast packs.
+* The Android app itself contains no game data; a pack on your phone does.
 
 ## 7. Licence terms and local law
 

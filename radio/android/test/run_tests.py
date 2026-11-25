@@ -6,7 +6,7 @@
 - Pack and Catalog read station packs written by awc_android.py: merging, updating, damaged files. This needs org.json
   for the PC (json.jar): set AWC_JSON_JAR, default <Android SDK>/test/json.jar.
 
-    python run_tests.py [folder with real .radiopak files to check as well]
+    python run_tests.py [folder with real pack files (.radiopak, .podpak) to check as well]
 
 The screens and the alarm on Android itself are tested by run_robo.py.
 """
@@ -76,7 +76,7 @@ def main():
     json_jar = os.environ.get("AWC_JSON_JAR") or os.path.join(sdk, "test", "json.jar")
     sources = lambda *n: [os.path.join(JAVA, "org", "awctool", "radio", x) for x in n]
     tests = lambda n: os.path.join(HERE, "org", "awctool", "radio", n)
-    srcs = sources("Schedule.java", "Engine.java") + [tests("EngineTest.java")]
+    srcs = sources("Schedule.java", "Engine.java", "Episodes.java") + [tests("EngineTest.java"), tests("EpisodesTest.java")]
     catalog = os.path.isfile(json_jar)
     if catalog:
         srcs += sources("Library.java", "Pack.java", "Catalog.java", "Alarm.java", "StationColor.java")
@@ -86,9 +86,10 @@ def main():
     r = subprocess.run(["javac", "-encoding", "UTF-8", "-cp", cp, "-d", OUT] + srcs)
     if r.returncode:
         sys.exit(1)
-    r = subprocess.run(["java", "-cp", cp, "org.awctool.radio.EngineTest"])
-    if r.returncode:
-        sys.exit(r.returncode)
+    for name in ("EngineTest", "EpisodesTest"):
+        r = subprocess.run(["java", "-cp", cp, "org.awctool.radio." + name])
+        if r.returncode:
+            sys.exit(r.returncode)
     if not catalog:
         print("Catalog and alarm tests skipped: no json.jar at " + json_jar)
         return
@@ -133,7 +134,10 @@ def compare_programmes(cp, folder):
         with open(os.path.join(folder, name), "rb") as f:
             offset, length = struct.unpack_from("<QQ", f.read(32), 16)
             f.seek(offset)
-            st = json.loads(f.read(length))["stations"][0]
+            stations = json.loads(f.read(length))["stations"]
+        if not stations:
+            continue                                   # a podcast pack has no programme
+        st = stations[0]
         station = {"songs": [track(x) for x in st["songs"]], "jingles": [track(x) for x in st["jingles"]],
                    "ads": [track(x) for x in st.get("ads", [])]}
         programmes = [("no", radio.Schedule(st["name"], station)), ("ads", radio.Schedule(st["name"], station, True))]

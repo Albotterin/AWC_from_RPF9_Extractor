@@ -4,10 +4,10 @@
 
     <string name="choose_folder">Ordner wählen …</string>
     <string name="setup_title">Willkommen</string>
-    <string name="setup_hint">Kopiere deine Sender-Packs (.radiopak) in einen Ordner auf diesem Handy, zum Beispiel „AWC-Radio“, und wähle diesen Ordner aus. Später hinzugefügte Packs erscheinen von selbst. AWC Radio am PC erzeugt sie (Knopf „Android-Packs …“).</string>
+    <string name="setup_hint">Kopiere deine Sender-Packs (.radiopak, für die Podcasts .podpak) in einen Ordner auf diesem Handy, zum Beispiel „AWC-Radio“, und wähle diesen Ordner aus. Später hinzugefügte Packs erscheinen von selbst. AWC Radio am PC erzeugt sie (Knopf „Android-Packs …“).</string>
     <string name="folder_error">Der Ordner konnte nicht gelesen werden: %1$s</string>
     <string name="folder_empty_title">Noch keine Sender</string>
-    <string name="folder_empty">Im Ordner „%1$s“ liegt kein lesbares Sender-Pack (.radiopak). Packs hineinkopieren und neu laden, oder einen anderen Ordner wählen.</string>
+    <string name="folder_empty">Im Ordner „%1$s“ liegt kein lesbares Pack (.radiopak, .podpak). Packs hineinkopieren und neu laden, oder einen anderen Ordner wählen.</string>
     <string name="loading">Lade …</string>
     <string name="up_next">Als Nächstes: %1$s</string>
     <string name="jingle">Jingle</string>
@@ -41,7 +41,7 @@
     <string name="info_title">Info &amp; Protokoll</string>
     <string name="info_body">Version: %1$s\nOrdner: %2$s\nPacks: %3$d\nSender: %4$d, Songs und Sendungen: %5$d\nHandy-Zeit (UTC): %6$s</string>
     <string name="info_skipped">Übersprungen: %1$s</string>
-    <string name="reloaded">%1$d Sender, %2$d Datei(en) übersprungen</string>
+    <string name="reloaded">%1$d Sender, %2$d Podcasts, %3$d Datei(en) übersprungen</string>
     <string name="info_close">Schließen</string>
     <string name="info_copy">Protokoll kopieren</string>
     <string name="info_copied">Protokoll kopiert</string>
@@ -122,4 +122,27 @@
     <string name="adverts_off">Werbung aus</string>
     <string name="menu_adverts_on">Werbung einschalten</string>
     <string name="menu_adverts_off">Werbung ausschalten</string>
+    <string name="tab_podcasts">Podcasts</string>
+    <string name="podcast">Podcast</string>
+    <string name="episode_n">Folge %1$d</string>
+    <string name="episode_of">Folge %1$d von %2$d</string>
+    <string name="episodes_count">%1$d Folgen</string>
+    <string name="podcast_summary">%1$d Folgen · %2$d Min.</string>
+    <string name="podcast_continue">Weiter mit Folge %1$d</string>
+    <string name="podcast_all_heard">Alles gehört</string>
+    <string name="podcast_playing">Folge %1$d läuft</string>
+    <string name="episode_left">noch %1$s von %2$s</string>
+    <string name="episode_heard">Gehört · %1$s</string>
+    <string name="episode_error">Diese Folge lässt sich nicht abspielen</string>
+    <string name="podcasts_empty_title">Noch keine Podcasts</string>
+    <string name="podcasts_empty">Starte in AWC Radio am PC noch einmal „Android-Packs…“ und kopiere die .podpak-Dateien in deinen Pack-Ordner.</string>
+    <string name="all_podcasts">Alle Podcasts</string>
+    <string name="all_episodes">Alle Folgen</string>
+    <string name="act_resume">Abspielen</string>
+    <string name="act_rewind">15 Sekunden zurück</string>
+    <string name="act_forward">30 Sekunden vor</string>
+    <string name="act_prev_episode">Vorige Folge</string>
+    <string name="act_next_episode">Nächste Folge</string>
+    <string name="act_seek">Stelle in der Folge</string>
+    <string name="info_podcasts">Podcasts: %1$d</string>
 </resources>

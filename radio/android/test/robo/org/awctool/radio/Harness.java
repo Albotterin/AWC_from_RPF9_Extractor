@@ -35,7 +35,7 @@ final class Harness {
         return new File(System.getProperty("awc.packs"));
     }
 
-    /** Stands in for the phone's file system: lists and opens the .radiopak files of folder(). */
+    /** Stands in for the phone's file system: lists and opens the pack files of folder(). */
     public static final class Docs extends ContentProvider {
         @Override
         public boolean onCreate() {

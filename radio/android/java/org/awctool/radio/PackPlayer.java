@@ -5,9 +5,10 @@ import android.media.MediaPlayer;
 import android.os.Build;
 
 /** One song of the pack played with MediaPlayer, straight out of the pack file (see Engine.Player). */
-final class PackPlayer implements Engine.Player {
+final class PackPlayer implements Engine.Player, Episodes.Player {
     private MediaPlayer mp;
     private boolean prepared, failed, finished, seeking, wantStart, released;
+    private double seekTarget;
     private final String name;
 
     /** `usage` says on which volume it plays: USAGE_MEDIA for the radio, USAGE_ALARM for the alarm. */
@@ -82,17 +83,71 @@ final class PackPlayer implements Engine.Player {
         try {
             mp.setVolume(volume, volume);
             if (posSec > 0.4) {                      // joined in the middle of the song
-                seeking = true;
                 wantStart = true;
-                int ms = (int) (posSec * 1000);
-                if (Build.VERSION.SDK_INT >= 26) mp.seekTo(ms, MediaPlayer.SEEK_CLOSEST);
-                else mp.seekTo(ms);
+                seek(posSec);
             } else {
                 mp.start();
             }
         } catch (RuntimeException e) {
             AppLog.d("start failed in " + name + ": " + e);
             failed = true;
+        }
+    }
+
+    private void seek(double posSec) {
+        seeking = true;
+        seekTarget = posSec;
+        finished = false;
+        int ms = (int) (posSec * 1000);
+        if (Build.VERSION.SDK_INT >= 26) mp.seekTo(ms, MediaPlayer.SEEK_CLOSEST);
+        else mp.seekTo(ms);
+    }
+
+    // ---- for podcasts: they pause and go back and forth
+    @Override
+    public void seekTo(double posSec) {
+        if (mp == null) return;
+        try {
+            seek(posSec);
+        } catch (RuntimeException e) {
+            AppLog.d("seek failed in " + name + ": " + e);
+            failed = true;
+        }
+    }
+
+    @Override
+    public void pause() {
+        wantStart = false;
+        if (mp == null) return;
+        try {
+            if (mp.isPlaying()) mp.pause();
+        } catch (RuntimeException ignored) {
+        }
+    }
+
+    @Override
+    public void resume() {
+        if (mp == null) return;
+        if (seeking) {
+            wantStart = true;
+            return;
+        }
+        try {
+            mp.start();
+        } catch (RuntimeException e) {
+            AppLog.d("resume failed in " + name + ": " + e);
+            failed = true;
+        }
+    }
+
+    @Override
+    public double position() {
+        if (mp == null) return 0;
+        if (seeking) return seekTarget;
+        try {
+            return mp.getCurrentPosition() / 1000.0;
+        } catch (RuntimeException e) {
+            return 0;
         }
     }
 

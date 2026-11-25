@@ -13,12 +13,13 @@
 1. [Start](#start)
 2. [Where the stations come from](#where-the-stations-come-from)
 3. [Listening](#listening)
-4. [Stations and progress](#stations-and-progress)
-5. [AWC Radio for Android](#awc-radio-for-android)
-6. [Building](#building)
-7. [Project layout](#project-layout)
-8. [Legal notice](#legal-notice)
-9. [Credits and license](#credits-and-license)
+4. [Podcasts](#podcasts)
+5. [Stations and progress](#stations-and-progress)
+6. [AWC Radio for Android](#awc-radio-for-android)
+7. [Building](#building)
+8. [Project layout](#project-layout)
+9. [Legal notice](#legal-notice)
+10. [Credits and license](#credits-and-license)
 
 ## Start
 
@@ -62,6 +63,16 @@ spots follows, with a jingle back into the music - on average a break roughly ev
 of the air time. 18 of the 34 stations have adverts in the game; each plays the ones the audio config lists for it. The
 programme without adverts is the same as before.
 
+## Podcasts
+
+The audio config lists five podcasts with their episodes in a fixed order: **Drunk Kings** (5), **Final Act** (4),
+**Fuck Marry Murder** (6), **The Safe Trap** (3) and **Vice City True Stories** (2) – the same five the credits name. All
+20 episodes are in `audio.rpf`, whatever the progress in the game. They play **in the Android app** (not in the radio on
+the PC), on demand instead of by the clock: pick an episode, pause, seek, and the app remembers the place.
+[All episodes with their length](docs/RADIO-PROGRESS.md#podcasts).
+
+![Podcasts in the app](docs/screenshots/08-app-podcasts.png)
+
 ## Stations and progress
 
 792 of 809 songs the credits list for the music stations (97.9 %) are found, and all 15 talk show episodes;
@@ -77,16 +88,16 @@ The current list of all stations with their content and length: [all stations](d
 The phone app plays the same live programme as the PC: same UTC clock, same order, same crossfades. It consists of the app
 and the station packs:
 
-* **`AWC-Radio.apk`** - the app (version 1.6), the same file for everybody, no game data inside. Android 7.0 or newer,
+* **`AWC-Radio.apk`** - the app (version 1.8), the same file for everybody, no game data inside. Android 7.0 or newer,
   English and German. Station grid, mini player and a large player in the colour of the station's logo; background playback
   with a media notification, lock-screen and headset buttons; sleep timer; **adverts** switch (off by default); **Android Auto** (switch on *Unknown sources* in
   its developer settings first, because the app does not come from the Play Store).
 * **Radio alarm** - several alarms with weekdays, station, volume, gentle start, snooze and vibration. It rings on the phone's
   alarm volume with a screen over the lock screen. If nothing can be heard from the radio within 10 seconds (pack missing,
   player error, phone not yet unlocked after a restart), the phone's own alarm tone rings. It stops by itself after 30 minutes.
-* **Station packs (`.radiopak`)** - one file per station, made on the PC: in AWC Radio click **Android packs…**, choose a
+* **Packs** - one file per station (`.radiopak`) and per podcast (`.podpak`), made on the PC: in AWC Radio click **Android packs…**, choose a
   folder and write them. Each holds the station's songs in the game's own quality (about 128 kbit/s, not re-encoded), its logo
-  and its programme data; about 4.7 GB for all 34 stations. Copy them into one folder on the phone and choose that folder in
+  and its programme data; about 4.7 GB for all 34 stations. A podcast pack holds the episodes and the cover (0.2 GB together). Copy them all into one folder on the phone and choose that folder in
   the app. New or changed packs are picked up by themselves. Adverts are
   only in packs written by version 2.6.0 or later.
 
@@ -108,7 +119,7 @@ the script). `python android\test\run_robo.py <pack folder>` runs the screens an
 ```
 radio/
   awc_radio.py          The radio program (window, schedule, playback)
-  awc_android.py        Writes one station pack (.radiopak) per station for the Android app, and its dialog
+  awc_android.py        Writes the packs for the Android app (per station and per podcast), and its dialog
   android/              The Android app: Java source, resources, build_apk.py, make_logo.py, tests
   Start AWC-Radio.bat   Launcher
   build_exe.bat         Builds dist\AWC-Radio.exe with PyInstaller

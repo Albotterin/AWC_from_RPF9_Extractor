@@ -118,7 +118,7 @@ public final class CatalogTest {
             closed = true;
         }
         check(closed, "closeUnused(null) closes everything");
-        check(Catalog.empty().stations.isEmpty() && Catalog.isPack("X.RadioPak") && !Catalog.isPack("x.dat")
+        check(Catalog.empty().stations.isEmpty() && Catalog.isPack("X.RadioPak") && Catalog.isPack("a.PodPak") && !Catalog.isPack("x.dat")
                 && !Catalog.isPack("x.radiopak.part"), "file names");
     }
 
@@ -126,6 +126,16 @@ public final class CatalogTest {
         Catalog c = load(folder, null);
         check(c.problems.isEmpty(), "problems " + c.problems);
         check(!c.stations.isEmpty(), "no station");
+        for (Library.Station p : c.podcasts) {
+            check(p.podcast && p.schedule == null && !p.songs.isEmpty(), "podcast " + p.name);
+            check(Catalog.indexOf(c.stations, p.name) < 0, "a podcast is no station: " + p.name);
+            check(p.logo.isEmpty() || p.pack.read(p.logo)[1] == 'P', "cover of " + p.name);
+            for (Schedule.Track t : p.songs) {
+                Pack.Entry e = p.pack.entry("t/" + t.key);
+                check(e != null && e.length > 100000 && t.sec > 60, p.name + ": file of " + t.key);
+            }
+            System.out.println("  podcast " + p.name + (p.logo.isEmpty() ? " [no cover]" : "") + ": " + p.songs.size() + " episodes");
+        }
         long items = 0;
         for (Library.Station s : c.stations) {
             check(s.logo.isEmpty() || s.pack.read(s.logo)[1] == 'P', "logo of " + s.name);      // not every station has one

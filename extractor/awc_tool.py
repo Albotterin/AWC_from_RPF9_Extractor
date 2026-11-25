@@ -218,8 +218,9 @@ class App(tk.Tk):
     def _place(self, iid):
         """(name, station, output sub folder) of a row of the view by station."""
         category, number, entry, station = self.node_info[iid]
-        return (self._station_label(category, number, entry), station,
-                os.path.join(safe_name(station), safe_name(tr("cat_" + category))))
+        folder = (os.path.join(tr("grp_podcasts"), safe_name(station)) if category == "podcast"
+                  else os.path.join(safe_name(station), safe_name(tr("cat_" + category))))
+        return self._station_label(category, number, entry), station, folder
 
     def _stream_text(self, s):
         label = names.track_label(self.names.get(s.id))
@@ -539,7 +540,7 @@ class App(tk.Tk):
                         self.tree.item(cid2, text=self._cue_text(ref, k))
 
     # ------------------------------------------------------------------ view by radio station
-    CATEGORY_ORDER = ("music", "set", "speech", "advert", "ident", "banter", "show", "bed", "talk", "other")
+    CATEGORY_ORDER = ("podcast", "music", "set", "speech", "advert", "ident", "banter", "show", "bed", "talk", "other")
 
     @staticmethod
     def _category(kind):
@@ -550,7 +551,7 @@ class App(tk.Tk):
         for start, cat in (("dj_banter", "banter"), ("ident", "ident"), ("show", "show"), ("talk", "talk"), ("news", "talk")):
             if kind.startswith(start):
                 return cat
-        return kind if kind in ("advert", "set") else "other"
+        return kind if kind in ("advert", "set", "podcast") else "other"
 
     def _view_changed(self):
         if self.by_station.get():
@@ -646,7 +647,8 @@ class App(tk.Tk):
         if self.by_station.get():
             self._rebuild_tree()
         adverts = {(e[0], e[1]) for v in data["stations"].values() for e in v.get("advert", ())}
-        self.set_status("st_stations_done", s=len(data["stations"]), a=len(adverts),
+        shows = sum(1 for v in data["stations"].values() if "podcast" in v)
+        self.set_status("st_stations_done", s=len(data["stations"]) - shows, p=shows, a=len(adverts),
                         d=sum(len(v.get("speech", ())) for v in data["stations"].values()))
         if icons.missing_stations() and self._icons_pools():
             self._icons_start(quiet=True)
@@ -679,6 +681,8 @@ class App(tk.Tk):
             return tr("lbl_advert_named", name=name) if name else tr("lbl_advert", n="%03d" % number)
         if named:
             return named
+        if kind == "podcast":
+            return tr("lbl_episode", show=title, n=extra[0])
         if kind == "part":
             return tr("lbl_part", show=title, e=extra[0], p=extra[1])
         if category in ("music", "set") and title:
@@ -701,12 +705,21 @@ class App(tk.Tk):
         adverts = sorted({(self.refs[e[0]].base, e[1], e[0]) for v in data["stations"].values() for e in v.get("advert", ())})
         advert_no = {(key, i): n for n, (_b, i, key) in enumerate(adverts, 1)}
         used = set()
-        for station in sorted(data["stations"], key=lambda n: re.sub("^the ", "", n.lower())):
+
+        def totals(entries):
+            return sum(self.refs[e[0]].streams[e[1]].est_seconds for e in entries)
+        shows = [n for n in data["stations"] if "podcast" in data["stations"][n]]
+        pnode = None
+        for station in sorted(data["stations"], key=lambda n: (n in shows, re.sub("^the ", "", n.lower()))):
             cats = data["stations"][station]
-            total = sum(len(v) for v in cats.values())
-            seconds = sum(self.refs[e[0]].streams[e[1]].est_seconds for v in cats.values() for e in v)
-            snode = self.tree.insert(cid, "end", text=" " + station, open=False,
-                                     values=("", "", tr("n_streams", n=total), fmt_time(seconds), ""))
+            everything = [e for v in cats.values() for e in v]
+            if station in shows and pnode is None:                  # the podcasts have a group of their own, last
+                episodes = [e for n in shows for v in data["stations"][n].values() for e in v]
+                pnode = self.tree.insert(cid, "end", text=tr("grp_podcasts"), open=True, values=(
+                    "", "", tr("n_streams", n=len(episodes)), fmt_time(totals(episodes)), ""))
+                self.nodes[pnode] = ("folder", None)
+            snode = self.tree.insert(pnode if station in shows else cid, "end", text=" " + station, open=False,
+                                     values=("", "", tr("n_streams", n=len(everything)), fmt_time(totals(everything)), ""))
             self.nodes[snode] = ("folder", station)
             for category in self.CATEGORY_ORDER:
                 entries = cats.get(category)
@@ -718,10 +731,12 @@ class App(tk.Tk):
                 else:                                           # talk shows by episode and part, the rest as stored
                     entries = sorted(entries, key=lambda e: ((0, e[3], e[4]) if e[2] == "part" else (1, "", []))
                                      + (self.refs[e[0]].base, e[1]))
-                seconds = sum(self.refs[e[0]].streams[e[1]].est_seconds for e in entries)
-                cnode = self.tree.insert(snode, "end", text=tr("cat_" + category), open=False,
-                                         values=("", "", tr("n_streams", n=len(entries)), fmt_time(seconds), ""))
-                self.nodes[cnode] = ("folder", None)
+                if category == "podcast":                    # the episodes stand directly below their podcast
+                    cnode = snode
+                else:
+                    cnode = self.tree.insert(snode, "end", text=tr("cat_" + category), open=False,
+                                             values=("", "", tr("n_streams", n=len(entries)), fmt_time(totals(entries)), ""))
+                    self.nodes[cnode] = ("folder", None)
                 for number, entry in enumerate(entries, 1):
                     ref = self.refs[entry[0]]
                     s = ref.streams[entry[1]]

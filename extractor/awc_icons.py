@@ -30,6 +30,9 @@ STATION_KEYS = {
     "WKTT Talk Radio": 2259141511428128088, "Worldwide FM": 4853129926419308999,
     "Thrillbilly Mud Club": 5000657249313955474,
     "Jack of Hearts": 6811332632485254002, "VYB": 11378843460216095013,
+    # the covers of the podcasts
+    "Drunk Kings": 17313509892237327231, "Final Act": 2934041327297051089, "Fuck Marry Murder": 4824653680872706417,
+    "The Safe Trap": 10616877626666773796, "Vice City True Stories": 15150795830351651194,
 }
 ROUND = ("Jack of Hearts", "VYB")          # badges drawn as a circle: the corners get the colour of the circle's edge
 SAME_LOGO = {"The Vault (Club)": "The Vault Radio",

@@ -1,10 +1,11 @@
 """AWC Radio station packs for the Android app.
 
 The Android app (AWC-Radio.apk, the same file for everybody, no game data in it) plays the stations live by the UTC
-clock, exactly like AWC Radio on the PC. Its music comes from station packs in a folder on the phone: one file per
-station (<station>.radiopak), made here from the user's own audio.rpf - the station's songs in the game's own quality
-(about 128 kbit/s, not re-encoded), its logo and its programme data. The app reads every pack of the folder, so a
-station is added or updated by copying just its file. Packs that would come out the same are not written again.
+clock, exactly like AWC Radio on the PC. Its audio comes from packs in a folder on the phone, made here from the
+user's own audio.rpf: one file per station (<station>.radiopak: its songs in the game's own quality, about 128 kbit/s,
+not re-encoded, its logo and its programme data) and one per podcast (<podcast>.podpak: the episodes and the cover).
+The app reads every pack of the folder, so a station or podcast is added or updated by copying just its file. Packs
+that would come out the same are not written again.
 
 Pack layout (little endian), read by android/java/org/awctool/radio/Pack.java:
     0   8 bytes  magic "AWCPACK1"
@@ -17,6 +18,8 @@ Pack layout (little endian), read by android/java/org/awctool/radio/Pack.java:
                              "files":{"t/<key>":[offset,length],"logos/<name>.png":[..]}}
                  a talk station carries "kind":"talk"; a song may carry "m": [[start second, title, artist], ...], the
                  parts of a long DJ mix; "ads": [{"k","t","s"}] are the station's adverts (played only when switched on)
+                 a podcast pack (.podpak, same layout) has "stations": [] and
+                 "podcasts": [{"name","logo","episodes":[{"k","s"}]}] (the episodes in their order)
 "sig" is a fingerprint of the content: it tells whether an existing file is still up to date.
 
 A pack contains game audio: for personal use only, do not share it.
@@ -43,6 +46,7 @@ MAGIC = b"AWCPACK1"
 VERSION = 1
 HEADER = 32
 EXTENSION = ".radiopak"
+PODCAST_EXTENSION = ".podpak"
 BYTES_PER_SEC = 16200                       # the game's Opus streams are about 129 kbit/s
 
 
@@ -56,12 +60,12 @@ class ExportError(Exception):
 
 STR = {
     "en": {
-        "title": "AWC Radio station packs for Android",
-        "intro": "Makes one file (.radiopak) per station: its songs in the game's own quality (about 128 kbit/s), the logo and "
+        "title": "AWC Radio packs for Android",
+        "intro": "Makes one file per station (.radiopak) and per podcast (.podpak): a station's songs in the game's own quality (about 128 kbit/s), the logo and "
                  "the programme. Install AWC-Radio.apk on the phone, copy the packs into one folder there (for example "
                  "\"AWC-Radio\") and choose that folder in the app. Later you only copy the new or changed files. For your own use "
                  "only: the packs contain game audio.",
-        "folder": "Folder for the packs on this PC", "browse": "Browse…", "stations": "Stations (Ctrl/Shift for several)",
+        "folder": "Folder for the packs on this PC", "browse": "Browse…", "stations": "Stations and podcasts (Ctrl/Shift for several)",
         "all": "All", "none": "None", "changed_only": "New and changed",
         "new": "new", "changed": "changed", "current": "up to date",
         "size": "{n} pack(s) to write, about {s}. Up to date and skipped: {c}",
@@ -69,17 +73,17 @@ STR = {
         "st_extract": "{station}: reading … {i}/{n}",
         "done": "{w} pack(s) written, {c} already up to date.\n\nFolder:\n{p}\n\nCopy the new files into the pack folder on the "
                 "phone (same names replace the old ones). Please do not share them: they contain game audio.",
-        "err_space": "Not enough free disk space in the target folder (about {s} needed).", "err_pick": "Pick at least one station.",
+        "err_space": "Not enough free disk space in the target folder (about {s} needed).", "err_pick": "Pick at least one station or podcast.",
         "err_folder": "Choose an existing folder for the packs.",
         "err": "Something went wrong:\n{e}", "cancelled": "Cancelled.",
     },
     "de": {
-        "title": "AWC Radio Sender-Packs für Android",
-        "intro": "Erzeugt pro Sender eine Datei (.radiopak): seine Songs in der Originalqualität des Spiels (ca. 128 kbit/s), das "
+        "title": "AWC Radio Packs für Android",
+        "intro": "Erzeugt eine Datei pro Sender (.radiopak) und pro Podcast (.podpak): die Songs eines Senders in der Originalqualität des Spiels (ca. 128 kbit/s), das "
                  "Logo und das Programm. Auf dem Handy AWC-Radio.apk installieren, die Packs dort in einen Ordner kopieren (zum "
                  "Beispiel „AWC-Radio“) und diesen Ordner in der App wählen. Später kopierst du nur die neuen oder geänderten "
                  "Dateien. Nur für den eigenen Gebrauch: die Packs enthalten Spiel-Audio.",
-        "folder": "Ordner für die Packs auf diesem PC", "browse": "Durchsuchen…", "stations": "Sender (Strg/Umschalt für mehrere)",
+        "folder": "Ordner für die Packs auf diesem PC", "browse": "Durchsuchen…", "stations": "Sender und Podcasts (Strg/Umschalt für mehrere)",
         "all": "Alle", "none": "Keine", "changed_only": "Neue und geänderte",
         "new": "neu", "changed": "geändert", "current": "aktuell",
         "size": "{n} Pack(s) zu schreiben, etwa {s}. Aktuell und übersprungen: {c}",
@@ -87,7 +91,7 @@ STR = {
         "st_extract": "{station}: lese … {i}/{n}",
         "done": "{w} Pack(s) geschrieben, {c} waren schon aktuell.\n\nOrdner:\n{p}\n\nDie neuen Dateien in den Pack-Ordner auf dem "
                 "Handy kopieren (gleiche Namen ersetzen die alten). Bitte nicht weitergeben: sie enthalten Spiel-Audio.",
-        "err_space": "Im Zielordner ist nicht genug Platz frei (es werden etwa {s} gebraucht).", "err_pick": "Bitte mindestens einen Sender wählen.",
+        "err_space": "Im Zielordner ist nicht genug Platz frei (es werden etwa {s} gebraucht).", "err_pick": "Bitte mindestens einen Sender oder Podcast wählen.",
         "err_folder": "Bitte einen vorhandenen Ordner für die Packs wählen.",
         "err": "Es ist ein Fehler aufgetreten:\n{e}", "cancelled": "Abgebrochen.",
     },
@@ -137,9 +141,14 @@ def estimate_bytes(stations):
 
 
 # ------------------------------------------------------------------------------------------------ what a pack holds
-def pack_file(name):
-    """File name of a station's pack: 'The Chamber 106.6' -> 'the_chamber_106_6.radiopak'."""
-    return icons.slug(name) + EXTENSION
+def pack_sources(index):
+    """Everything that gets a pack of its own: the stations and the podcasts of the radio index, {name: entry}."""
+    return dict(index["stations"], **index.get("podcasts", {}))
+
+
+def pack_file(name, podcast=False):
+    """File name of a pack: 'The Chamber 106.6' -> 'the_chamber_106_6.radiopak', 'Final Act' -> 'final_act.podpak'."""
+    return icons.slug(name) + (PODCAST_EXTENSION if podcast else EXTENSION)
 
 
 def _logo(name):
@@ -151,8 +160,11 @@ def _logo(name):
 
 
 def station_entry(name, st, has_logo):
-    """The station as it stands in the pack index."""
-    entry = {"name": name, "logo": "logos/%s.png" % icons.slug(name) if has_logo else "",
+    """The station (or podcast) as it stands in the pack index."""
+    logo = "logos/%s.png" % icons.slug(name) if has_logo else ""
+    if st.get("podcast"):
+        return {"name": name, "logo": logo, "episodes": [{"k": track_key(e), "s": e["sec"]} for e in st["songs"]]}
+    entry = {"name": name, "logo": logo,
              "songs": [dict({"k": track_key(s), "t": s["title"], "a": s["artist"], "s": s["sec"]}, **({"m": s["m"]} if s.get("m") else {}))
                        for s in st["songs"]],
              "jingles": [{"k": track_key(j), "s": j["sec"]} for j in st["jingles"]]}
@@ -186,8 +198,8 @@ def read_signature(path):
                 return ""
             f.seek(off)
             meta = json.loads(f.read(length).decode("utf-8"))
-            for st in meta.get("stations", []):                     # every item of the programme must be in the file
-                for item in st.get("songs", []) + st.get("jingles", []) + st.get("ads", []):
+            for st in meta.get("stations", []) + meta.get("podcasts", []):  # every item must be in the file
+                for item in st.get("songs", []) + st.get("jingles", []) + st.get("ads", []) + st.get("episodes", []):
                     if "t/" + item["k"] not in meta["files"]:
                         return ""
             return str(meta.get("sig", ""))
@@ -199,7 +211,7 @@ def plan(stations, index, folder):
     """-> {station: (path, signature, "new" | "changed" | "current")} for the packs in `folder`."""
     out = {}
     for name, st in stations.items():
-        path = os.path.join(folder, pack_file(name))
+        path = os.path.join(folder, pack_file(name, st.get("podcast", False)))
         sig = signature(name, st, index)
         state = "new" if not os.path.isfile(path) else "current" if read_signature(path) == sig else "changed"
         out[name] = (path, sig, state)
@@ -355,8 +367,11 @@ def export_packs(stations, index, rpf, folder, progress=None, cancel=None, cache
                     entry = station_entry(name, stations[name], bool(logo))
                     if logo:
                         writer.add_bytes(entry["logo"], logo)
-                    writer.finish({"v": VERSION, "created": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                                   "sig": sig, "stations": [entry]})
+                    meta = {"v": VERSION, "created": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                            "sig": sig, "stations": [entry]}
+                    if stations[name].get("podcast"):
+                        meta.update(stations=[], podcasts=[entry])
+                    writer.finish(meta)
                     os.replace(path + ".part", path)
                 except BaseException:
                     writer.abort()
@@ -381,7 +396,8 @@ def open_dialog(app):
     from tkinter import filedialog, messagebox, ttk
 
     import awc_radio as radio
-    names = list(app.stations)
+    sources = pack_sources(app.index)
+    names = list(sources)
     win = tk.Toplevel(app)
     win.title(t("title"))
     win.configure(bg=radio.BG)
@@ -427,7 +443,7 @@ def open_dialog(app):
     btn_cancel.pack(side="right")
 
     def chosen():
-        return {names[i]: app.stations[names[i]] for i in lb.curselection()}
+        return {names[i]: sources[names[i]] for i in lb.curselection()}
 
     def refresh(*_):
         sel = chosen()
@@ -451,12 +467,13 @@ def open_dialog(app):
         folder = var_folder.get().strip()
         state.clear()
         if os.path.isdir(folder):
-            state.update({n: v[2] for n, v in plan(app.stations, app.index, folder).items()})
+            state.update({n: v[2] for n, v in plan(sources, app.index, folder).items()})
         top_row = lb.yview()[0]
         lb.delete(0, "end")
         for nm in names:
-            st = app.stations[nm]
-            line = "%s   –   %s   (%d)" % (nm, human(estimate_bytes({nm: st})), len(st["songs"]))
+            st = sources[nm]
+            line = "%s%s   –   %s   (%d)" % ("Podcast: " if st.get("podcast") else "", nm,
+                                             human(estimate_bytes({nm: st})), len(st["songs"]))
             if nm in state:
                 line += "   ·   %s" % t(state[nm])
             lb.insert("end", line)
@@ -553,15 +570,15 @@ def open_dialog(app):
 def main(argv=None):
     import argparse
     import awc_radio as radio
-    ap = argparse.ArgumentParser(description="Write AWC Radio station packs (.radiopak) for the Android app")
-    ap.add_argument("folder", help="folder for the packs (one file per station); up-to-date files are left alone")
-    ap.add_argument("--stations", nargs="*", help="station names (default: all)")
+    ap = argparse.ArgumentParser(description="Write AWC Radio packs (.radiopak, .podpak) for the Android app")
+    ap.add_argument("folder", help="folder for the packs (one file per station and podcast); up-to-date files are left alone")
+    ap.add_argument("--stations", nargs="*", help="station and podcast names (default: all)")
     a = ap.parse_args(argv)
     cfg = radio.load_settings()
     idx = radio.load_index(cfg["rpf"], cfg.get("pool", ""))
     if not idx:
         raise SystemExit("no radio index yet: start AWC Radio once")
-    stations = {k: v for k, v in idx["stations"].items() if not a.stations or k in a.stations}
+    stations = {k: v for k, v in pack_sources(idx).items() if not a.stations or k in a.stations}
     os.makedirs(a.folder, exist_ok=True)
     t0 = time.time()
     try:

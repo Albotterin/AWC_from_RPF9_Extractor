@@ -76,7 +76,7 @@ Du kannst eine einzelne `.awc`, eine `.rpf` oder einen **ganzen Ordner** angeben
 * 📂 **Ordner-Modus**: alle Unterordner nach `*.rpf` und `*.awc` durchsuchen.
 * 🌳 **Baumansicht** Container → Gruppe → AWC → Stream mit Stream-ID, Codec, Stereo/Mono, Dauer und Größe.
 * 🗂 **Gruppen**: AWCs werden nach ihrer Lage im Archiv gebündelt (≈ ein Ordner / Radiosender). Rechtsklick auf eine Gruppe → **Gruppe umbenennen…**; der Name wird für den Export-Ordner genutzt.
-* 📻 **Ansicht nach Radiosendern**: Sender → Kategorie → Stream, mit Senderlogo: Songs, DJ-Sets, DJ-Intros/-Outros und Überleitungen, Werbung, Jingles, DJ-Ansagen, Musikbetten, Talk-Sendungen. Beim Extrahieren ein Ordner je Sender und Kategorie.
+* 📻 **Ansicht nach Radiosendern**: Sender → Kategorie → Stream, mit Senderlogo: Songs, DJ-Sets, DJ-Intros/-Outros und Überleitungen, Werbung, Jingles, DJ-Ansagen, Musikbetten, Talk-Sendungen; dazu eine Gruppe mit den Podcasts. Beim Extrahieren ein Ordner je Sender und Kategorie.
 * ▶️ **Player** direkt aus dem Archiv (Play/Pause/Stop, Positionsleiste, Lautstärke) über `ffplay`.
 * 💾 **Extraktion** als Opus (verlustfrei), FLAC, WAV (16 Bit) oder MP3 (320 kbit/s) – für Streams, ganze AWCs oder Container.
 * ⏱ **Dauer-Filter** („Nur Streams ab N Sekunden“) blendet die vielen Kurz-Schnipsel aus.
@@ -169,6 +169,8 @@ länger). Ohne Haken erscheint wieder die Ansicht nach Lage im Archiv.
 * **Werbespots** teilen sich die Sender; sie sind einmal für das ganze Archiv nummeriert (`Werbung 001`, …). Die
   Konfiguration enthält keine Produktnamen. Rechtsklick → **Titel / Interpret setzen…** benennt einen Spot, oder man
   trägt Namen in `%APPDATA%\AWC-Tool\advert_names.json` ein: `{"<Stream-ID, hex>": "<Name>"}`.
+* Die **Podcasts** stehen in einer eigenen Gruppe **Podcasts**, je Podcast mit Cover und seinen Folgen; beim Extrahieren
+  entstehen die Ordner `Podcasts/<Name>/`.
 * Was die Konfiguration keinem Sender zuordnet, steht nach Lage unter **Keinem Sender zugeordnet**.
 
 ### Namen, Logos und Mixe
@@ -199,7 +201,7 @@ länger). Ohne Haken erscheint wieder die Ansicht nach Lage im Archiv.
    UI-Textur-Pool des Spiels (`data\ttdb\ui\ttdb_ui.ttpf`, neben der `audio.rpf`) nach `%APPDATA%\AWC-Tool\icons\`
    geschnitten. Der kleine Leser `awc_logos.py` kann genau diese Texturen (BC1 / BC7 in zlib-Blöcken, nichts wird
    entschlüsselt), es muss also nichts heruntergeladen werden. Das passiert nach einem Scan; der Knopf **Sender-Logos…**
-   wiederholt den Schritt. Die Logos werden in voller Spielgröße (256 × 256) gespeichert. Bekannt sind 27 Sender-Logos; den
+   wiederholt den Schritt. Die Logos werden in voller Spielgröße (256 × 256) gespeichert. Bekannt sind 32 Logos und Podcast-Cover; den
    Sender liefert die Credits-Liste (siehe Punkt 7). Gruppen-Zeilen bekommen ein kleines Logo, und FLAC/MP3-Exporte
    tragen das Logo als Cover-Bild. Vom Spiel wird nichts mitgeliefert.
 9. **Sender-Mixe** (optional): ein paar sehr lange Streams (40-120 Min.) sind komplette Radio-Mixe. Das Spiel legt

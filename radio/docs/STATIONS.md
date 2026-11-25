@@ -62,6 +62,25 @@ In the sample archive 18 stations list adverts, 239 different ones, each station
 
 AWC Radio plays the adverts of a station only in its programme "with adverts".
 
+## Podcasts
+
+The track list `joaat("core.radiostation.podcast_<name>_talk")` holds a podcast's episodes in their order, through a list
+of lists (`<name>`: `drunk_kings`, `final_act`, `fmm`, `safetrap`, `vice_city_true_stories`). Besides, 20 track lists with
+a single entry point at one episode each. Every episode is one stream in a music AWC of its own; in the sample archive the
+20 AWCs lie one after the other.
+
+| Podcast | Episodes | Stream names found (the ID is their hash) |
+|---|---:|---|
+| Drunk Kings | 5 | - |
+| Final Act | 4 | `pod_finalact_01` ... `04` |
+| Fuck Marry Murder | 6 | `podcast_fmm_ep01` ... `ep06` |
+| The Safe Trap | 3 | `podcast_safetrap_ep1` ... `ep3` |
+| Vice City True Stories | 2 | - |
+
+A search of all music streams for further numbers of these name patterns found none. The publisher's credits page names
+the same five podcasts. The game shows episode titles and numbers of its own (a player reported "#021" for The Safe Trap);
+the audio config does not hold them.
+
 ## Places that play their own music
 
 Some objects of the game file are named `joaat("core.radiostation.<name>_music")`: track lists of places of the game. For

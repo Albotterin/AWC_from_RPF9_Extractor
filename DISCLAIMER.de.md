@@ -19,8 +19,8 @@ Das Repository enthält den Quellcode und die Dokumentation von drei Programmen:
 | Programm | Was es tut |
 |---|---|
 | AWC Audio Extractor (PC) | findet die Audio-Container in einem Archiv, das du auswählst, spielt sie ab und kann sie in Audiodateien kopieren |
-| AWC Radio (PC) | spielt die Radiosender deiner Dateien als Live-Programm und schreibt Sender-Packs für dein Handy |
-| AWC-Radio-App (Android) | spielt diese Sender-Packs ab, mit Radiowecker |
+| AWC Radio (PC) | spielt die Radiosender deiner Dateien als Live-Programm und schreibt Sender- und Podcast-Packs für dein Handy |
+| AWC-Radio-App (Android) | spielt diese Packs ab, mit Radiowecker |
 
 Es ist ein privates, nicht-kommerzielles Hobbyprojekt. Es ist kein Spiel, kein Mod-Loader und kein Werkzeug, um ein Spiel
 auszuführen, zu portieren oder neu zu kompilieren.
@@ -78,8 +78,8 @@ Audiodateien, Logos und Sender-Packs aus deinen Dateien bleiben durch das **Urhe
 Publishers, der Interpreten, Komponisten, Labels und weiterer Rechteinhaber.
 
 * Nutze sie **nur privat** und nur, soweit das Recht an deinem Wohnort das erlaubt.
-* **Teile, verbreite, verkaufe, streame oder spiele sie nicht öffentlich ab.** Das gilt auch für die Sender-Packs.
-* Die Android-App selbst enthält keine Spieldaten; ein Sender-Pack auf deinem Handy schon.
+* **Teile, verbreite, verkaufe, streame oder spiele sie nicht öffentlich ab.** Das gilt auch für die Sender- und Podcast-Packs.
+* Die Android-App selbst enthält keine Spieldaten; ein Pack auf deinem Handy schon.
 
 ## 7. Lizenzbedingungen und Recht vor Ort
 

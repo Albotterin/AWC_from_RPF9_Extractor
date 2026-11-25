@@ -33,7 +33,7 @@ NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 SONG_MIN, SONG_MAX = 60.0, 1500.0          # seconds: shorter is not a song, longer is a mix
 JINGLE_MIN, JINGLE_MAX = 2.0, 25.0         # unnamed short streams of a station are used as jingles
 MIN_SONGS = 5                              # a station needs at least this many songs to be listed
-INDEX_VERSION = 7
+INDEX_VERSION = 8
 
 BG, PANEL, CARD, CARD_SEL, FG, DIM, ACCENT = "#14161c", "#1c1f27", "#232733", "#2f3550", "#eceef4", "#8b91a3", "#ff5a36"
 
@@ -417,13 +417,18 @@ def make_index(rpf, pool, get_songs, status=None, progress=None):
     for st in stations.values():                        # an advert is never a jingle: it only runs when adverts are wanted
         st["jingles"] = [j for j in st["jingles"] if (j["base"], j["idx"]) not in adverts]
     stations = dict(sorted(stations.items(), key=lambda kv: sort_key(kv[0])))
+    try:
+        podcasts = gamedata.build_podcasts(items, gamedata.read_podcasts(rpf))     # for the app: played on demand
+    except (OSError, ValueError):
+        podcasts = {}
     used = {}
-    for st in stations.values():
+    for st in list(stations.values()) + list(podcasts.values()):
         for tr_ in st["songs"] + st["jingles"] + st.get("ads", []):
             for base, _idx in tr_.get("parts") or [(tr_["base"], tr_["idx"])]:
                 used[base] = None
     by_base = {it["base"]: it for it in items}
-    idx = {"fp": fingerprint(rpf, pool), "stations": stations, "items": {str(b): by_base[b] for b in used}}
+    idx = {"fp": fingerprint(rpf, pool), "stations": stations, "podcasts": podcasts,
+           "items": {str(b): by_base[b] for b in used}}
     with open(index_path(), "w", encoding="utf-8") as f:
         json.dump(idx, f)
     return idx

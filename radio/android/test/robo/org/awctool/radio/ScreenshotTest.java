@@ -45,7 +45,7 @@ public class ScreenshotTest {
 
     private RadioService radio;
 
-    private static void shot(Activity a, String name, Dialog dialog) throws Exception {
+    static void shot(Activity a, String name, Dialog dialog) throws Exception {
         Bitmap bmp = capture(a.getWindow());
         if (dialog != null) {
             Harness.pass(400);
@@ -71,7 +71,7 @@ public class ScreenshotTest {
         return bmp;
     }
 
-    private static List<View> all(View root) {
+    static List<View> all(View root) {
         List<View> out = new ArrayList<>();
         out.add(root);
         if (root instanceof ViewGroup) {
@@ -80,7 +80,7 @@ public class ScreenshotTest {
         return out;
     }
 
-    private static boolean tap(View root, String text) {
+    static boolean tap(View root, String text) {
         for (View v : all(root)) {
             boolean match = v instanceof TextView && ((TextView) v).getText().toString().trim().equals(text)
                     || text.contentEquals(String.valueOf(v.getContentDescription()));
@@ -113,7 +113,8 @@ public class ScreenshotTest {
         ActivityController<MainActivity> c = Robolectric.buildActivity(MainActivity.class).setup();
         Harness.settle();
         MainActivity a = c.get();
-        Assert.assertEquals(Harness.folder().list((d, n) -> n.endsWith(".radiopak")).length, PackStore.get(a).stations.size());
+        Assert.assertEquals(Harness.folder().list((d, n) -> n.endsWith(".radiopak")).length,
+                PackStore.get(a).stations.size());
         shot(a, "01_radio_idle", null);
 
         RadioService s = playing("Flash FM");

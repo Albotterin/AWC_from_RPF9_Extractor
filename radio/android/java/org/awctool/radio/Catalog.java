@@ -9,13 +9,14 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * All station packs (.radiopak) of the folder, seen as one station list. Pure Java (no Android), see PackStore.
+ * All packs of the folder - stations (.radiopak) and podcasts (.podpak) - seen as one list of stations and one of
+ * podcasts. Pure Java (no Android), see PackStore.
  *
  * Every pack normally holds one station. If two files hold a station of the same name, the pack that was made later
  * wins, so an update can simply be copied next to (or over) the old file.
  */
 final class Catalog {
-    static final String EXTENSION = ".radiopak";
+    static final String EXTENSION = ".radiopak", PODCAST_EXTENSION = ".podpak";
     static final String CLUB_STATION = "Clubmixes";
 
     /** A pack file of the folder; a file whose size or time changed counts as a new one. */
@@ -40,22 +41,26 @@ final class Catalog {
     }
 
     final List<Library.Station> stations;
+    final List<Library.Station> podcasts;
     /** "file name: why it could not be read" */
     final List<String> problems;
     private final Map<String, Pack> packs;                    // by Source.key()
 
-    private Catalog(List<Library.Station> stations, Map<String, Pack> packs, List<String> problems) {
+    private Catalog(List<Library.Station> stations, List<Library.Station> podcasts, Map<String, Pack> packs, List<String> problems) {
         this.stations = stations;
+        this.podcasts = podcasts;
         this.packs = packs;
         this.problems = Collections.unmodifiableList(problems);
     }
 
     static Catalog empty() {
-        return new Catalog(Collections.emptyList(), new LinkedHashMap<>(), new ArrayList<>());
+        return new Catalog(Collections.emptyList(), Collections.emptyList(), new LinkedHashMap<>(), new ArrayList<>());
     }
 
     static boolean isPack(String fileName) {
-        return fileName != null && fileName.toLowerCase(Locale.ROOT).endsWith(EXTENSION);
+        if (fileName == null) return false;
+        String n = fileName.toLowerCase(Locale.ROOT);
+        return n.endsWith(EXTENSION) || n.endsWith(PODCAST_EXTENSION);
     }
 
     /**
@@ -67,7 +72,7 @@ final class Catalog {
         Collections.sort(sorted, (a, b) -> a.name.compareTo(b.name));
         Map<String, Pack> packs = new LinkedHashMap<>();
         List<String> problems = new ArrayList<>();
-        Map<String, Library.Station> byName = new HashMap<>();
+        Map<String, Library.Station> byName = new HashMap<>(), podByName = new HashMap<>();
         for (Source s : sorted) {
             if (!isPack(s.name)) continue;
             String key = s.key();
@@ -84,28 +89,35 @@ final class Catalog {
                 }
             }
             packs.put(key, p);
-            for (Library.Station st : p.stations()) {
-                Library.Station other = byName.get(st.name);
-                // "created" is an ISO time, so the texts compare like the times; equal: the later file name wins
-                if (other == null || p.created.compareTo(other.pack.created) >= 0) byName.put(st.name, st);
-            }
+            take(p.stations(), p, byName);
+            take(p.podcasts(), p, podByName);
         }
-        List<Library.Station> stations = new ArrayList<>(byName.values());
-        Collections.sort(stations, (a, b) -> {
+        return new Catalog(inOrder(byName, old == null ? null : old.stations), inOrder(podByName, old == null ? null : old.podcasts),
+                packs, problems);
+    }
+
+    private static void take(List<Library.Station> from, Pack p, Map<String, Library.Station> byName) {
+        for (Library.Station st : from) {
+            Library.Station other = byName.get(st.name);
+            // "created" is an ISO time, so the texts compare like the times; equal: the later file name wins
+            if (other == null || p.created.compareTo(other.pack.created) >= 0) byName.put(st.name, st);
+        }
+    }
+
+    /** Sorted by name; the old list object if nothing in it changed (Station has no equals(): same objects). */
+    private static List<Library.Station> inOrder(Map<String, Library.Station> byName, List<Library.Station> old) {
+        List<Library.Station> list = new ArrayList<>(byName.values());
+        Collections.sort(list, (a, b) -> {
             int c = sortKey(a.name).compareTo(sortKey(b.name));
             return c != 0 ? c : a.name.compareTo(b.name);
         });
-        boolean unchanged = old != null && old.stations.equals(stations);          // Station has no equals(): same objects
-        return new Catalog(unchanged ? old.stations : Collections.unmodifiableList(stations), packs, problems);
+        return old != null && old.equals(list) ? old : Collections.unmodifiableList(list);
     }
 
     /** The same station objects in the same order, and the same problems: nothing to tell anybody. */
     boolean sameAs(Catalog other) {
-        if (other == null || stations.size() != other.stations.size() || !problems.equals(other.problems)) return false;
-        for (int i = 0; i < stations.size(); i++) {
-            if (stations.get(i) != other.stations.get(i)) return false;
-        }
-        return true;
+        // Station has no equals(): the lists are equal when they hold the same objects
+        return other != null && stations.equals(other.stations) && podcasts.equals(other.podcasts) && problems.equals(other.problems);
     }
 
     private String keyOfFile(String id) {

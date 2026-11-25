@@ -71,6 +71,9 @@ VENUE_PLAYLISTS = (("radio_mudclub", "Thrillbilly Mud Club"),)
 # A club sound can have three layers that play together in the game: the DJ set itself and the quiet rest of the room.
 # The set is the loud layer; these are its stream IDs (found by measuring the layers).
 CLUB_MAIN_LAYERS = frozenset((0x0582dfac, 0x0dbfce2a, 0x16b32680, 0x01ae6157, 0x1d7ca6cc))
+# the podcasts: the track list "core.radiostation.podcast_<name>_talk" holds the episodes in their order
+PODCASTS = (("drunk_kings", "Drunk Kings"), ("final_act", "Final Act"), ("fmm", "Fuck Marry Murder"),
+            ("safetrap", "The Safe Trap"), ("vice_city_true_stories", "Vice City True Stories"))
 
 
 def _u32(d, o):
@@ -450,6 +453,68 @@ def hits(game):
     return out
 
 
+# ------------------------------------------------------------------------------------------------ podcasts
+def parse_podcasts(files):
+    """-> {podcast name: [(bank hash, stream hash) per episode, in order]}."""
+    metas, game = _game_file(files)
+    if game is None:
+        return {}
+
+    def walk(name_hash, seen, out):                     # -> the sound of every track below an object
+        d = None if name_hash is None else game.get(name_hash)
+        if not d or name_hash in seen:
+            return
+        seen.add(name_hash)
+        if d[0] == TYPE_TRACK and len(d) >= 16:
+            out.append(game.hash_at(_u32(d, 12)))
+        elif d[0] == TYPE_LIST_OF_LISTS:
+            for k in range(_u32(d, 8)):
+                walk(game.hash_at(_u32(d, 12 + 4 * k)), seen, out)
+        elif d[0] == TYPE_TRACKLIST:
+            if _u32(d, 68) != NONE:
+                walk(game.hash_at(_u32(d, 68)), seen, out)
+            for k in range(_u32(d, 72)):
+                walk(game.hash_at(_u32(d, 76 + 4 * k)), seen, out)
+
+    found = {}
+    for key, name in PODCASTS:
+        walk(joaat("core.radiostation.podcast_%s_talk" % key), set(), found.setdefault(name, []))
+    probe = [h for hs in found.values() for h in hs]
+    if not probe:
+        return {}
+    sounds = max(metas, key=lambda m: sum(1 for h in probe if h in m.index))
+    out = {}
+    for name, hs in found.items():
+        waves = [w for w in (_wave(sounds, h) for h in hs) if w]
+        if waves:
+            out[name] = waves
+    return out
+
+
+def read_podcasts(path):
+    """parse_podcasts() for the archive at `path`. Raises OSError / ValueError."""
+    try:
+        return parse_podcasts(config_files(path))
+    except (struct.error, IndexError, zlib.error) as e:
+        raise ValueError("audio config not understood: %s" % e) from e
+
+
+def build_podcasts(items, podcasts):
+    """-> {name: {"songs": [episodes], "jingles": [], "podcast": True}} for the podcasts whose episodes are all among
+    the scanned banks. An episode's title is its number, its artist the podcast."""
+    by_id = {}
+    for it in items:
+        for s in it["streams"]:
+            by_id.setdefault(s["id"] & STREAM_ID_MASK, (it, s))
+    out = {}
+    for name, waves in podcasts.items():
+        found = [by_id.get(w[1] & STREAM_ID_MASK) for w in waves]
+        if all(found):
+            out[name] = {"songs": [_track(it, s, "Episode %d" % n, name) for n, (it, s) in enumerate(found, 1)],
+                         "jingles": [], "podcast": True}
+    return out
+
+
 # ------------------------------------------------------------------------------------------------ AWC Radio stations
 class _Banks:
     """Finds the stream of a wave among the scanned banks. A stream ID can exist in several banks (every station has
@@ -661,6 +726,8 @@ def catalog(files):
             found = []
             _tracks(game, sounds, _u32(d, 64 + 12 * k), False, seen, found)
             out.setdefault(name, []).extend(found)
+    for name, waves in parse_podcasts(files).items():
+        out[name] = [Track(w, name, [str(n)], False, "podcast") for n, w in enumerate(waves, 1)]
     for key, name in VIEW_LISTS:
         tracks = []
         _club_tracks(game, sounds, joaat("core.radiostation.%s_music" % key), set(), tracks)

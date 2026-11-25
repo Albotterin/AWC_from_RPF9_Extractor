@@ -13,12 +13,13 @@
 1. [Start](#start)
 2. [Woher die Sender kommen](#woher-die-sender-kommen)
 3. [Hören](#hören)
-4. [Sender und Fortschritt](#sender-und-fortschritt)
-5. [AWC Radio für Android](#awc-radio-für-android)
-6. [Selbst bauen](#selbst-bauen)
-7. [Projektaufbau](#projektaufbau)
-8. [Rechtlicher Hinweis](#rechtlicher-hinweis)
-9. [Credits und Lizenz](#credits-und-lizenz)
+4. [Podcasts](#podcasts)
+5. [Sender und Fortschritt](#sender-und-fortschritt)
+6. [AWC Radio für Android](#awc-radio-für-android)
+7. [Selbst bauen](#selbst-bauen)
+8. [Projektaufbau](#projektaufbau)
+9. [Rechtlicher Hinweis](#rechtlicher-hinweis)
+10. [Credits und Lizenz](#credits-und-lizenz)
 
 ## Start
 
@@ -64,6 +65,16 @@ mit zwei oder drei Spots, danach führt ein Jingle zurück zur Musik – im Mitt
 ein Zehntel der Sendezeit. 18 der 34 Sender haben im Spiel Werbung; jeder spielt die Spots, die die Audio-Konfiguration
 für ihn nennt. Das Programm ohne Werbung ist dasselbe wie bisher.
 
+## Podcasts
+
+Die Audio-Konfiguration führt fünf Podcasts mit ihren Folgen in fester Reihenfolge: **Drunk Kings** (5), **Final Act** (4),
+**Fuck Marry Murder** (6), **The Safe Trap** (3) und **Vice City True Stories** (2) – dieselben fünf, die die Credits
+nennen. Alle 20 Folgen liegen in der `audio.rpf`, unabhängig vom Spielfortschritt. Sie laufen **in der Android-App** (nicht
+im PC-Radio), nicht nach der Uhr, sondern auf Abruf: Man wählt die Folge, pausiert, spult, und die App merkt sich die
+Stelle. [Alle Folgen mit Länge](docs/RADIO-PROGRESS.de.md#podcasts).
+
+![Podcasts in der App](docs/screenshots/08-app-podcasts.png)
+
 ## Sender und Fortschritt
 
 792 von 809 Songs, die die Credits für die Musiksender nennen (97,9 %), sind gefunden, dazu alle 15 Folgen
@@ -77,9 +88,9 @@ Die aktuelle Liste aller Sender mit Inhalt und Länge: [alle Sender](docs/RADIO-
 ## AWC Radio für Android
 
 Die Handy-App spielt dasselbe Live-Programm wie der PC: gleiche UTC-Uhr, gleiche Reihenfolge, gleiche Überblendungen.
-Dazu gehören die App und die Sender-Packs:
+Dazu hat sie einen eigenen Bereich für die [Podcasts](#podcasts). Zur App gehören die Packs:
 
-* **`AWC-Radio.apk`** - die App (Version 1.6), für alle dieselbe Datei, ohne Spieldaten. Android 7.0 oder neuer, Deutsch und
+* **`AWC-Radio.apk`** - die App (Version 1.8), für alle dieselbe Datei, ohne Spieldaten. Android 7.0 oder neuer, Deutsch und
   Englisch. Senderraster, kleiner Player und großer Player in der Farbe des Senderlogos; Wiedergabe im Hintergrund mit
   Medien-Benachrichtigung, Sperrbildschirm- und Kopfhörertasten; Einschlaftimer; Schalter für **Werbung** (von Haus aus aus); **Android Auto** (vorher in dessen
   Entwicklereinstellungen „Unbekannte Quellen“ aktivieren, weil die App nicht aus dem Play Store kommt).
@@ -87,9 +98,9 @@ Dazu gehören die App und die Sender-Packs:
   mit der Weckerlautstärke des Handys und zeigt einen Bildschirm über dem Sperrbildschirm. Ist vom Radio nach 10 Sekunden
   nichts zu hören (Pack fehlt, Player-Fehler, Handy nach einem Neustart noch nicht entsperrt), klingelt der Weckton des
   Handys. Nach 30 Minuten hört er von selbst auf.
-* **Sender-Packs (`.radiopak`)** - eine Datei je Sender, am PC erzeugt: in AWC Radio auf **Android-Packs…** klicken, einen
-  Ordner wählen und schreiben. Jedes enthält die Songs des Senders in der Originalqualität des Spiels (ca. 128 kbit/s, nicht
-  neu kodiert), sein Logo und die Programmdaten; etwa 4,7 GB für alle 34 Sender. In einen Ordner auf dem Handy kopieren und
+* **Packs** - eine Datei je Sender (`.radiopak`) und je Podcast (`.podpak`), am PC erzeugt: in AWC Radio auf **Android-Packs…** klicken, einen
+  Ordner wählen und schreiben. Ein Sender-Pack enthält die Songs des Senders in der Originalqualität des Spiels (ca. 128 kbit/s, nicht
+  neu kodiert), sein Logo und die Programmdaten; etwa 4,7 GB für alle 34 Sender. Ein Podcast-Pack enthält die Folgen und das Cover (zusammen 0,2 GB). Alle in denselben Ordner auf dem Handy kopieren und
   diesen in der App wählen. Neue oder geänderte Packs werden von selbst übernommen. Die Werbung
   steckt erst in Packs, die ab Version 2.6.0 geschrieben wurden.
 
@@ -111,7 +122,7 @@ Skript). `python android\test\run_robo.py <Pack-Ordner>` führt Bildschirme und 
 ```
 radio/
   awc_radio.py          Das Radio-Programm (Fenster, Programmplan, Wiedergabe)
-  awc_android.py        Schreibt je Sender ein Pack (.radiopak) für die Android-App, samt Dialog
+  awc_android.py        Schreibt die Packs für die Android-App (je Sender und je Podcast), samt Dialog
   android/              Die Android-App: Java-Quelltext, Ressourcen, build_apk.py, make_logo.py, Tests
   Start AWC-Radio.bat   Starter
   build_exe.bat         Baut dist\AWC-Radio.exe mit PyInstaller
