@@ -71,7 +71,7 @@ python radio/awc_radio.py        # das Radio
 
 ## 📱 Die AWC-Radio-App für Android
 
-Das Radio für die Hosentasche, fürs Auto und für den Nachttisch. **`AWC-Radio.apk`** (Version 1.11; die App läuft auf einem echten Android-Handy) spielt dasselbe
+Das Radio für die Hosentasche, fürs Auto und für den Nachttisch. **`AWC-Radio.apk`** (Version 1.11; eine frühere Version läuft auf einem echten Android-Handy) spielt dasselbe
 Live-Programm wie der PC: gleiche UTC-Uhr, gleiche Reihenfolge, gleiche Überblendungen – mit Sender-Packs derselben Version
 spielen Handy und PC zur selben Zeit denselben Song.
 
@@ -121,7 +121,7 @@ Stand **2026-11-25** (v2.8.0), gemessen an einer 28,5 GB großen `audio.rpf`.
 | Extractor nach Sendern | 28 Sender und 5 Podcasts mit Logo, 3.417 DJ-Zeilen | ✅ |
 | Podcasts | alle 5, die die Credits nennen, mit 20 Folgen (3 Std. 36 Min.), in der App und am PC | ✅ |
 | Score | 2.543 Stücke (rund 33 Std.); 974 ab 30 Sekunden (26,5 Std.) kommen in die App-Packs | ✅ |
-| Android-App | Version 1.11: Radio, Podcasts, Score, DJ, Werbung, Radiowecker, Android Auto; läuft auf einem echten Android-Handy | ✅ |
+| Android-App | Version 1.11: Radio, Podcasts, Score, DJ, Werbung, Radiowecker, Android Auto; eine frühere Version läuft auf einem echten Android-Handy | ✅ |
 | The Vault Radio | läuft als ein langer Mix; seine 24 gelisteten Songs sind keine Einzeldateien | 🎚 |
 
 ![AWC Radio – Fortschritt der Sender](radio/docs/radio-progress.svg)
@@ -138,7 +138,7 @@ Details zu jedem Sender: [Fortschritt des Radios](radio/docs/RADIO-PROGRESS.de.m
 - [ ] Die Produktnamen der Werbespots sind nicht bekannt
 - [x] AWC Radio am PC spielt die Podcasts
 - [x] Das Radio spricht die DJ-Intros und -Outros über die Songs (PC und App)
-- [x] Die Android-App läuft auf einem echten Handy
+- [x] Die Android-App läuft auf einem echten Handy (bestätigt für eine Version vor 1.11)
 - [ ] Neuere Funktionen der App (Score, DJ) sind am PC getestet (Robolectric), noch nicht auf dem Handy
 - [ ] Extractor: nur Opus; das RPF9-Inhaltsverzeichnis wird nicht gelesen, es gibt also keine Dateinamen
 
