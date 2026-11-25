@@ -27,6 +27,10 @@ public final class ProgramDump {
                                     out.printf(java.util.Locale.ROOT, "%s|%d|%s%d|%s|%s|%.6f|%.6f|%.6f|%.6f%n", s.name, a - 2,
                                             adverts ? "ads" : "no", fade, it.ad ? "ad" : it.jingle ? "jingle" : "song", it.track.key,
                                             it.start, it.end, it.fadeIn, it.fadeOut);
+                                    for (Schedule.Voice v : s.programme(adverts, fade).voices(it)) {
+                                        out.printf(java.util.Locale.ROOT, "%s|%d|%s%d|voice|%s|%.6f|%.6f%n", s.name, a - 2,
+                                                adverts ? "ads" : "no", fade, v.line.key, it.start, v.at);
+                                    }
                                 }
                             }
                         }

@@ -34,7 +34,7 @@ final class Logos {
             } catch (Exception ignored) {
             }
         }
-        if (b == null) b = initials(st.name, size);
+        if (b == null) b = st.score != null ? scoreCover(st.score, size) : initials(st.name, size);
         CACHE.put(key, b);
         return b;
     }
@@ -55,6 +55,28 @@ final class Logos {
         c = StationColor.of(pixels);
         COLORS.put(key, c);
         return c;
+    }
+
+    /** A group of the score: the bars of a level meter on an evening sky in the group's hue. */
+    private static Bitmap scoreCover(String group, int size) {
+        float hue = "openworld".equals(group) ? 165 : "mission".equals(group) ? 225 : "compound".equals(group) ? 12 : 285;
+        Bitmap bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(bmp);
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        p.setShader(new LinearGradient(0, 0, 0, size, StationColor.hsl(hue, 0.60f, 0.24f),
+                StationColor.hsl((hue + 35) % 360, 0.68f, 0.48f), Shader.TileMode.CLAMP));
+        c.drawRect(0, 0, size, size, p);
+        p.setShader(null);
+        p.setColor(Color.WHITE);
+        float[] bars = {0.22f, 0.44f, 0.64f, 0.36f, 0.52f, 0.28f};
+        float width = size * 0.07f, gap = size * 0.045f;
+        float x = (size - bars.length * width - (bars.length - 1) * gap) / 2f;
+        for (float h : bars) {
+            float half = size * h / 2f;
+            c.drawRoundRect(x, size / 2f - half, x + width, size / 2f + half, width / 2f, width / 2f, p);
+            x += width + gap;
+        }
+        return bmp;
     }
 
     private static Bitmap initials(String name, int size) {

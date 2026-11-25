@@ -39,7 +39,8 @@ import java.util.List;
  * calculated from the UTC clock exactly like on the PC (Schedule, played by Engine).
  *
  * A podcast is played by the same service, but on demand (Episodes): it pauses where it is, can be wound back and forth
- * and goes on with the next episode.
+ * and goes on with the next episode. A group of the game's score is played the same way, piece by piece, each from its
+ * start.
  */
 public class RadioService extends MediaBrowserService implements PackStore.Listener {
     static final String ACTION_PLAY = "org.awctool.radio.PLAY";
@@ -63,7 +64,7 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
     private static final String CHANNEL = "radio";
     private static final long PAUSE_TIMEOUT_MS = 30L * 60 * 1000;     // a pause that is forgotten ends the service
     private static final long SLEEP_FADE_MS = 8000;
-    static final String PREFS = "radio", PREF_LAST = "lastName", PREF_ADS = "ads";
+    static final String PREFS = "radio", PREF_LAST = "lastName", PREF_ADS = "ads", PREF_DJ = "dj";
     static final String PREF_FADE_ON = "xfade", PREF_FADE_SEC = "xfadeSec";      // crossfade between two songs
     static final int FADE_MAX = Schedule.FADE_MAX;
     private static final long WAKE_LOCK_MS = 30L * 60 * 1000;
@@ -99,6 +100,7 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
     /** A setting that shapes the programme changed (the switches in the player and on the settings page). */
     private final SharedPreferences.OnSharedPreferenceChangeListener settingsListener = (p, key) -> {
         if (PREF_ADS.equals(key) || PREF_FADE_ON.equals(key) || PREF_FADE_SEC.equals(key)) applyProgramme();
+        if (PREF_DJ.equals(key) && engine != null) engine.setDj(dj(this));
     };
 
     private final Runnable tickRun = new Runnable() {
@@ -286,6 +288,7 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
     // ------------------------------------------------------------------------------------------ browsing (Android Auto)
     private static final String ROOT = "awc_root", RECENT = "awc_recent", NOPACK = "awc_nopack", STATION_ID = "st:";
     private static final String PODCASTS = "awc_podcasts", PODCAST_ID = "pod:", EPISODE_ID = "ep:";
+    private static final String SCORE = "awc_score", SCORE_ID = "scg:", SCORE_SUB_ID = "scs:";
     // Android Auto / Automotive hints for how to draw the tree (the strings are part of the public media-app contract)
     private static final String STYLE_SUPPORTED = "android.media.browse.CONTENT_STYLE_SUPPORTED";
     private static final String STYLE_PLAYABLE = "android.media.browse.CONTENT_STYLE_PLAYABLE_HINT";
@@ -314,7 +317,7 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
         new Thread(() -> result.sendResult(children(parentId)), "awc-browse").start();
     }
 
-    /** What the car shows below an entry: stations and "Podcasts" at the top, then the podcasts and their episodes. */
+    /** What the car shows below an entry: stations, "Podcasts" and "Score" at the top, then what is inside them. */
     List<MediaBrowser.MediaItem> children(String parentId) {
         Context ctx = getApplicationContext();
         List<MediaBrowser.MediaItem> out = new ArrayList<>();
@@ -335,7 +338,34 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
                             .setTitle(getString(R.string.episode_n, i + 1)).setSubtitle(Ui.fmt(p.songs.get(i).sec))
                             .setIconBitmap(Logos.get(p, 192)).build(), MediaBrowser.MediaItem.FLAG_PLAYABLE));
                 }
-            } else if (list.isEmpty() && catalog.podcasts.isEmpty()) {
+            } else if (SCORE.equals(parentId)) {
+                for (Library.Station g : catalog.scores) {
+                    out.add(new MediaBrowser.MediaItem(new MediaDescription.Builder().setMediaId(SCORE_ID + g.name)
+                            .setTitle(Ui.nameOf(ctx, g))
+                            .setSubtitle(getResources().getQuantityString(R.plurals.pieces_count, g.songs.size(), g.songs.size()))
+                            .setIconBitmap(Logos.get(g, 192)).build(), MediaBrowser.MediaItem.FLAG_BROWSABLE));
+                }
+            } else if (parentId.startsWith(SCORE_ID)) {
+                Library.Station g = catalog.onDemand(parentId.substring(SCORE_ID.length()));
+                List<String> subs = new ArrayList<>();
+                for (int i = 0; g != null && i < g.songs.size(); i++) {
+                    String sub = g.songs.get(i).artist;
+                    if (subs.contains(sub)) continue;
+                    subs.add(sub);
+                    out.add(new MediaBrowser.MediaItem(new MediaDescription.Builder()
+                            .setMediaId(SCORE_SUB_ID + g.name + "#" + sub).setTitle(sub).build(), MediaBrowser.MediaItem.FLAG_BROWSABLE));
+                }
+            } else if (parentId.startsWith(SCORE_SUB_ID)) {
+                int hash = parentId.indexOf('#');
+                Library.Station g = hash < 0 ? null : catalog.onDemand(parentId.substring(SCORE_SUB_ID.length(), hash));
+                for (int i = 0; g != null && i < g.songs.size(); i++) {
+                    Schedule.Track t = g.songs.get(i);
+                    if (!t.artist.equals(parentId.substring(hash + 1))) continue;
+                    out.add(new MediaBrowser.MediaItem(new MediaDescription.Builder().setMediaId(EPISODE_ID + g.name + "#" + i)
+                            .setTitle(t.title).setSubtitle(Ui.fmt(t.sec))
+                            .setIconBitmap(Logos.get(g, 192)).build(), MediaBrowser.MediaItem.FLAG_PLAYABLE));
+                }
+            } else if (list.isEmpty() && catalog.podcasts.isEmpty() && catalog.scores.isEmpty()) {
                 out.add(new MediaBrowser.MediaItem(new MediaDescription.Builder().setMediaId(NOPACK)
                         .setTitle(getString(R.string.auto_no_pack)).build(), MediaBrowser.MediaItem.FLAG_PLAYABLE));
             } else {
@@ -353,6 +383,10 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
                 if (ROOT.equals(parentId) && !catalog.podcasts.isEmpty()) {
                     out.add(new MediaBrowser.MediaItem(new MediaDescription.Builder().setMediaId(PODCASTS)
                             .setTitle(getString(R.string.tab_podcasts)).build(), MediaBrowser.MediaItem.FLAG_BROWSABLE));
+                }
+                if (ROOT.equals(parentId) && !catalog.scores.isEmpty()) {
+                    out.add(new MediaBrowser.MediaItem(new MediaDescription.Builder().setMediaId(SCORE)
+                            .setTitle(getString(R.string.tab_score)).build(), MediaBrowser.MediaItem.FLAG_BROWSABLE));
                 }
             }
         } catch (RuntimeException e) {
@@ -429,12 +463,17 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
         if (session == null) return;
         List<MediaSession.QueueItem> q = new ArrayList<>();
         if (episodes != null) {
+            boolean score = isScore();
+            // a score group holds hundreds of pieces: the queue shows those of the current sub group
+            String sub = score && episodes.index() >= 0 ? station.songs.get(episodes.index()).artist : "";
             for (int i = 0; i < episodes.count(); i++) {
+                if (score && !station.songs.get(i).artist.equals(sub)) continue;
                 q.add(new MediaSession.QueueItem(new MediaDescription.Builder().setMediaId(EPISODE_ID + stationName + "#" + i)
-                        .setTitle(getString(R.string.episode_n, i + 1)).build(), i));
+                        .setTitle(score ? station.songs.get(i).title : getString(R.string.episode_n, i + 1)).build(), i));
             }
             session.setQueue(q);
-            session.setQueueTitle(stationName);
+            session.setQueueTitle(score ? sub : stationName);
+            queueSub = sub;
             return;
         }
         if (stations == null) return;
@@ -560,7 +599,15 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
 
     private Engine newEngine(Library.Station st) {
         final Pack p = st.pack;
-        return new Engine(st.programme(adverts(this), crossfade(this)), clock, track -> new PackPlayer(p, "t/" + track.key, AudioAttributes.USAGE_MEDIA));
+        Engine e = new Engine(st.programme(adverts(this), crossfade(this)), clock,
+                track -> new PackPlayer(p, "t/" + track.key, AudioAttributes.USAGE_MEDIA));
+        e.setDj(dj(this));
+        return e;
+    }
+
+    /** Whether the listener wants the DJ's intros and outros (off unless switched on). */
+    static boolean dj(Context c) {
+        return c.getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(PREF_DJ, false);
     }
 
     /** Whether the listener wants advert breaks (off unless switched on). */
@@ -593,9 +640,19 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
         }
     }
 
-    // ------------------------------------------------------------------------------------------ podcasts
+    // ------------------------------------------------------------------------------------------ podcasts and score
+    /** Something is played on demand: a podcast or the score. */
     boolean isPodcast() {
         return episodes != null;
+    }
+
+    boolean isScore() {
+        return episodes != null && station != null && station.score != null;
+    }
+
+    /** The name to show for what is on. */
+    String label() {
+        return station != null && station.score != null ? Ui.nameOf(this, station) : stationName;
     }
 
     int episodeIndex() {
@@ -611,22 +668,34 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
         return episodes == null ? 0 : episodes.duration();
     }
 
+    /** The pieces of the score are music: each starts at its beginning. */
+    private static final Episodes.Memory FROM_THE_START = new Episodes.Memory() {
+        @Override
+        public double position(String key) {
+            return 0;
+        }
+
+        @Override
+        public void remember(String key, double position, boolean heard) {
+        }
+    };
+    private String queueSub = "";
+
     private Episodes newEpisodes(Library.Station p) {
         final Pack pack = p.pack;
-        return new Episodes(p.songs, track -> new PackPlayer(pack, "t/" + track.key, AudioAttributes.USAGE_MEDIA), new Heard(this));
+        Episodes.Memory memory = p.score == null ? new Heard(this) : FROM_THE_START;
+        return new Episodes(p.songs, track -> new PackPlayer(pack, "t/" + track.key, AudioAttributes.USAGE_MEDIA), memory);
     }
 
-    /** Play an episode of a podcast, from where the listener left it. */
+    /** Play an episode of a podcast from where the listener left it, or a piece of the score. */
     void playEpisode(String name, int index) {
         ensureStarted();
-        List<Library.Station> list = PackStore.get(this).podcasts;
-        int at = Catalog.indexOf(list, name);
-        if (at < 0) {
-            AppLog.d("no pack for the podcast " + name);
+        Library.Station p = PackStore.get(this).onDemand(name);
+        if (p == null) {
+            AppLog.d("no pack for " + name);
             if (state == STOPPED) stopAll();
             return;
         }
-        Library.Station p = list.get(at);
         handler.removeCallbacks(tickRun);
         handler.removeCallbacks(pauseTimeout);
         if (engine != null) engine.stop();
@@ -662,11 +731,20 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
     }
 
     private void onEpisodeChanged() {
-        title = getString(R.string.episode_n, episodes.index() + 1);
-        artist = "";
-        nextText = episodes.index() + 1 < episodes.count() ? getString(R.string.episode_n, episodes.index() + 2) : "";
+        boolean more = episodes.index() + 1 < episodes.count();
+        if (isScore()) {
+            Schedule.Track t = station.songs.get(episodes.index());
+            title = t.title;
+            artist = t.artist;
+            nextText = !more ? "" : station.songs.get(episodes.index() + 1).title;
+            if (!t.artist.equals(queueSub)) publishQueue();
+        } else {
+            title = getString(R.string.episode_n, episodes.index() + 1);
+            artist = "";
+            nextText = more ? getString(R.string.episode_n, episodes.index() + 2) : "";
+            new Heard(this).setLast(stationName, episodes.index());
+        }
         episodeLoading = episodes.isLoading();
-        new Heard(this).setLast(stationName, episodes.index());
         acquireWakeLock();
         updateSession();
         updateNotification();
@@ -684,7 +762,7 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
         } else if (episodes.hasFailed()) {
             AppLog.d("podcast: episode cannot be played");
             pauseInternal();
-            title = getString(R.string.episode_error);
+            title = getString(isScore() ? R.string.piece_error : R.string.episode_error);
             updateSession();
             updateNotification();
             return;
@@ -718,15 +796,14 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
     @Override
     public void onStationsChanged() {
         if (state != STOPPED && episodes != null) {
-            List<Library.Station> list = PackStore.get(this).podcasts;
-            int at = Catalog.indexOf(list, stationName);
-            if (at < 0) {
+            Library.Station now = PackStore.get(this).onDemand(stationName);
+            if (now == null) {
                 AppLog.d("the pack of " + stationName + " is gone: stop");
                 stopAll();
-            } else if (list.get(at) != station) {                    // a new pack: go on at the same place
+            } else if (now != station) {                             // a new pack: go on at the same place
                 int episode = episodes.index();
                 episodes.release();
-                station = list.get(at);
+                station = now;
                 episodes = newEpisodes(station);
                 episodes.open(episode, state == PLAYING);
                 publishQueue();
@@ -758,6 +835,7 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
         }
         notifyChildrenChanged(ROOT);                                 // the car reads its station list again
         notifyChildrenChanged(PODCASTS);
+        notifyChildrenChanged(SCORE);
     }
 
     void toggle() {
@@ -947,23 +1025,26 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
 
     /** The media controls of a podcast: a position that can be dragged, back and forward, the episodes as queue. */
     private void updatePodcastSession(int ps) {
+        boolean score = isScore();
         long actions = PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PAUSE | PlaybackState.ACTION_PLAY_PAUSE
                 | PlaybackState.ACTION_SKIP_TO_NEXT | PlaybackState.ACTION_SKIP_TO_PREVIOUS | PlaybackState.ACTION_STOP
                 | PlaybackState.ACTION_PLAY_FROM_MEDIA_ID | PlaybackState.ACTION_PLAY_FROM_SEARCH
-                | PlaybackState.ACTION_SKIP_TO_QUEUE_ITEM | PlaybackState.ACTION_SEEK_TO | PlaybackState.ACTION_REWIND
-                | PlaybackState.ACTION_FAST_FORWARD;
+                | PlaybackState.ACTION_SKIP_TO_QUEUE_ITEM | PlaybackState.ACTION_SEEK_TO;
+        if (!score) actions |= PlaybackState.ACTION_REWIND | PlaybackState.ACTION_FAST_FORWARD;
         PlaybackState.Builder pb = new PlaybackState.Builder().setActions(actions)
                 .setState(ps, (long) (episodes.position() * 1000), ps == PlaybackState.STATE_PLAYING && !episodes.isLoading() ? 1f : 0f)
-                .setActiveQueueItemId(episodes.index())
-                .addCustomAction(jumpAction(-BACK_SECONDS, R.string.act_rewind, R.drawable.ic_rewind))
-                .addCustomAction(jumpAction(FORWARD_SECONDS, R.string.act_forward, R.drawable.ic_forward));
+                .setActiveQueueItemId(episodes.index());
+        if (!score) {
+            pb.addCustomAction(jumpAction(-BACK_SECONDS, R.string.act_rewind, R.drawable.ic_rewind))
+                    .addCustomAction(jumpAction(FORWARD_SECONDS, R.string.act_forward, R.drawable.ic_forward));
+        }
         session.setPlaybackState(pb.build());
         MediaMetadata.Builder md = new MediaMetadata.Builder()
                 .putString(MediaMetadata.METADATA_KEY_TITLE, title)
-                .putString(MediaMetadata.METADATA_KEY_ARTIST, stationName)
-                .putString(MediaMetadata.METADATA_KEY_ALBUM, stationName)
+                .putString(MediaMetadata.METADATA_KEY_ARTIST, score ? artist : stationName)
+                .putString(MediaMetadata.METADATA_KEY_ALBUM, label())
                 .putString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE, title)
-                .putString(MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE, stationName)
+                .putString(MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE, score ? artist + " • " + label() : stationName)
                 .putString(MediaMetadata.METADATA_KEY_MEDIA_ID, EPISODE_ID + stationName + "#" + episodes.index())
                 .putLong(MediaMetadata.METADATA_KEY_DURATION, (long) (episodes.duration() * 1000));
         Bitmap logo = logo();
@@ -1073,9 +1154,9 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
 
     private Notification buildNotification() {
         Notification.Builder b = Build.VERSION.SDK_INT >= 26 ? new Notification.Builder(this, CHANNEL) : new Notification.Builder(this);
-        String head = title.isEmpty() ? (stationName.isEmpty() ? getString(R.string.app_name) : stationName) : title;
-        String text = state == PAUSED ? getString(R.string.notif_paused, stationName)
-                : stationName + (artist.isEmpty() ? "" : " • " + artist);
+        String shown = label();
+        String head = title.isEmpty() ? (shown.isEmpty() ? getString(R.string.app_name) : shown) : title;
+        String text = state == PAUSED ? getString(R.string.notif_paused, shown) : shown + (artist.isEmpty() ? "" : " • " + artist);
         Intent open = new Intent(this, MainActivity.class).setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         b.setSmallIcon(R.drawable.ic_notify)
                 .setContentTitle(head)
@@ -1090,7 +1171,7 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
                 .setDeleteIntent(actionIntent(ACTION_STOP, 9));
         Bitmap logo = logo();
         if (logo != null) b.setLargeIcon(logo);
-        boolean pod = episodes != null;
+        boolean pod = episodes != null && !isScore();          // the score has the buttons of music: previous and next
         if (pod) b.addAction(jumpButton(R.drawable.ic_rewind, R.string.act_rewind, -BACK_SECONDS, 5));
         else b.addAction(action(R.drawable.ic_prev, R.string.act_prev, ACTION_PREV, 1));
         if (state == PAUSED) b.addAction(action(R.drawable.ic_play, pod ? R.string.act_resume : R.string.act_play, ACTION_TOGGLE, 2));

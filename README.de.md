@@ -48,6 +48,8 @@ python radio/awc_radio.py        # das Radio
 * Schreibt die originalen Opus-Pakete 1:1 in `.opus`-Dateien (keine Neukodierung); optional FLAC, WAV oder MP3.
 * Spielt jeden Stream direkt aus dem Archiv.
 * Zeigt das Archiv **nach Radiosendern**: Songs, DJ-Intros und -Outros, Werbespots, Jingles und Talk, mit Senderlogo – und die **Podcasts** in einer eigenen Gruppe.
+* Liest den **Score** des Spiels (die interaktive Musik): Stücke aus seinen Instrumentenspuren gemischt, gruppiert in offene
+  Welt, Missionen, Stützpunkte und Aktivitäten – zum Hören, Speichern und fürs Handy (braucht FFmpeg).
 * Benennt Streams aus der Spiel-Konfiguration, von der öffentlichen Credits-Seite oder aus eigenen Listen; Sender-Logos optional.
 * Oberfläche auf Deutsch und Englisch.
 
@@ -59,15 +61,17 @@ python radio/awc_radio.py        # das Radio
   **The Vault**, **Thrillbilly Mud Club**), samt Playlists aus der Audio-Konfiguration des Spiels gelesen.
 * Ein Live-Programm nach der UTC-Uhr: Jeder Sender läuft weiter, alle mit derselben Uhrzeit hören denselben Song.
 * Jingles, DJ-Ansagen und Überblendungen zwischen den Songs; lange DJ-Mixe zeigen den Titel des aktuellen Abschnitts.
+* **Der DJ**, wenn man ihn einschaltet: Ansagen über den Anfang und das Ende der Songs, in den Fenstern, die die Songdateien
+  dafür markieren (von Haus aus aus).
 * **Werbung wahlweise**: jeder Sender mit oder ohne Werbeblöcke (Standard: ohne).
-* **Podcasts**: die 5 Podcasts des Spiels mit ihren 20 Folgen, abspielbar in der Android-App.
+* **Podcasts**: die 5 Podcasts des Spiels mit ihren 20 Folgen, abspielbar in der Android-App und am PC.
 * Eine [**Android-App**](#-die-awc-radio-app-für-android) spielt dasselbe Programm auf dem Handy und im Auto – und weckt dich damit.
 
 ➡️ [**Radio-Anleitung**](radio/README.de.md)
 
 ## 📱 Die AWC-Radio-App für Android
 
-Das Radio für die Hosentasche, fürs Auto und für den Nachttisch. **`AWC-Radio.apk`** (Version 1.8) spielt dasselbe
+Das Radio für die Hosentasche, fürs Auto und für den Nachttisch. **`AWC-Radio.apk`** (Version 1.11; die App läuft auf einem echten Android-Handy) spielt dasselbe
 Live-Programm wie der PC: gleiche UTC-Uhr, gleiche Reihenfolge, gleiche Überblendungen – mit Sender-Packs derselben Version
 spielen Handy und PC zur selben Zeit denselben Song.
 
@@ -75,12 +79,14 @@ spielen Handy und PC zur selben Zeit denselben Song.
 |---|---|
 | 🎧 **Hören** | Senderlogos als Raster, ein kleiner und ein großer Player in der Farbe des Senders; Wischen über das Logo wechselt den Sender. Spielt im Hintergrund weiter, mit Medien-Benachrichtigung, Sperrbildschirm-, Kopfhörer- und Bluetooth-Tasten |
 | 🎙 **Podcasts** | Ein eigener Bereich neben dem Radio: Cover, Folgenliste, Player mit Positionsleiste, 15 Sekunden zurück und 30 vor; die Stelle in jeder Folge wird gemerkt, die nächste folgt von selbst |
+| 🗣 **DJ** | Ansagen über den Songs, in den Einstellungen einzuschalten; die Musik tritt zurück, solange der DJ spricht |
+| 🎼 **Score** | Ein eigener Reiter: offene Welt, Missionen, Stützpunkte und Aktivitäten, jeweils mit Untergruppen und Stücken |
 | ⏰ **Radiowecker** | Mehrere Wecker mit Wochentagen, Sender, Lautstärke, sanftem Start und Schlummern; ein Sonnenaufgang-Bildschirm über dem Sperrbildschirm. Ist das Radio nicht zu hören, klingelt der Weckton des Handys; Wecker bleiben nach einem Neustart erhalten |
 | 🚗 **Android Auto** | Die Sender als Raster mit ihren Logos, Song und Sender auf dem Player-Bildschirm, Sprachbefehle wie *„Spiele Radio On-U auf AWC Radio“* |
 | 😴 **Einschlaftimer** | Stoppt das Radio nach der gewählten Zeit |
-| 📢 **Werbung** | Schalter im Player und im Menü (App 1.9: auf der Einstellungsseite), von Haus aus aus; bei 18 Sendern |
-| ⚙️ **Einstellungen** *(App 1.9, im Quellcode, noch ohne Release)* | Eine Einstellungsseite: Überblenden ein/aus und 1–12 s (nur zwischen zwei Songs), Werbung, Pack-Ordner, Akku-Einstellungen, Info und Protokoll |
-| 📦 **Packs** | Eine Datei je Sender (`.radiopak`) und je Podcast (`.podpak`), alle in einem Ordner auf dem Handy: einzeln hinzufügen oder aktualisieren, ohne alles neu zu kopieren |
+| 📢 **Werbung** | Schalter im Player und auf der Einstellungsseite, von Haus aus aus; bei 18 Sendern |
+| ⚙️ **Einstellungen** | Eine Einstellungsseite: Überblenden ein/aus und 1–12 s (nur zwischen zwei Songs), Werbung, Pack-Ordner, Akku-Einstellungen, Info und Protokoll |
+| 📦 **Packs** | Eine Datei je Sender (`.radiopak`), je Podcast (`.podpak`) und je Score-Gruppe (`.scorepak`), alle in einem Ordner auf dem Handy: einzeln hinzufügen oder aktualisieren, ohne alles neu zu kopieren |
 | 🔒 **Offline** | Die App hat keine Internet-Berechtigung: Alles kommt aus den Packs auf dem Handy |
 | 🌍 **Sprachen** | Deutsch und Englisch |
 | 📋 **Voraussetzung** | Android 7.0 oder neuer |
@@ -88,8 +94,8 @@ spielen Handy und PC zur selben Zeit denselben Song.
 **Einrichten**
 
 1. `AWC-Radio.apk` installieren (aus dem [neuesten Release](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/latest) oder selbst gebaut aus [`radio/android/`](radio/README.de.md#awc-radio-für-android)). Benachrichtigungen erlauben: Der Wecker braucht sie.
-2. Am PC in AWC Radio auf **Android-Packs…** klicken, einen Ordner wählen und die Packs schreiben (Originalqualität, etwa 4,7 GB für alle 34 Sender und 0,2 GB für die Podcasts). Später werden nur neue oder geänderte Packs geschrieben.
-3. Die `.radiopak`- und `.podpak`-Dateien in denselben Ordner auf dem Handy kopieren, die App starten und diesen Ordner einmal wählen.
+2. Am PC in AWC Radio auf **Android-Packs…** klicken, einen Ordner wählen und die Packs schreiben (Originalqualität, etwa 4,8 GB für alle 34 Sender und 0,2 GB für die Podcasts). Später werden nur neue oder geänderte Packs geschrieben. Die Score-Packs (etwa 1,6 GB) werden dort angeboten, sobald der Score im AWC-Tool gelesen wurde (Knopf **Score …**), oder aus dessen Score-Fenster geschrieben.
+3. Die `.radiopak`-, `.podpak`- und `.scorepak`-Dateien in denselben Ordner auf dem Handy kopieren, die App starten und diesen Ordner einmal wählen.
 4. Für Android Auto: in den Einstellungen von Android Auto etwa zehnmal auf *Version* tippen, im Drei-Punkte-Menü die Entwicklereinstellungen öffnen und *Unbekannte Quellen* aktivieren.
 
 **Gut zu wissen**
@@ -101,40 +107,40 @@ spielen Handy und PC zur selben Zeit denselben Song.
 
 ## Fortschritt
 
-Stand **2026-11-25** (v2.7.0), gemessen an einer 28,5 GB großen `audio.rpf`.
+Stand **2026-11-25** (v2.8.0), gemessen an einer 28,5 GB großen `audio.rpf`.
 
 | Bereich | Stand | |
 |---|---|---|
-| Vom Scan gefundene Musik-Container | 2.968 mit 2.992 Streams (rund 96 Stunden), alle Opus und extrahierbar | ✅ |
+| Vom Scan gefundene Musik-Container | 3.008 mit 3.116 Streams (rund 101 Stunden), alle Opus und extrahierbar | ✅ |
 | Songs, die die Credits für die Musiksender nennen | **792 von 809** gefunden (97,9 %) | 🟢 |
 | Talk-Radio | alle 5 in den Credits genannten Sendungen, **15 Folgen** | ✅ |
 | Sender in AWC Radio | 34 (darunter 3 „(Mix)“-Sender, 4 Orte aus dem Spiel und „Clubmixes“) | ✅ |
 | Orte aus dem Spiel | Jack of Hearts (100 Min. DJ-Set), VYB (45 Min.), The Vault (Club, 84 Min.), Thrillbilly Mud Club (20 Songs) | ✅ |
 | Werbung | 239 Spots, wahlweise im Programm von 18 Sendern | ✅ |
+| DJ-Ansagen über den Songs | 714 Songs mit Intro, 687 mit Outro, 2.221 Ansagen auf 18 Sendern | ✅ |
 | Extractor nach Sendern | 28 Sender und 5 Podcasts mit Logo, 3.417 DJ-Zeilen | ✅ |
-| Podcasts | alle 5, die die Credits nennen, mit 20 Folgen (3 Std. 36 Min.), in der App abspielbar | ✅ |
-| Android-App | Version 1.8: Radio und Podcasts, Werbung wahlweise, Radiowecker, Android Auto | ✅ |
+| Podcasts | alle 5, die die Credits nennen, mit 20 Folgen (3 Std. 36 Min.), in der App und am PC | ✅ |
+| Score | 2.543 Stücke (rund 33 Std.); 974 ab 30 Sekunden (26,5 Std.) kommen in die App-Packs | ✅ |
+| Android-App | Version 1.11: Radio, Podcasts, Score, DJ, Werbung, Radiowecker, Android Auto; läuft auf einem echten Android-Handy | ✅ |
 | The Vault Radio | läuft als ein langer Mix; seine 24 gelisteten Songs sind keine Einzeldateien | 🎚 |
 
 ![AWC Radio – Fortschritt der Sender](radio/docs/radio-progress.svg)
 
 Details zu jedem Sender: [Fortschritt des Radios](radio/docs/RADIO-PROGRESS.de.md).
 
-### Im Quellcode, noch ohne Release
-
-* App 1.9 und das PC-Radio: Überblenden nur zwischen zwei Songs, abschaltbar und einstellbar; Einstellungsseite in der App.
-
 ### Noch offen
 
-- [ ] 17 gelistete Songs ohne Datei: die Club-DJ-Sets (Bodega The DJ, DJ Stevie J), zwei von Worldwide FM, einer von Radio On-U
-- [ ] Die 8 eigens geschriebenen Songs von „Honey FM – Liquid City“
+- [ ] 17 gelistete Songs ohne Datei: die Club-DJ-Sets (Bodega The DJ, DJ Stevie J), zwei von Worldwide FM, einer von Radio On-U.
+      Kein Stream des Archivs trägt ihre Namen (Musik, Sprache und Sound-Banken durchsucht)
+- [ ] Die 8 eigens geschriebenen Songs von „Honey FM – Liquid City“ (ebenfalls nicht gefunden)
 - [ ] Die Titel der Podcast-Folgen sind nicht bekannt (sie sind nummeriert)
-- [ ] AWC Radio am PC spielt die Podcasts noch nicht
-- [ ] Ein 61 Minuten langer Club-Mix steht in keiner Titelliste der Konfiguration; er bleibt in „Clubmixes“
+- [ ] Ein 61 Minuten langer Club-Mix bleibt in „Clubmixes“: Keine Titelliste und kein Ort der Konfiguration spielt ihn
 - [ ] Die Produktnamen der Werbespots sind nicht bekannt
-- [ ] Das Radio spricht die DJ-Intros und -Outros noch nicht über die Songs
-- [ ] App 1.8 ist am PC getestet (Robolectric), auf echten Handys noch wenig
-- [ ] Extractor: nur Opus (Musik und die DJ-Sprache des Radios); das RPF9-Inhaltsverzeichnis wird nicht gelesen, es gibt also keine Dateinamen
+- [x] AWC Radio am PC spielt die Podcasts
+- [x] Das Radio spricht die DJ-Intros und -Outros über die Songs (PC und App)
+- [x] Die Android-App läuft auf einem echten Handy
+- [ ] Neuere Funktionen der App (Score, DJ) sind am PC getestet (Robolectric), noch nicht auf dem Handy
+- [ ] Extractor: nur Opus; das RPF9-Inhaltsverzeichnis wird nicht gelesen, es gibt also keine Dateinamen
 
 ### Meilensteine
 
@@ -154,6 +160,7 @@ Details zu jedem Sender: [Fortschritt des Radios](radio/docs/RADIO-PROGRESS.de.m
 | [v2.5.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.5.0) | 2026-11-25 | 📻 Ein Pack je Sender, App 1.5 mit Radiowecker und neuem Design, Sender für Orte aus dem Spiel |
 | [v2.6.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.6.0) | 2026-11-25 | 📻 Werbung wahlweise (App 1.6) · 🎛 Ansicht nach Radiosendern mit DJ-Intros, Outros und Werbung |
 | [v2.7.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.7.0) | 2026-11-25 | 🎙 Podcasts in App (1.8, eigener Bereich, `.podpak`) und Extractor |
+| [v2.8.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.8.0) | 2026-11-25 | 🎼 Der Score des Spiels (AWC-Tool und App 1.11, `.scorepak`) · 📻 DJ-Ansagen, Podcasts am PC, Überblend-Einstellung · 🎛 40 weitere Musik-Container |
 
 ## Aufbau des Repositorys
 

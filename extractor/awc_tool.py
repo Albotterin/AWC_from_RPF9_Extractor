@@ -1,11 +1,12 @@
 """AWC Tool - find, play and extract RAGE AWC music streams.
 
 Finds music streams in standalone AWC files and (via header scan for 'ADAT') inside RPF archives.
+The score of the game (its interactive music) has a window of its own, see awc_score_ui.
 A whole folder can be searched recursively for *.rpf and *.awc files.
 The user interface language can be switched at runtime (English / Deutsch).
 
 Requires Python 3 (tkinter) and ffmpeg/ffplay in the PATH (or next to the program).
-Run:  python awc_tool.py [--lang=en|de] [folder | file.awc | file.rpf ...]
+Run:  python awc_tool.py [--lang=en|de] [--score] [folder | file.awc | file.rpf ...]   (--score: open the score window)
 """
 import bisect
 import collections
@@ -294,6 +295,8 @@ class App(tk.Tk):
         self._reg(ttk.Checkbutton(top, variable=self.use_cache), "text", "chk_cache").pack(side="left", padx=12)
         self.btn_scan_cancel = self._reg(ttk.Button(top, command=self.cancel, state="disabled"), "text", "btn_scan_cancel")
         self.btn_scan_cancel.pack(side="left")
+        ttk.Separator(top, orient="vertical").pack(side="left", fill="y", padx=10)
+        self._reg(ttk.Button(top, command=self.open_score), "text", "btn_score").pack(side="left")
         # language switch (right side)
         self.lang_box = ttk.Combobox(top, values=list(LANGUAGES.values()), state="readonly", width=10)
         self.lang_box.current(list(LANGUAGES).index(awc_i18n.get_lang()))
@@ -402,6 +405,10 @@ class App(tk.Tk):
         self.bar.pack(fill="x")
         self.status = ttk.Label(bot, text="")
         self.status.pack(anchor="w", pady=(2, 0))
+
+    def open_score(self):
+        import awc_score_ui  # noqa: PLC0415
+        awc_score_ui.open_window(self)
 
     # ----------------------------------------------------------------- scanning
     def pick_folder(self):
@@ -1684,6 +1691,9 @@ class App(tk.Tk):
 
     def _close(self):
         self.cancel_flag = True
+        win = getattr(self, "score_window", None)
+        if win is not None and win.winfo_exists():
+            win.close()
         self._kill()
         shutil.rmtree(self.cache_dir, ignore_errors=True)
         self.destroy()
@@ -1711,9 +1721,11 @@ def selftest(out_path, awc_path):
 
 def main():
     awc_i18n.load_saved_lang()
-    args = []
+    args, score = [], False
     for a in sys.argv[1:]:
-        if a.startswith("--lang="):
+        if a == "--score":
+            score = True
+        elif a.startswith("--lang="):
             awc_i18n.set_lang(a.split("=", 1)[1])
         else:
             args.append(a)
@@ -1721,6 +1733,8 @@ def main():
         selftest(args[1], args[2])
         return
     app = App([a for a in args if os.path.exists(a)])
+    if score:
+        app.after(400, app.open_score)
     app.mainloop()
 
 

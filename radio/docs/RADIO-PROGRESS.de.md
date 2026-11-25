@@ -78,7 +78,7 @@ Was die Audio-Konfiguration diese Orte spielen lässt. Die Aufnahmen stehen nich
 
 ## Podcasts
 
-Die fünf Podcasts der Credits-Liste, alle gefunden: 20 Folgen, zusammen 3 Std. 36 Min. Sie laufen auf Abruf in der Android-App und sind in den Zahlen zu den Sendern nicht mitgezählt.
+Die fünf Podcasts der Credits-Liste, alle gefunden: 20 Folgen, zusammen 3 Std. 36 Min. Sie laufen auf Abruf in der Android-App und im PC-Radio und sind in den Zahlen zu den Sendern nicht mitgezählt.
 
 | Podcast | Folgen | Längen in Reihenfolge | Gesamt |
 |---|---:|---|---:|

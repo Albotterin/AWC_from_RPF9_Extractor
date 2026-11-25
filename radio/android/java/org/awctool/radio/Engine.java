@@ -10,8 +10,10 @@ import java.util.List;
  *
  * Every tick it looks at the programme (Schedule) for "now": items that are about to start are opened ahead of time
  * (PRELOAD), started when their time comes at the position the station has reached by then, and faded in and out with an
- * equal-power crossfade where the programme overlaps two songs (else one follows the other). A player that fails is opened again a few times; a clock jump or a dropped audio focus is
- * handled with resync().
+ * equal-power crossfade where the programme overlaps two songs (else one follows the other). A player that fails is opened
+ * again a few times; a clock jump or a dropped audio focus is handled with resync().
+ *
+ * With the DJ switched on (setDj) a second player says his lines over a song (Schedule.voices) while the song steps back.
  */
 final class Engine {
     interface Clock {
@@ -41,6 +43,20 @@ final class Engine {
     static final double START_COMPENSATION = 0.08;  // start() needs a moment, start that much early
     static final int MAX_TRIES = 3;
     static final double TAIL = 0.25;              // an item that is not faded out may end this much after its time
+    static final float DUCK = 0.25f;              // how loud the music stays while the DJ talks (awc_dj.py: the same)
+    static final double RAMP = 0.35;              // seconds the music takes to step back and forward again
+    static final double VOICE_PRELOAD = 10.0;     // open a line this many seconds before it is said
+
+    /** One line of the DJ over an item. */
+    private static final class Line {
+        final Schedule.Voice voice;
+        Player player;
+        boolean started, over;
+
+        Line(Schedule.Voice voice) {
+            this.voice = voice;
+        }
+    }
 
     private static final class Slot {
         final Schedule.Item item;
@@ -48,6 +64,7 @@ final class Engine {
         boolean started, dead;
         int tries = 1;
         double retryAt;
+        List<Line> lines;                         // what the DJ says over it; null: not looked up
 
         Slot(Schedule.Item item) {
             this.item = item;
@@ -62,6 +79,7 @@ final class Engine {
     private Schedule.Item current;
     private boolean changed;
     private int failures;
+    private boolean dj;
 
     Engine(Schedule schedule, Clock clock, Factory factory) {
         this.schedule = schedule;
@@ -71,6 +89,12 @@ final class Engine {
 
     void setDuck(float d) {
         duck = d;
+    }
+
+    /** The DJ's intros and outros on or off, at any time. */
+    void setDj(boolean on) {
+        dj = on;
+        if (!on) for (Slot s : slots) silence(s);
     }
 
     /** The programme this engine plays. */
@@ -100,6 +124,13 @@ final class Engine {
 
     int failures() {
         return failures;
+    }
+
+    /** Number of the DJ's players that exist right now (for tests and diagnostics). */
+    int openLines() {
+        int n = 0;
+        for (Slot s : slots) if (s.lines != null) for (Line l : s.lines) if (l.player != null) n++;
+        return n;
     }
 
     /** Number of players that exist right now (for tests and diagnostics). */
@@ -133,8 +164,85 @@ final class Engine {
         return null;
     }
 
+    private static void release(Line l) {
+        l.over = true;
+        if (l.player != null) {
+            try {
+                l.player.release();
+            } catch (RuntimeException ignored) {
+            }
+            l.player = null;
+        }
+    }
+
+    private static void silence(Slot s) {
+        if (s.lines != null) for (Line l : s.lines) release(l);
+        s.lines = null;
+    }
+
+    /** Starts and ends the DJ's lines over an item; true while the volume is on the move. */
+    private boolean talk(Slot s, double now) {
+        if (!dj) return false;
+        if (s.lines == null) {
+            s.lines = new ArrayList<>();
+            for (Schedule.Voice v : schedule.voices(s.item)) s.lines.add(new Line(v));
+        }
+        boolean busy = false;
+        for (Line l : s.lines) {
+            double from = s.item.start + l.voice.at, to = from + l.voice.line.sec;
+            if (l.over || now < from - VOICE_PRELOAD) continue;
+            if (!l.started && now > to - 1.0) {                       // too late to say it (tuned in just now)
+                release(l);
+                continue;
+            }
+            if (now > from - RAMP - 0.3 && now < to + RAMP + 0.3) busy = true;
+            if (l.player == null) {
+                try {
+                    l.player = factory.open(l.voice.line);
+                } catch (RuntimeException e) {
+                    l.player = null;
+                }
+                if (l.player == null) {
+                    release(l);
+                    continue;
+                }
+            }
+            if (l.player.isFailed()) {
+                failures++;
+                release(l);
+            } else if (!l.started) {
+                if (l.player.isPrepared() && s.started && now + START_COMPENSATION >= from) {
+                    l.player.startAt(Math.max(0.0, now + START_COMPENSATION - from), duck);
+                    l.started = true;
+                }
+            } else if (l.player.isFinished() || now > to + 0.5) {
+                l.player.release();                                   // said: the music may still be stepping forward
+                l.player = null;
+                l.over = true;
+            } else {
+                l.player.setVolume(duck);
+            }
+        }
+        return busy;
+    }
+
+    /** How loud the music of an item is at `now` because of the DJ: 1, or less while he talks over it. */
+    private static float behindDj(Slot s, double now) {
+        if (s.lines == null) return 1f;
+        double most = 0;
+        for (Line l : s.lines) {
+            if (!l.started && (l.over || l.player == null || !l.player.isPrepared())) continue;    // nothing to hear
+            double from = s.item.start + l.voice.at, to = from + l.voice.line.sec;
+            double in = Math.min(1, Math.max(0, (now - (from - RAMP)) / RAMP));
+            double out = Math.min(1, Math.max(0, (to + RAMP - now) / RAMP));
+            most = Math.max(most, in * out);
+        }
+        return (float) (1 - (1 - DUCK) * most);
+    }
+
     private void kill(Slot s) {
         s.dead = true;
+        silence(s);
         if (s.player != null) {
             try {
                 s.player.release();
@@ -226,15 +334,16 @@ final class Engine {
                 s.retryAt = now + 1.0;
                 continue;
             }
+            if (talk(s, now)) busy = true;
             if (!s.started) {
                 if (now + 2.0 >= it.start) busy = true;
                 // start() needs a moment: a little early, so that one item follows the other without a gap
                 if (p.isPrepared() && now + START_COMPENSATION >= it.start) {
-                    p.startAt(Math.max(0.0, now + START_COMPENSATION - it.start), volume(it, now, duck));
+                    p.startAt(Math.max(0.0, now + START_COMPENSATION - it.start), volume(it, now, duck) * behindDj(s, now));
                     s.started = true;
                 }
             } else {
-                p.setVolume(volume(it, now, duck));
+                p.setVolume(volume(it, now, duck) * behindDj(s, now));
                 if (now - it.start < it.fadeIn + 0.2 || now > it.end - it.fadeOut - 0.2) busy = true;
             }
             if (s.started && (cur == null || it.start > cur.item.start)) cur = s;

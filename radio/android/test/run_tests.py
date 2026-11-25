@@ -43,6 +43,24 @@ def write_pack(a, path, name, created, title, talk=False):
     writer.finish({"v": 1, "created": created, "sig": name + created, "stations": [entry]})
 
 
+def make_score_folder(a, root):
+    """Two score packs (and an older one of the same group) as awc_android writes them, with stand-in audio."""
+    folder = os.path.join(root, "score")
+    os.makedirs(folder)
+    piece = lambda i, sub, title: {"id": i, "group": "x", "sub": sub, "title": title, "sec": 40.0, "parts": []}
+    for name, group, created, pieces in (
+            ("score_missions.scorepak", "mission", "2026-02-01T00:00:00Z", [piece("m1", "ROB Bank", "new piece"), piece("m2", "ROB Boat", "b")]),
+            ("score_old_missions.scorepak", "mission", "2026-01-01T00:00:00Z", [piece("m0", "ROB Bank", "old piece")]),
+            ("score_open_world.scorepak", "openworld", "2026-01-01T00:00:00Z", [piece("o1", "Events", "a")])):
+        entry = a.station_entry("Score: " + group, {"score": group, "pieces": pieces}, False)
+        writer = a.PackWriter(os.path.join(folder, name))
+        for item in entry["pieces"]:
+            writer.add_bytes("t/" + item["k"], b"OggS" + item["k"].encode())
+        writer.finish({"v": 1, "created": created, "sig": name, "stations": [], "scores": [entry]})
+        assert a.read_signature(os.path.join(folder, name)) == name
+    return folder
+
+
 def make_folders():
     find_python_modules()
     import awc_android as a
@@ -67,7 +85,7 @@ def make_folders():
     write_pack(a, p(two, "alpha.radiopak"), "Alpha", "2026-03-01T00:00:00Z", "updated song")
     shutil.copyfile(p(one, "charlie_talk.radiopak"), p(two, "charlie_talk.radiopak"))
     write_pack(a, p(two, "delta.radiopak"), "Delta", new, "delta")
-    return one, two
+    return one, two, make_score_folder(a, root)
 
 
 def main():
@@ -96,7 +114,8 @@ def main():
     r = subprocess.run(["java", "-cp", cp, "org.awctool.radio.AlarmTest"])
     if r.returncode:
         sys.exit(r.returncode)
-    runs = [["synthetic"] + list(make_folders())] + [["real", d] for d in sys.argv[1:]]
+    one, two, score = make_folders()
+    runs = [["synthetic", one, two], ["score", score]] + [["real", d] for d in sys.argv[1:]]
     for args in runs:
         r = subprocess.run(["java", "-cp", cp, "org.awctool.radio.CatalogTest"] + args)
         if r.returncode:
@@ -142,17 +161,25 @@ def compare_programmes(cp, folder):
         talk = st.get("kind") == "talk"
         station = {"songs": [track(x) for x in st["songs"]], "jingles": [track(x) for x in st["jingles"]],
                    "ads": [track(x) for x in st.get("ads", [])]}
+        spoken = {x["k"]: [int(x["k"].split("_")[0]), int(x["k"].split("_")[1]), x["s"]] for x in st.get("voices", [])}
+        for entry, own in zip(st["songs"], station["songs"]):
+            if "dj" in entry:
+                own["dj"] = {w: [v[0], v[1], [spoken[k] for k in v[2]]] for w, v in entry["dj"].items()}
+        station["toads"] = [spoken[k] for k in st.get("toads", [])]
         programmes = [("%s%d" % (tag, fade), radio.Schedule(st["name"], station, tag == "ads", fade))
                       for tag in ("no", "ads") for fade in (0, 3, 8)]
         for i, now in enumerate(moments):
             for tag, schedule in programmes:
                 for start, end, kind, tr, fin, fout in schedule.items_from(now, 40):
                     want.append("%s|%d|%s|%s|%s|%.6f|%.6f|%.6f|%.6f" % (st["name"], i, tag, kind, radio._tkey(tr), start, end, fin, fout))
+                    for at, line in schedule.voices((start, end, kind, tr, fin, fout)):
+                        want.append("%s|%d|%s|voice|%s_%s|%.6f|%.6f" % (st["name"], i, tag, line[0], line[1], start, at))
     with open(out, encoding="utf-8") as f:
         got = f.read().splitlines()
     got.sort()
     want.sort()
     ads = sum(1 for x in want if "|ad|" in x)
+    said = sum(1 for x in want if "|voice|" in x)
     bad = [(a, b) for a, b in zip(got, want) if a != b]
     if len(got) != len(want) or bad:
         print("programme differs: %d lines from the app, %d from the PC; first: %s" % (len(got), len(want), bad[:3]))
@@ -161,7 +188,8 @@ def compare_programmes(cp, folder):
     if leaked or not ads:
         print("adverts: %d in the advert programme, %d in the advert-free one" % (ads, leaked))
         sys.exit(1)
-    print("Programme: app and PC identical (%d items compared, %d of them adverts, none in the advert-free programme)" % (len(want), ads))
+    print("Programme: app and PC identical (%d lines compared: %d adverts, %d DJ lines, no advert in the advert-free programme)"
+          % (len(want), ads, said))
 
 
 if __name__ == "__main__":

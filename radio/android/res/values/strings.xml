@@ -4,10 +4,10 @@
 
     <string name="choose_folder">Choose folder …</string>
     <string name="setup_title">Welcome</string>
-    <string name="setup_hint">Copy your station packs (.radiopak, and .podpak for the podcasts) into a folder on this phone, for example “AWC-Radio”, and choose that folder. Packs you add later appear by themselves. AWC Radio on your PC writes them (button “Android packs …”).</string>
+    <string name="setup_hint">Copy your station packs (.radiopak, .podpak for the podcasts, .scorepak for the score) into a folder on this phone, for example “AWC-Radio”, and choose that folder. Packs you add later appear by themselves. AWC Radio on your PC writes them (button “Android packs …”).</string>
     <string name="folder_error">The folder could not be read: %1$s</string>
     <string name="folder_empty_title">No stations yet</string>
-    <string name="folder_empty">There is no readable pack (.radiopak, .podpak) in the folder “%1$s”. Copy packs into it and reload, or choose another folder.</string>
+    <string name="folder_empty">There is no readable pack (.radiopak, .podpak, .scorepak) in the folder “%1$s”. Copy packs into it and reload, or choose another folder.</string>
     <string name="loading">Loading …</string>
     <string name="up_next">Up next: %1$s</string>
     <string name="jingle">Jingle</string>
@@ -155,4 +155,30 @@
     <string name="settings_no_folder">not chosen</string>
     <string name="settings_more">Phone and app</string>
     <string name="settings_version">AWC Radio %1$s</string>
+    <string name="tab_score">Score</string>
+    <string name="score_openworld">Open world</string>
+    <string name="score_mission">Missions</string>
+    <string name="score_compound">Compounds</string>
+    <string name="score_activity">Activities</string>
+    <string name="score_playing">Playing: %1$s</string>
+    <string name="score_play_all">Play all</string>
+    <string name="score_all_pieces">All pieces</string>
+    <string name="score_names">The names are the working names from the game files and may give away the story.</string>
+    <string name="piece_error">This piece cannot be played</string>
+    <string name="info_score">Score pieces: %1$d</string>
+    <string name="score_empty_title">No score yet</string>
+    <string name="score_empty">Read the score in AWC Tool on your PC (button “Score …”), write the app packs there and copy the .scorepak files into your pack folder.</string>
+    <string name="act_prev_piece">Previous piece</string>
+    <string name="act_next_piece">Next piece</string>
+    <string name="act_seek_piece">Position in the piece</string>
+    <plurals name="pieces_count">
+        <item quantity="one">%1$d piece</item>
+        <item quantity="other">%1$d pieces</item>
+    </plurals>
+    <plurals name="score_summary">
+        <item quantity="one">%1$d piece · %2$d min</item>
+        <item quantity="other">%1$d pieces · %2$d min</item>
+    </plurals>
+    <string name="dj_switch">DJ</string>
+    <string name="dj_what">Intros and outros over the songs</string>
 </resources>

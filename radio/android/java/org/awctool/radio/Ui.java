@@ -378,6 +378,14 @@ final class Ui {
         return String.format(Locale.getDefault(), "%02d:%02d", hour, minute);
     }
 
+    /** The name of a station or podcast; a group of the score has a translated one. */
+    static String nameOf(Context c, Library.Station st) {
+        if (st == null) return "";
+        if (st.score == null) return st.name;
+        return c.getString("openworld".equals(st.score) ? R.string.score_openworld : "mission".equals(st.score) ? R.string.score_mission
+                : "compound".equals(st.score) ? R.string.score_compound : R.string.score_activity);
+    }
+
     static String fmt(double sec) {
         int s = (int) Math.max(0, sec);
         return (s / 60) + ":" + (s % 60 < 10 ? "0" : "") + (s % 60);

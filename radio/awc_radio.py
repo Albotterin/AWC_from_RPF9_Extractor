@@ -8,10 +8,12 @@ background: switching away and back, or a second person with the same clock, lan
 It uses the same scan cache as awc_tool.py and needs ffplay (next to the program or in PATH).
 """
 import bisect
+import hashlib
 import json
 import os
 import queue
 import re
+import struct
 import subprocess
 import sys
 import threading
@@ -25,6 +27,7 @@ sys.path[:0] = [HERE, os.path.join(os.path.dirname(HERE), "extractor")]   # the 
 import awc_config as gamecfg  # noqa: E402
 import awc_core as core  # noqa: E402
 import awc_credits as credits  # noqa: E402
+import awc_dj  # noqa: E402
 import awc_gamedata as gamedata  # noqa: E402
 import awc_i18n  # noqa: E402
 import awc_icons as icons  # noqa: E402
@@ -33,7 +36,7 @@ NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 SONG_MIN, SONG_MAX = 60.0, 1500.0          # seconds: shorter is not a song, longer is a mix
 JINGLE_MIN, JINGLE_MAX = 2.0, 25.0         # unnamed short streams of a station are used as jingles
 MIN_SONGS = 5                              # a station needs at least this many songs to be listed
-INDEX_VERSION = 8
+INDEX_VERSION = 9
 
 BG, PANEL, CARD, CARD_SEL, FG, DIM, ACCENT = "#14161c", "#1c1f27", "#232733", "#2f3550", "#eceef4", "#8b91a3", "#ff5a36"
 
@@ -50,11 +53,15 @@ STR = {
         "err_ffplay": "ffplay was not found. Put ffplay.exe next to the program or into your PATH.",
         "err_credits": "The credits page could not be downloaded:\n{e}\n\nPick the page saved from your browser instead?",
         "err_html": "HTML page", "err_generic": "Something went wrong:\n{e}", "err_nostations": "No station with songs was found.",
-        "kind_song": "SONG", "kind_jingle": "JINGLE", "kind_ad": "ADVERT", "advert": "Advert", "chk_ads": "Adverts",
+        "kind_song": "SONG", "kind_jingle": "JINGLE", "kind_ad": "ADVERT", "advert": "Advert", "chk_ads": "Adverts", "chk_dj": "DJ",
+        "dj_needs_ffmpeg": "The DJ needs FFmpeg (ffmpeg.exe) next to the program or in your PATH.",
         "lbl_fade": "Crossfade", "fade_off": "Off", "fade_s": "{n} s",
         "st_fade_note": "The programme now differs from devices with another crossfade setting (standard: 3 s).", "btn_play": "▶ Play (live)", "btn_pause": "⏸ Pause",
         "sync_hint": "Live: the stations run by the UTC clock, everyone with the same time hears the same song.", "lbl_volume": "Volume", "n_songs": "{n} songs", "n_shows": "{n} shows", "kind_show": "SHOW", "st_loading": "Loading …",
         "lbl_next": "Up next:", "tune": "Tune in to a station on the left", "no_logo_hint": "",
+        "pod_header": "Podcasts", "pod_episode": "Episode {n}", "pod_summary": "{n} episodes · {m} min", "pod_heard": "heard",
+        "pod_resume": "continue at {t}", "pod_back": "−{n} s", "pod_forward": "+{n} s", "pod_error": "cannot be played",
+        "pod_count": "{n} episodes",
     },
     "de": {
         "title": "AWC Radio", "setup_title": "Spieldateien wählen",
@@ -68,11 +75,15 @@ STR = {
         "err_ffplay": "ffplay wurde nicht gefunden. ffplay.exe neben das Programm legen oder in den PATH aufnehmen.",
         "err_credits": "Die Credits-Seite konnte nicht geladen werden:\n{e}\n\nStattdessen die im Browser gespeicherte Seite wählen?",
         "err_html": "HTML-Seite", "err_generic": "Es ist ein Fehler aufgetreten:\n{e}", "err_nostations": "Es wurde kein Sender mit Songs gefunden.",
-        "kind_song": "SONG", "kind_jingle": "JINGLE", "kind_ad": "WERBUNG", "advert": "Werbung", "chk_ads": "Werbung",
+        "kind_song": "SONG", "kind_jingle": "JINGLE", "kind_ad": "WERBUNG", "advert": "Werbung", "chk_ads": "Werbung", "chk_dj": "DJ",
+        "dj_needs_ffmpeg": "Für den DJ wird FFmpeg (ffmpeg.exe) neben dem Programm oder im PATH gebraucht.",
         "lbl_fade": "Überblenden", "fade_off": "Aus", "fade_s": "{n} s",
         "st_fade_note": "Das Programm weicht jetzt von Geräten mit anderer Überblendung ab (Standard: 3 s).", "btn_play": "▶ Abspielen (live)", "btn_pause": "⏸ Pause",
         "sync_hint": "Live: Die Sender laufen nach der UTC-Uhrzeit, alle mit derselben Zeit hören denselben Song.", "lbl_volume": "Lautstärke", "n_songs": "{n} Songs", "n_shows": "{n} Sendungen", "kind_show": "SENDUNG", "st_loading": "Lade …",
         "lbl_next": "Als Nächstes:", "tune": "Links einen Sender wählen", "no_logo_hint": "",
+        "pod_header": "Podcasts", "pod_episode": "Folge {n}", "pod_summary": "{n} Folgen · {m} Min.", "pod_heard": "gehört",
+        "pod_resume": "weiter bei {t}", "pod_back": "−{n} s", "pod_forward": "+{n} s", "pod_error": "lässt sich nicht abspielen",
+        "pod_count": "{n} Folgen",
     },
 }
 
@@ -422,6 +433,10 @@ def make_index(rpf, pool, get_songs, status=None, progress=None):
         st["jingles"] = [j for j in st["jingles"] if (j["base"], j["idx"]) not in adverts]
     stations = dict(sorted(stations.items(), key=lambda kv: sort_key(kv[0])))
     try:
+        spoken = awc_dj.collect(rpf, items, stations)            # the DJ's windows and lines of every song
+    except (OSError, ValueError, struct.error):
+        spoken = {}
+    try:
         podcasts = gamedata.build_podcasts(items, gamedata.read_podcasts(rpf))     # for the app: played on demand
     except (OSError, ValueError):
         podcasts = {}
@@ -431,6 +446,10 @@ def make_index(rpf, pool, get_songs, status=None, progress=None):
             for base, _idx in tr_.get("parts") or [(tr_["base"], tr_["idx"])]:
                 used[base] = None
     by_base = {it["base"]: it for it in items}
+    by_base.update(spoken)                                      # the speech containers of the DJ lines
+    for st in stations.values():
+        for line in [x for s in st["songs"] for w in s.get("dj", {}).values() for x in w[2]] + st.get("toads", []):
+            used[line[0]] = None
     idx = {"fp": fingerprint(rpf, pool), "stations": stations, "podcasts": podcasts,
            "items": {str(b): by_base[b] for b in used}}
     with open(index_path(), "w", encoding="utf-8") as f:
@@ -466,6 +485,7 @@ FADE_MAX = 12
 LEAD = 0.4                                 # ffplay needs about this long to start; its start position is moved on by it
 TAIL = 0.3                                 # an item that is not faded out may play this much longer than scheduled
 AD_AFTER = (540, 361)                      # with adverts: a break after 9 to 15 minutes of programme (540 + 0..360 s)
+DJ_INTRO, DJ_OUTRO, DJ_BEFORE_ADS = 50, 35, 70      # per cent: how often the DJ talks over an intro, an outro, into a break
 
 
 def segment_at(tr_, pos):
@@ -505,6 +525,8 @@ class Schedule:
     while the previous one fades out. Jingles, adverts and talk shows are never faded: they follow back to back. The
     overlap is part of the timetable, so listeners hear the same only with the same crossfade (standard: FADE).
 
+    With the DJ switched on, voices() says what the DJ says over an item; that changes nothing in the timetable.
+
     Every station has a second programme with adverts (ads=True, for stations that have an advert list): after 9 to 15
     minutes of songs comes a break of two or three adverts, then a jingle. Without adverts the programme is the same as
     for a station that has none."""
@@ -516,6 +538,7 @@ class Schedule:
         self.songs = sorted(station["songs"], key=_tkey)
         self.jingles = sorted(station["jingles"], key=_tkey)
         self.ads = sorted(station.get("ads", []), key=_tkey) if ads else []
+        self.toads = station.get("toads", [])                          # the DJ's lines into an advert break
         self.days = {}
 
     def _day(self, d):
@@ -581,6 +604,36 @@ class Schedule:
         self.days[d] = (starts, entries)
         return self.days[d]
 
+    def voices(self, item):
+        """What the DJ says over an item of items_from(): [(second in the item, [bank position, stream, length])].
+
+        Over a song the DJ talks in its marked intro (every second time) and outro (every third time); before an advert
+        break the line that leads into it replaces the outro. The same for everybody at the same second."""
+        start, end, kind, tr_, fin, _fout = item
+        dj = tr_.get("dj")
+        if kind != "song" or not dj:
+            return []
+        h = _h(self.name, "dj", int(start), _tkey(tr_))
+        out, length = [], end - start
+        window = dj.get("i")
+        if window and h % 100 < DJ_INTRO:
+            line = window[2][(h >> 8) % len(window[2])]
+            if window[0] >= fin and window[0] + line[2] <= length:
+                out.append((window[0], line))
+        window = dj.get("o")
+        if window:
+            lines, chance = window[2], DJ_OUTRO
+            if self.ads and self.toads and self.items_from(start + 0.001, 2)[1][2] == "ad":
+                fit = [x for x in self.toads if x[2] <= window[1] - window[0] + 0.6]
+                if fit:
+                    lines, chance = fit, DJ_BEFORE_ADS
+            if (h >> 16) % 100 < chance:
+                line = lines[(h >> 20) % len(lines)]
+                free = not out or window[0] >= out[0][0] + out[0][1][2] + 1.0
+                if free and window[0] + line[2] <= length:
+                    out.append((window[0], line))
+        return out
+
     def items_from(self, now, n):
         """The item that started last at UNIX time `now` and the n-1 after it:
         [(start, end, kind, track, fade_in, fade_out)]. end is when its audio ends (the item that crosses midnight
@@ -622,9 +675,12 @@ class RadioApp(tk.Tk):
         self.q = queue.Queue()
         self.cfg = load_settings()
         self.ffplay = find_tool("ffplay")
+        self.ffmpeg = find_tool("ffmpeg")                     # only needed to mix the DJ into the songs
         self.index = None
         self.stations = {}
         self.cards = {}
+        self.podcast = None             # the podcast that is shown instead of a station, or None
+        self.pod_panel = None
         self.logo_refs = []
         self.station = None
         self.sched = None
@@ -714,6 +770,8 @@ class RadioApp(tk.Tk):
         ttk.Button(top, text=t("btn_android"), command=self._android).pack(side="right", padx=8)
         self.var_ads = tk.BooleanVar(value=bool(self.cfg.get("ads", False)))         # off unless the listener wants them
         ttk.Checkbutton(top, text=t("chk_ads"), variable=self.var_ads, command=self._toggle_ads).pack(side="right", padx=8)
+        self.var_dj = tk.BooleanVar(value=bool(self.cfg.get("dj", False)))           # the DJ's intros and outros: off too
+        ttk.Checkbutton(top, text=t("chk_dj"), variable=self.var_dj, command=self._toggle_dj).pack(side="right", padx=(8, 0))
         self.box_fade = ttk.Combobox(top, state="readonly", width=5,                  # between two songs: off or 1-12 s
                                      values=[t("fade_off")] + [t("fade_s", n=n) for n in range(1, FADE_MAX + 1)])
         self.box_fade.current(self._fade())
@@ -738,6 +796,7 @@ class RadioApp(tk.Tk):
 
         right = tk.Frame(body, bg=BG)
         right.pack(side="left", fill="both", expand=True, padx=(10, 20), pady=16)
+        self.body, self.right = body, right
         self.big = tk.Canvas(right, width=150, height=150, bg=BG, highlightthickness=0)
         self.big.pack(anchor="w")
         self.lbl_station = tk.Label(right, text=t("tune"), bg=BG, fg=FG, font=("Segoe UI", 22, "bold"), anchor="w")
@@ -784,6 +843,7 @@ class RadioApp(tk.Tk):
 
     def _show_setup(self):
         self._stop()
+        self._close_podcasts()
         self.radio.pack_forget()
         self.setup.pack(fill="both", expand=True)
 
@@ -896,6 +956,7 @@ class RadioApp(tk.Tk):
             pass
 
     def _open_index(self, idx, pool, background_icons=False):
+        self._close_podcasts()
         self.index = idx
         self.stations = idx["stations"]
         self._fill_stations()
@@ -953,7 +1014,12 @@ class RadioApp(tk.Tk):
             w.destroy()
         self.cards.clear()
         self.logo_refs.clear()
-        for name, st in self.stations.items():
+        podcasts = (self.index or {}).get("podcasts", {})
+        for name, st in list(self.stations.items()) + list(podcasts.items()):
+            if podcasts and name == next(iter(podcasts)):
+                tk.Label(self.list_frame, text=t("pod_header"), bg=BG, fg=ACCENT, font=("Segoe UI", 12, "bold"),
+                         anchor="w").pack(fill="x", padx=12, pady=(14, 2))
+            pod = name in podcasts
             card = tk.Frame(self.list_frame, bg=CARD, cursor="hand2")
             card.pack(fill="x", padx=(10, 6), pady=3)
             cv = tk.Canvas(card, width=44, height=44, bg=CARD, highlightthickness=0)
@@ -963,17 +1029,17 @@ class RadioApp(tk.Tk):
             box.pack(side="left", fill="x", expand=True)
             lab = tk.Label(box, text=name, bg=CARD, fg=FG, font=("Segoe UI", 11, "bold"), anchor="w")
             lab.pack(fill="x")
-            count = "n_shows" if any(_is_show(s) for s in st["songs"]) else "n_songs"
+            count = "pod_count" if pod else "n_shows" if any(_is_show(s) for s in st["songs"]) else "n_songs"
             sub = tk.Label(box, text=t(count, n=len(st["songs"])), bg=CARD, fg=DIM, anchor="w")
             sub.pack(fill="x")
             for w in (card, cv, box, lab, sub):
-                w.bind("<Button-1>", lambda e, n=name: self._tune(n))
+                w.bind("<Button-1>", lambda e, n=name, p=pod: self._open_podcast(n) if p else self._tune(n))
             self.cards[name] = (card, cv, box, lab, sub)
         self._mark_selected()
 
     def _mark_selected(self):
         for name, widgets in self.cards.items():
-            col = CARD_SEL if name == self.station else CARD
+            col = CARD_SEL if name == (self.podcast or self.station) else CARD
             for w in widgets:
                 w.config(bg=col)
 
@@ -997,6 +1063,40 @@ class RadioApp(tk.Tk):
         if self.station:
             self._draw_logo(self.big, self.station, 150)
 
+    # -------------------------------------------------------------------------------- podcasts
+    def _open_podcast(self, name):
+        """A podcast takes the place of the station: the radio stops, the episodes are listed."""
+        if not self.ffplay:
+            messagebox.showerror(t("title"), t("err_ffplay"))
+            return
+        import awc_radio_podcasts  # noqa: PLC0415
+        self._stop()
+        self.station = None
+        self.podcast = name
+        if self.pod_panel is None:
+            self.pod_panel = awc_radio_podcasts.PodcastPanel(self, sys.modules[__name__], self.body)
+        self.right.pack_forget()
+        self.pod_panel.pack(side="left", fill="both", expand=True, padx=(10, 20), pady=16)
+        self._mark_selected()
+        self._see_card(name)
+        self.pod_panel.open_show(name)
+
+    def _leave_podcast(self):
+        """Back to the radio's side of the window; a running episode pauses and keeps its place."""
+        if self.pod_panel is not None and self.podcast is not None:
+            self.pod_panel.stop()
+            self.pod_panel.pack_forget()
+            self.right.pack(side="left", fill="both", expand=True, padx=(10, 20), pady=16)
+        self.podcast = None
+
+    def _close_podcasts(self):
+        """Another set of files: the podcast side starts anew."""
+        self._leave_podcast()
+        if self.pod_panel is not None:
+            self.pod_panel.stop()
+            self.pod_panel.destroy()
+            self.pod_panel = None
+
     # -------------------------------------------------------------------------------- playback
     def _save_prefs(self):
         self.cfg["vol"] = int(self.vol.get())
@@ -1006,6 +1106,7 @@ class RadioApp(tk.Tk):
         if not self.ffplay:
             messagebox.showerror(t("title"), t("err_ffplay"))
             return
+        self._leave_podcast()
         self._stop()
         self.station = name
         with self.want.mutex:               # drop work for the previous station
@@ -1040,6 +1141,28 @@ class RadioApp(tk.Tk):
         save_settings(self.cfg)
         self._retune()
 
+    def _toggle_dj(self):
+        """The DJ talks over the songs, or not; the timetable stays the same."""
+        if self.var_dj.get() and not self.ffmpeg:
+            self.var_dj.set(False)
+            messagebox.showinfo(t("title"), t("dj_needs_ffmpeg"))
+            return
+        self.cfg["dj"] = bool(self.var_dj.get())
+        save_settings(self.cfg)
+        if self.station and self.state in ("playing", "loading"):
+            with self.want.mutex:
+                self.want.queue.clear()
+            self._sync()
+
+    def _voices(self, item):
+        return self.sched.voices(item) if self.sched is not None and self.var_dj.get() else []
+
+    def _key(self, item):
+        """The name of the file that plays an item: the track, or the track with what the DJ says over it."""
+        voices = self._voices(item)
+        key = _tkey(item[3])
+        return key if not voices else key + "dj" + "-".join("%d_%d@%d" % (v[1][0], v[1][1], int(v[0] * 10)) for v in voices)
+
     def _fade_chosen(self, _e=None):
         self.cfg["crossfade"] = self.box_fade.current()
         save_settings(self.cfg)
@@ -1053,9 +1176,6 @@ class RadioApp(tk.Tk):
             self._tune(self.station)
         elif self.station:
             self.sched = self._programme(self.station)
-
-    def _track_key(self, tr_):
-        return _tkey(tr_)
 
     def _show_next(self):
         if self.upcoming:
@@ -1092,8 +1212,9 @@ class RadioApp(tk.Tk):
 
     def _queue_tracks(self):
         for item in [self.cur_item] + self.upcoming:             # extract in playing order
-            if self._track_key(item[3]) not in self.ready:
-                self.want.put(item[3])
+            key = self._key(item)
+            if key not in self.ready:
+                self.want.put((key, item[3], self._voices(item)))
 
     def _sync(self, skip_current=False):
         """Jump to whatever the station has on air right now (the same for everybody with the same clock).
@@ -1115,7 +1236,7 @@ class RadioApp(tk.Tk):
     def _spawn(self, item):
         """Start ffplay for `item` at the position the station has reached by now, with its crossfade in/out."""
         start, end, _kind, tr_, fin, fout = item
-        path = self.ready.get(self._track_key(tr_))
+        path = self.ready.get(self._key(item))
         if not path or not os.path.isfile(path):
             return None
         pos = max(0.0, time.time() + LEAD - start)               # where the station is by the time ffplay is up
@@ -1200,19 +1321,34 @@ class RadioApp(tk.Tk):
         if self.state == "playing":           # ffplay cannot change its volume from outside: restart at the live position
             self._sync()
 
+    def _cut(self, tr_):
+        """The file of one track in the cache (made if it is not there)."""
+        dst = os.path.join(cache_dir(), "r_%s.opus" % _tkey(tr_))
+        if not (os.path.isfile(dst) and os.path.getsize(dst) > 0):
+            extract_track(self.index, self.cfg["rpf"], tr_, dst + ".part")
+            os.replace(dst + ".part", dst)
+        return dst
+
     def _prepare_loop(self):
-        """Background thread: cut the tracks out of the archive into small Opus files that ffplay can play."""
+        """Background thread: cut the tracks out of the archive into small Opus files that ffplay can play, and mix the
+        DJ into those he talks over."""
         while True:
-            tr_ = self.want.get()
-            key = self._track_key(tr_)
+            key, tr_, voices = self.want.get()
             if key in self.ready:
                 continue
-            dst = os.path.join(cache_dir(), "r_%s.opus" % key)
             try:
-                if not (os.path.isfile(dst) and os.path.getsize(dst) > 0):
-                    extract_track(self.index, self.cfg["rpf"], tr_, dst + ".part")
-                    os.replace(dst + ".part", dst)
-                self.ready[key] = dst
+                path = self._cut(tr_)
+                if voices:
+                    mixed = os.path.join(cache_dir(), "d_%s.opus" % hashlib.sha1(key.encode()).hexdigest()[:20])
+                    if not (os.path.isfile(mixed) and os.path.getsize(mixed) > 0):
+                        try:
+                            lines = [(at, self._cut(awc_dj.line_track(x)), x[2]) for at, x in voices]
+                            awc_dj.mix(path, lines, mixed + ".part", self.ffmpeg)
+                            os.replace(mixed + ".part", mixed)
+                        except Exception:  # noqa: BLE001   (without the DJ rather than silence)
+                            mixed = path
+                    path = mixed
+                self.ready[key] = path
             except Exception:  # noqa: BLE001
                 self.ready[key] = ""
 
@@ -1220,7 +1356,7 @@ class RadioApp(tk.Tk):
         try:
             now = time.time()
             if self.state == "loading" and self.cur:
-                key = self._track_key(self.cur[1])
+                key = self._key(self.cur_item)
                 if now >= self.cur_end:           # extraction took so long that the item is over: catch up
                     self._sync()
                 elif key in self.ready:
@@ -1237,7 +1373,7 @@ class RadioApp(tk.Tk):
                 self._reap(now)
                 nxt = self.upcoming[0] if self.upcoming else None
                 if nxt and now + LEAD >= nxt[0]:  # time for the next item: it fades in while this one fades out
-                    key = self._track_key(nxt[3])
+                    key = self._key(nxt)
                     if self.ready.get(key):
                         proc = self._spawn(nxt)
                         if proc is not None:
@@ -1302,6 +1438,8 @@ class RadioApp(tk.Tk):
 
     def _close(self):
         self._kill()
+        if self.pod_panel is not None:
+            self.pod_panel.stop()
         self._save_prefs()
         self.destroy()
 

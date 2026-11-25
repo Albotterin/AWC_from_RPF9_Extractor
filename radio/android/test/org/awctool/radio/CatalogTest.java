@@ -122,6 +122,20 @@ public final class CatalogTest {
                 && !Catalog.isPack("x.radiopak.part"), "file names");
     }
 
+    /** Score packs: their groups in the fixed order, apart from stations and podcasts, the newer pack wins. */
+    private static void score(File folder) throws Exception {
+        Catalog c = load(folder, null);
+        check(c.problems.isEmpty(), "problems " + c.problems);
+        check(c.stations.isEmpty() && c.podcasts.isEmpty() && c.scores.size() == 2, "only the score: " + c.scores.size());
+        check(c.scores.get(0).name.equals("score:openworld") && c.scores.get(1).name.equals("score:mission"), "order of the groups");
+        Library.Station m = c.onDemand("score:mission");
+        check(m != null && m.podcast && "mission".equals(m.score) && c.onDemand("score:none") == null, "on demand");
+        check(m.songs.size() == 2 && m.songs.get(0).title.equals("new piece") && m.songs.get(0).artist.equals("ROB Bank"), "pieces");
+        for (Schedule.Track t : m.songs) check(m.pack.read("t/" + t.key).length > 0, "file " + t.key);
+        check(Catalog.isPack("Score_Missions.ScorePak") && !Catalog.isPack("a.scorepak.part"), "score file names");
+        c.closeUnused(null);
+    }
+
     private static void real(File folder) throws Exception {
         Catalog c = load(folder, null);
         check(c.problems.isEmpty(), "problems " + c.problems);
@@ -136,28 +150,53 @@ public final class CatalogTest {
             }
             System.out.println("  podcast " + p.name + (p.logo.isEmpty() ? " [no cover]" : "") + ": " + p.songs.size() + " episodes");
         }
-        long items = 0;
+        for (Library.Station g : c.scores) {
+            check(g.score != null && !g.songs.isEmpty(), "score group " + g.name);
+            double seconds = 0;
+            for (Schedule.Track t : g.songs) {
+                Pack.Entry e = g.pack.entry("t/" + t.key);
+                // quiet pieces are small (variable bit rate); a file far smaller than that lost its audio
+                check(e != null && e.length > 20000 && e.length > t.sec * 1500 && t.sec >= 1 && !t.title.isEmpty() && !t.artist.isEmpty(),
+                        g.name + ": " + t.title);
+                seconds += t.sec;
+            }
+            System.out.println("  " + g.name + ": " + g.songs.size() + " pieces, " + Math.round(seconds / 360) / 10.0 + " h");
+        }
+        long items = 0, djWindows = 0;
         for (Library.Station s : c.stations) {
             check(s.logo.isEmpty() || s.pack.read(s.logo)[1] == 'P', "logo of " + s.name);      // not every station has one
             List<Schedule.Track> all = new ArrayList<>(s.songs);
             all.addAll(s.jingles);
             all.addAll(s.ads);
+            all.addAll(s.toads);
+            int talked = 0;
+            for (Schedule.Track t : s.songs) {                       // every line the DJ may say is in the pack
+                for (Schedule.Window w : new Schedule.Window[]{t.intro, t.outro}) {
+                    if (w == null) continue;
+                    check(w.to > w.from && !w.lines.isEmpty() && w.from >= 0 && w.from < t.sec, "window of " + t.title);
+                    all.addAll(w.lines);
+                    talked++;
+                }
+            }
+            djWindows += talked;
             Schedule plain = s.programme(false, Schedule.FADE);
             check(plain == s.programme(false, Schedule.FADE) && (s.programme(true, Schedule.FADE) == plain) == s.ads.isEmpty()
                     && s.programme(false, 0) != plain, "programmes of " + s.name);
             for (Schedule.Track t : all) {
                 Pack.Entry e = s.pack.entry("t/" + t.key);
-                check(e != null && e.length > 1000, s.name + ": file of " + t.key);
+                check(e != null && e.length > 500, s.name + ": file of " + t.key);
                 items++;
             }
             check(plain.itemsFrom(System.currentTimeMillis() / 1000.0, 5).size() == 5, "programme of " + s.name);
             System.out.println("  " + s.name + (s.talk ? " [talk]" : "") + (s.logo.isEmpty() ? " [no logo]" : "") + ": " + s.songs.size() + " + " + s.jingles.size() + " + " + s.ads.size() + " adverts");
         }
-        System.out.println(c.stations.size() + " stations in " + c.packCount() + " packs, " + items + " recordings");
+        System.out.println(c.stations.size() + " stations in " + c.packCount() + " packs, " + items + " recordings, "
+                + djWindows + " DJ windows");
     }
 
     public static void main(String[] args) throws Exception {
         if (args[0].equals("real")) real(new File(args[1]));
+        else if (args[0].equals("score")) score(new File(args[1]));
         else synthetic(new File(args[1]), new File(args[2]));
         System.out.println("Catalog: ALL OK (" + checks + " checks)");
     }

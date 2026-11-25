@@ -15,7 +15,8 @@ import java.util.zip.CRC32;
  * This is a line-by-line port of class Schedule in awc_radio.py and must give exactly the same result (same order,
  * same times, same crossfades), so that the phone and the PC play the same song at the same second. A station with
  * adverts has a second programme with advert breaks (built when a list of adverts is given). Only two songs that follow
- * each other are crossfaded; the seconds of that overlap are part of the timetable.
+ * each other are crossfaded; the seconds of that overlap are part of the timetable. voices() says what the DJ says over
+ * an item when the listener wants the DJ; that changes nothing in the timetable.
  * Times are UNIX seconds (double), like time.time() in Python.
  */
 public final class Schedule {
@@ -23,6 +24,31 @@ public final class Schedule {
     public static final double FADE = 3.0;               // standard seconds of crossfade between two songs
     public static final int FADE_MAX = 12;
     private static final int AD_AFTER = 540, AD_AFTER_SPAN = 361;   // an advert break after 9 to 15 minutes of songs
+    // per cent: how often the DJ talks over an intro, an outro, into an advert break
+    private static final int DJ_INTRO = 50, DJ_OUTRO = 35, DJ_BEFORE_ADS = 70;
+
+    /** Where the DJ may talk over a song (seconds into it) and the lines that fit there. */
+    public static final class Window {
+        public final double from, to;
+        public final List<Track> lines;
+
+        public Window(double from, double to, List<Track> lines) {
+            this.from = from;
+            this.to = to;
+            this.lines = lines;
+        }
+    }
+
+    /** A line the DJ says over an item, `at` seconds into it. */
+    public static final class Voice {
+        public final double at;
+        public final Track line;
+
+        Voice(double at, Track line) {
+            this.at = at;
+            this.line = line;
+        }
+    }
 
     public static final class Track {
         public final String key;      // "<base>_<idx>", also the file name of the audio
@@ -32,6 +58,7 @@ public final class Schedule {
         /** Parts of a long mix (start second, title, artist), or null. The title is empty for a part without a name. */
         public final double[] partStart;
         public final String[] partTitle, partArtist;
+        public Window intro, outro;       // the DJ's windows over a song, or null
 
         public Track(String key, String title, String artist, double sec) {
             this(key, title, artist, sec, null, null, null);
@@ -105,6 +132,7 @@ public final class Schedule {
     private final Map<Integer, Day> days = new HashMap<>();
     private final double fade;
     private final boolean talk;                          // talk radio: its items are shows, never crossfaded
+    private List<Track> toads = Collections.emptyList();  // the DJ's lines into an advert break
 
     public Schedule(String name, List<Track> songs, List<Track> jingles) {
         this(name, songs, jingles, Collections.<Track>emptyList());
@@ -127,6 +155,47 @@ public final class Schedule {
         Collections.sort(this.songs, byKey);
         Collections.sort(this.jingles, byKey);
         Collections.sort(this.ads, byKey);
+    }
+
+    void setLinesIntoAds(List<Track> lines) {
+        toads = lines;
+    }
+
+    /**
+     * What the DJ says over an item of itemsFrom() (the same as voices() in awc_radio.py): over a song in its marked intro
+     * (every second time) and outro (every third time); before an advert break the line that leads into it replaces the
+     * outro.
+     */
+    public List<Voice> voices(Item item) {
+        List<Voice> out = new ArrayList<>();
+        Track tr = item.track;
+        if (item.jingle || item.ad || (tr.intro == null && tr.outro == null)) return out;
+        long h = h(name, "dj", (long) item.start, tr.key);
+        double length = item.end - item.start;
+        Window window = tr.intro;
+        if (window != null && h % 100 < DJ_INTRO) {
+            Track line = window.lines.get((int) ((h >> 8) % window.lines.size()));
+            if (window.from >= item.fadeIn && window.from + line.sec <= length) out.add(new Voice(window.from, line));
+        }
+        window = tr.outro;
+        if (window != null) {
+            List<Track> lines = window.lines;
+            int chance = DJ_OUTRO;
+            if (!ads.isEmpty() && !toads.isEmpty() && itemsFrom(item.start + 0.001, 2).get(1).ad) {
+                List<Track> fit = new ArrayList<>();
+                for (Track t : toads) if (t.sec <= window.to - window.from + 0.6) fit.add(t);
+                if (!fit.isEmpty()) {
+                    lines = fit;
+                    chance = DJ_BEFORE_ADS;
+                }
+            }
+            if ((h >> 16) % 100 < chance) {
+                Track line = lines.get((int) ((h >> 20) % lines.size()));
+                boolean free = out.isEmpty() || window.from >= out.get(0).at + out.get(0).line.sec + 1.0;
+                if (free && window.from + line.sec <= length) out.add(new Voice(window.from, line));
+            }
+        }
+        return out;
     }
 
     /** Stable hash: crc32 of the parts joined with '|' (see _h in awc_radio.py). */

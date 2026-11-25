@@ -29,7 +29,7 @@ starting with the magic `ADAT`. So the archive can be scanned for AWC headers.
 5. Results (`offset`, `length`, streams, estimated durations) are cached as JSON in
    `%APPDATA%\AWC-Tool\cache\<sha1 of path>.json`, keyed by file size and mtime.
 
-Example: a 28.5 GB archive → 6,636 valid AWC headers, 2,968 music containers, 2,992 streams, ~6 minutes
+Example: a 28.5 GB archive → 6,636 valid AWC headers, 3,008 music containers, 3,116 streams, ~6 minutes
 (disk-bound).
 
 ## 2. AWC header
@@ -67,6 +67,10 @@ Tags seen in music containers:
 The tool does not interpret the stream-info/chunk-index arrays exactly; it **scans the header (4-byte aligned) for
 `u64` values with a known tag and an offset behind the header**. That is enough for the layouts seen so far, and it
 is what makes the format detection cheap. A file without both `0x48` and `0x55` is not treated as a music container.
+
+In music containers (low flag byte `0x25`) the header is: `u16` first chunk per stream, `u32` × (count + 1), `u32`
+stream IDs, then the chunk table – at `20 + 10 × count`. With an **odd** stream count the table does not lie on a 4-byte
+step, so the tool then reads it at exactly that place (40 containers of the sample archive).
 
 ## 3. Stream format chunk (`0x48`)
 
@@ -140,7 +144,7 @@ by their position in the archive:
 2. start a new group when `offset - previous_end >= 0x10000` **or** the running AWC number (ordinal among *all* valid
    `ADAT` headers found, music or not) is not `previous + 1`, i.e. a non-music AWC sits in between.
 
-Observed in the sample archive: the 2,968 music AWCs lie in 47 groups between 0.08 GB and 26.4 GB (2,849 of 2,967
+Observed in the sample archive: the 2,968 music AWCs an earlier scan found lie in 47 groups between 0.08 GB and 26.4 GB (2,849 of 2,967
 transitions have less than 4 KiB of padding); the boundaries between the groups are mostly one non-music AWC or a gap
 of up to ~24 MB. Whether a group really is one directory (e.g. one radio station) can't be proven without the
 table of contents - it is an inference from the layout.
@@ -162,7 +166,7 @@ Event types seen in the sample archive (the name resolves by hashing it with the
 |---|---|---:|---|
 | `0xE89AE78C` | `beat` | 16,207 | beat grid (gaps of a few seconds) |
 | `0xA6D93246` | `trackid` | 981 | a track starts here; `value` is a track number |
-| `0x08DBA0F8` | `dj` | 2,728 | DJ talk |
+| `0x08DBA0F8` | `dj` | 2,728 | in songs four per bank: the windows where the DJ may talk over the intro and the outro (start, end, start, end) |
 | `0xDA8F5F53` / `0x5D40B28D` | `intro` / `outro` | 773 / 766 | intro / outro of a segment |
 | `0x0C801D6C` / `0x3A423FE8` | `low` / `high` | 1,472 / 2,187 | energy level |
 
@@ -208,7 +212,34 @@ Opus codec are read. In the sample archive the radio stations have 3,417 such li
 `dj_outro_NN`, `dj_to_ads_NN`, `dj_to_news_NN`. A container belongs to the station whose songs its lines announce, else
 to the station around it in the archive.
 
-## 9. Not covered
+## 9. The score (interactive music)
+
+The score is described in a metadata file of the audio config and played from **sound banks** (`awc_score.py`).
+
+**Sound banks** are `ADAT` containers with flags `0xFF21` / `0xFF61`:
+
+```
+0x10  u32 (only with flag 0x40)
+...   u16[count]       first chunk of every stream
+...   u32[count + 1]
+...   u32[count]       stream IDs
+...   u64[]            chunk table (as in section 2); per stream 0x76 format and 0x55 data
+```
+
+The format chunk holds `u32` samples (all channels together) at +0, `u16` rate at +8, the codec at +28 and the channel
+count at +29; the data is laid out like the speech lines of section 8.
+
+**Music objects** (first byte = type): a *project* (95) points to a *name list* (103: `u16` count, entries of a 64-byte
+name and a `u32` number). A *section* (104) holds tempo (`f32` at 12), beats per bar, its number (24), its project (32)
+and per instrument layer (stem 105, with the layer's name) a *clip* (107) or nothing (the layer stops). A *follow action*
+(109) says after how many beats the music goes on with which section; a clip can have one too and hand over to another
+clip. A clip leads to a sound of the sound file, and that to a bank stream. Bit 2 of a clip's second byte marks a loop.
+
+A piece starts at a section without the `FA_` prefix and follows the actions until the music would repeat or the next
+event is needed. The mix lets a one-shot ring until a later section gives its layer something new, and cuts silence at
+the end.
+
+## 10. Not covered
 
 * Sound-effect AWCs and other non-music kinds (chunk `0xFA` "sfx header", Vorbis, MIDI `0x68`, …).
 * Codecs other than `0x0B`: PCM, IMA/MS-ADPCM, XMA2, MPEG, Vorbis, ATRAC9, DSP, other Opus variants.

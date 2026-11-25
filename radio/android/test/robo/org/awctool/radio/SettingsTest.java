@@ -84,7 +84,7 @@ public class SettingsTest {
         Harness.settle();
         View root = a.getWindow().getDecorView();
         for (String text : new String[]{"Wiedergabe", "Überblenden", "Dauer", "3 s", "Werbung", "Pack-Ordner", "AWC-Radio",
-                "Sender neu laden", "Akku-Einstellungen", "AWC Radio 1.9"}) {
+                "Sender neu laden", "Akku-Einstellungen", "AWC Radio 1.11"}) {
             Assert.assertTrue(text, shows(root, text));
         }
         ScreenshotTest.shot(a, "50_settings", null);
@@ -120,6 +120,27 @@ public class SettingsTest {
         ads.performClick();
         Harness.pass(500);
         Assert.assertSame(flash.programme(true, 8), playing());
+
+        // the DJ: off unless switched on; he comes and goes without tuning in anew
+        Switch dj = views(root, Switch.class).get(2);
+        Assert.assertTrue(shows(root, "DJ"));
+        Assert.assertFalse(dj.isChecked() || RadioService.dj(app));
+        Object running = ReflectionHelpers.getField(radio, "engine");
+        Assert.assertEquals(false, ReflectionHelpers.getField(running, "dj"));
+        dj.performClick();
+        Harness.pass(500);
+        Assert.assertTrue(RadioService.dj(app));
+        Assert.assertSame(running, ReflectionHelpers.getField(radio, "engine"));
+        Assert.assertEquals(true, ReflectionHelpers.getField(running, "dj"));
+        int said = 0;
+        for (Schedule.Item it : flash.programme(true, 8).itemsFrom(System.currentTimeMillis() / 1000.0, 40)) {
+            for (Schedule.Voice v : flash.programme(true, 8).voices(it)) {
+                Assert.assertNotNull("line in the pack", flash.pack.entry("t/" + v.line.key));
+                said++;
+            }
+        }
+        Assert.assertTrue("the DJ has something to say: " + said, said > 5);
+        ScreenshotTest.shot(a, "53_settings_dj", null);
 
         // a station without adverts is not restarted by the advert switch
         radio.play(Catalog.indexOf(PackStore.get(app).stations, "Jack of Hearts"));

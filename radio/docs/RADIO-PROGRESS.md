@@ -78,7 +78,7 @@ What the audio config says these places play. Their recordings are not in the cr
 
 ## Podcasts
 
-The five podcasts of the credits list, all found: 20 episodes, 3 h 36 min together. They play on demand in the Android app and are not counted in the station figures.
+The five podcasts of the credits list, all found: 20 episodes, 3 h 36 min together. They play on demand in the Android app and in the radio on the PC and are not counted in the station figures.
 
 | Podcast | Episodes | Lengths in order | Total |
 |---|---:|---|---:|

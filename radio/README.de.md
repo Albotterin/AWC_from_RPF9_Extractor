@@ -61,9 +61,14 @@ Club-DJ-Sets ist das eine begründete Vermutung. Braucht wie der Extractor `ffpl
 **Überblenden.** Überblendet wird nur von einem **Song in den nächsten** (Standard: 3 Sekunden). Jingles, Werbung,
 Talk-Sendungen und Podcasts werden nie überblendet, sie folgen direkt aufeinander. Die Überblendung lässt sich
 ausschalten oder auf 1–12 Sekunden stellen – am PC mit **Überblenden** oben im Fenster, in der App auf der
-Einstellungsseite. Sie ist Teil des Zeitplans: PC und Handy laufen nur mit derselben Einstellung gleich. *Neu im
-Quellcode (App 1.9); das neueste Release v2.7.0 mit App 1.8 blendet noch rund um Jingles und Werbung und hat keine
-Einstellung.*
+Einstellungsseite. Sie ist Teil des Zeitplans: PC und Handy laufen nur mit derselben Einstellung gleich.
+
+**Der DJ.** Am PC **DJ** anhaken oder in den Einstellungen der App einschalten (von Haus aus aus). Die Songdateien
+markieren, wo der DJ über Anfang und Ende sprechen darf; die Sprach-Container des Senders halten Ansagen für diese Stellen,
+die meisten genau zu diesem Song. Über einem Song spricht der DJ dann jedes zweite Mal das Intro und jedes dritte Mal das
+Outro, und vor einem Werbeblock leitet er über. Die Musik tritt zurück, solange er spricht. Welche Ansage kommt, folgt
+derselben Uhr wie alles andere; der Zeitplan ist mit und ohne DJ gleich. 18 Sender haben solche Ansagen. Am PC wird die
+Ansage vorher in eine Kopie des Songs gemischt (braucht neben `ffplay` auch `ffmpeg`).
 
 **Werbung.** Jeder Sender hat zwei Programme nach derselben Uhr: ohne Werbung (Standard) und mit Werbung. Am PC dafür den
 Haken **Werbung** setzen, in der App den Schalter **Werbung** einschalten. Nach etwa 9 bis 15 Minuten Musik folgt ein Block
@@ -75,9 +80,8 @@ für ihn nennt. Das Programm ohne Werbung ist dasselbe wie bisher.
 
 Die Audio-Konfiguration führt fünf Podcasts mit ihren Folgen in fester Reihenfolge: **Drunk Kings** (5), **Final Act** (4),
 **Fuck Marry Murder** (6), **The Safe Trap** (3) und **Vice City True Stories** (2) – dieselben fünf, die die Credits
-nennen. Alle 20 Folgen liegen in der `audio.rpf`, unabhängig vom Spielfortschritt. Sie laufen **in der Android-App** (nicht
-im PC-Radio), nicht nach der Uhr, sondern auf Abruf: Man wählt die Folge, pausiert, spult, und die App merkt sich die
-Stelle. [Alle Folgen mit Länge](docs/RADIO-PROGRESS.de.md#podcasts).
+nennen. Alle 20 Folgen liegen in der `audio.rpf`, unabhängig vom Spielfortschritt. Sie laufen auf Abruf statt nach der Uhr, **in der Android-App** und im PC-Radio unter den Sendern: Folge wählen, pausieren, spulen, 15 Sekunden zurück oder 30 vor; die Stelle
+in jeder Folge wird gemerkt. [Alle Folgen mit Länge](docs/RADIO-PROGRESS.de.md#podcasts).
 
 ![Podcasts in der App](docs/screenshots/08-app-podcasts.png)
 
@@ -96,19 +100,24 @@ Die aktuelle Liste aller Sender mit Inhalt und Länge: [alle Sender](docs/RADIO-
 Die Handy-App spielt dasselbe Live-Programm wie der PC: gleiche UTC-Uhr, gleiche Reihenfolge, gleiche Überblendungen.
 Dazu hat sie einen eigenen Bereich für die [Podcasts](#podcasts). Zur App gehören die Packs:
 
-* **`AWC-Radio.apk`** - die App (Version 1.8), für alle dieselbe Datei, ohne Spieldaten. Android 7.0 oder neuer, Deutsch und
+* **`AWC-Radio.apk`** - die App (Version 1.11), für alle dieselbe Datei, ohne Spieldaten. Android 7.0 oder neuer, Deutsch und
   Englisch. Senderraster, kleiner Player und großer Player in der Farbe des Senderlogos; Wiedergabe im Hintergrund mit
   Medien-Benachrichtigung, Sperrbildschirm- und Kopfhörertasten; Einschlaftimer; Schalter für **Werbung** (von Haus aus aus); **Android Auto** (vorher in dessen
   Entwicklereinstellungen „Unbekannte Quellen“ aktivieren, weil die App nicht aus dem Play Store kommt).
-* **Einstellungsseite** (App 1.9, noch in keinem Release) - Überblenden ein/aus und Dauer, Werbung, Pack-Ordner und neu
+* **Einstellungsseite** - Überblenden ein/aus und Dauer, Werbung, Pack-Ordner und neu
   laden, Akku-Einstellungen, Info und Protokoll; zu öffnen über das Drei-Punkte-Menü.
+* **Score-Reiter** – der Score des Spiels aus den `.scorepak`-Dateien: vier Gruppen,
+  darin Untergruppen (eine Mission, ein Gebiet) und Stücke; ein Stück läuft von vorn, danach geht die Gruppe weiter. Die
+  Namen sind Arbeitsnamen aus den Spieldateien und können die Handlung verraten. Wie die Stücke entstehen, steht beim
+  [Extractor](../extractor/README.de.md#der-score).
 * **Radiowecker** - mehrere Wecker mit Wochentagen, Sender, Lautstärke, sanftem Start, Schlummern und Vibration. Er klingelt
   mit der Weckerlautstärke des Handys und zeigt einen Bildschirm über dem Sperrbildschirm. Ist vom Radio nach 10 Sekunden
   nichts zu hören (Pack fehlt, Player-Fehler, Handy nach einem Neustart noch nicht entsperrt), klingelt der Weckton des
   Handys. Nach 30 Minuten hört er von selbst auf.
-* **Packs** - eine Datei je Sender (`.radiopak`) und je Podcast (`.podpak`), am PC erzeugt: in AWC Radio auf **Android-Packs…** klicken, einen
+* **Packs** - eine Datei je Sender (`.radiopak`), je Podcast (`.podpak`) und je Score-Gruppe (`.scorepak`), am PC erzeugt: in AWC Radio auf **Android-Packs…** klicken, einen
   Ordner wählen und schreiben. Ein Sender-Pack enthält die Songs des Senders in der Originalqualität des Spiels (ca. 128 kbit/s, nicht
-  neu kodiert), sein Logo und die Programmdaten; etwa 4,7 GB für alle 34 Sender. Ein Podcast-Pack enthält die Folgen und das Cover (zusammen 0,2 GB). Alle in denselben Ordner auf dem Handy kopieren und
+  neu kodiert), sein Logo und die Programmdaten; etwa 4,8 GB für alle 34 Sender (mit den DJ-Ansagen). Die vier Score-Packs mit den Stücken ab 30 Sekunden werden am PC
+  gemischt (1,6 GB, braucht FFmpeg). Ein Podcast-Pack enthält die Folgen und das Cover (zusammen 0,2 GB). Alle in denselben Ordner auf dem Handy kopieren und
   diesen in der App wählen. Neue oder geänderte Packs werden von selbst übernommen. Die Werbung
   steckt erst in Packs, die ab Version 2.6.0 geschrieben wurden.
 

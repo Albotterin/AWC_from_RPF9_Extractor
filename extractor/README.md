@@ -52,12 +52,14 @@ This tool takes a different route:
    or one folder. You can **name the groups yourself** (right-click), and the names become export folder names.
 6. It can also show an archive **by radio station**: the stations are read from the game's audio config, each with its
    logo and with its songs, **DJ intros and outros**, **adverts**, jingles and talk.
+7. And it reads the game's **score** – the interactive music that is not stored as finished tracks – and mixes it into
+   pieces you can listen to and save (see [The score](#the-score)).
 
 You can point it at a single `.awc`, a single `.rpf`, or a **whole folder** – it searches all subfolders for
 every `.rpf` and `.awc` file and lists all music streams it finds.
 
-> Example run on a 28.5 GB `audio.rpf`: 6,636 AWC headers found, 2,968 of them music containers with
-> 2,992 streams (Opus, 48 kHz) ≈ 96 hours of audio ≈ 5 GB as `.opus` files.
+> Example run on a 28.5 GB `audio.rpf`: 6,636 AWC headers found, 3,008 of them music containers with
+> 3,116 streams (Opus, 48 kHz) ≈ 101 hours of audio ≈ 6 GB as `.opus` files.
 
 ## Legal notice – please read
 
@@ -80,6 +82,7 @@ every `.rpf` and `.awc` file and lists all music streams it finds.
 | 🌳 **Tree view** | Container → group → AWC → stream, with stream ID, codec, stereo/mono, duration and size. |
 | 🗂 **Groups** | AWCs are clustered by their position in the archive (≈ one folder / radio station each). Right-click a group → **Rename group…**; the name is used for the export folder. |
 | 📻 **View by radio station** | Station → category → stream, with the station logo: songs, DJ sets, DJ intros/outros and links, adverts, jingles, DJ talk, music beds, talk shows; plus a group with the podcasts. Extraction writes one folder per station and category. |
+| 🎼 **Score** | The interactive music as pieces, grouped by open world, missions, compounds and activities; search, listen, save as Opus, write app packs. |
 | ▶️ **Player** | Play any stream straight from the archive (play/pause/stop, seek bar, volume). Uses `ffplay`. |
 | 💾 **Extraction** | Opus (lossless remux), FLAC, WAV (16-bit PCM) or MP3 (320 kbit/s). Select streams, whole AWCs or whole containers. |
 | ⏱ **Duration filter** | "Only streams longer than N seconds" – skips the many short snippets. |
@@ -181,6 +184,23 @@ by position back.
   the folders `Podcasts/<name>/`.
 * Whatever the config assigns to no station is listed by position under **Not assigned to a station**.
 
+### The score
+
+The button **Score…** opens a window of its own for the game's score. The game does not store it as finished songs: its
+audio config describes **sections** (tempo, instrument layers, which recording each layer plays, looping or once) and how
+they follow each other; the recordings lie in sound banks. The tool reads that, finds the banks (a pass over the archive,
+a few minutes the first time) and offers **pieces**: a section the game starts by an event, together with those that
+follow it by themselves, mixed from their layers with FFmpeg. In the sample archive that is 2,543 pieces, about 33 hours;
+974 are at least 30 seconds long.
+
+* Groups: **Open world**, **Missions**, **Compounds**, **Activities**, each with sub groups. The names are the developers'
+  working names (`CG_RAID_CAUGHT_SHOOTOUT_A`) – there are no official titles, and they may give away the story.
+* Double-click listens; **Save** writes `Score/<group>/<sub group>/<title>.opus`; **App packs** writes one `.scorepak`
+  per group for [AWC Radio on Android](../radio/README.md#awc-radio-for-android).
+* A piece is a **reconstruction**: in the game, layers also come and go with what the player does.
+
+`--score` on the command line opens the window right away. How the data is laid out: [FORMAT.md](docs/FORMAT.md#9-the-score-interactive-music).
+
 ### Names, logos and mixes
 
 6. **Name the groups** (optional): right-click a *Group NN* row → **Rename group…** (e.g. after listening to a few
@@ -228,7 +248,7 @@ by position back.
 ### Command line options
 
 ```
-python awc_tool.py [--lang=en|de] [folder | file.awc | file.rpf ...]
+python awc_tool.py [--lang=en|de] [--score] [folder | file.awc | file.rpf ...]
 python awc_tool.py --selftest <report.txt> <file.awc>     # diagnostics (used for the built exe)
 ```
 
@@ -337,8 +357,9 @@ To add a language, edit `awc_i18n.py`: add an entry to `LANGUAGES` and a table w
 
 ## Limitations
 
-* **Only Opus (`0x0B`)** is supported: the music containers, and in the view by station the DJ speech containers of the
-  radio. Other AWC kinds (sound effects, other speech, Vorbis/ADPCM/XMA banks, …) are skipped.
+* **Only Opus (`0x0B`)** is supported: the music containers, in the view by station the DJ speech containers of the
+  radio, and for the score the recordings of its sound banks. Other AWC kinds (sound effects, other speech,
+  Vorbis/ADPCM/XMA banks, …) are skipped.
 * **Adverts have no product names** and some DJ lines no recognised name: the AWCs and the radio config don't hold them.
 * The view by station depends on the game's radio config; it was developed with one archive.
 * The **RPF9 table of contents is not parsed** (it appears to be encrypted/obfuscated), so there are **no real
@@ -378,6 +399,8 @@ extractor/
   awc_logos.py        Small reader for the logo textures of the game's UI texture pool
   awc_gamedata.py     Reads the radio stations, their playlists and categories from the game's audio config
   awc_speech.py       Reads the DJ speech containers (view by radio station)
+  awc_score.py        Reads the score: sections, sound banks, pieces, mixing
+  awc_score_ui.py     The score window
   logos/              Pictures drawn for stations the programs invent themselves (make_station_logos.py)
   Start AWC-Tool.bat  Launcher
   build_exe.bat       Builds dist\AWC-Tool.exe with PyInstaller

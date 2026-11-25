@@ -213,6 +213,7 @@ public class AlarmService extends Service {
                 players.add(p);
                 return p;
             });
+            engine.setDj(RadioService.dj(this));
             engine.setDuck(gain());
             heardAt = SystemClock.elapsedRealtime();
             updateNotification();

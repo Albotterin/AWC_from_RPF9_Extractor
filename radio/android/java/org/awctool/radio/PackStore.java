@@ -147,7 +147,7 @@ final class PackStore {
         Catalog result = Catalog.load(files, old, source -> open(ctx, DocumentsContract.buildDocumentUriUsingTree(tree, source.id)));
         if (old == null || !result.sameAs(old)) {
             AppLog.d("folder read: " + files.size() + " pack file(s), " + result.stations.size() + " station(s), "
-                    + result.podcasts.size() + " podcast(s)");
+                    + result.podcasts.size() + " podcast(s), " + result.scores.size() + " score group(s)");
             for (String p : result.problems) AppLog.d("skipped " + p);
         }
         return result;

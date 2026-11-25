@@ -59,8 +59,14 @@ are an educated guess. Needs `ffplay` like the extractor.
 **Crossfade.** Only one **song into the next** is crossfaded (standard: 3 seconds). Jingles, adverts, talk shows and
 podcasts are never faded: they follow back to back. You can switch the crossfade off or set it to 1-12 seconds - on the
 PC with **Crossfade** at the top of the window, in the app on the settings page. The overlap is part of the timetable, so
-PC and phone stay in step only with the same setting. *New in the source (app 1.9); the latest release, v2.7.0 with app
-1.8, still crossfades around jingles and adverts and has no setting.*
+PC and phone stay in step only with the same setting.
+
+**The DJ.** Tick **DJ** on the PC, or switch it on in the app's settings (default: off). The song files mark where the DJ
+may talk over their beginning and their end; the speech containers of the station hold lines for those places, most of
+them about the very song. Over a song the DJ then speaks its intro every second time and its outro every third time, and
+before an advert break he leads into it. The music steps back while he talks. Which line is said follows the same clock
+as everything else, and the timetable stays the same with the DJ on or off. 18 stations have such lines. On the PC the
+line is mixed into a copy of the song first (needs `ffmpeg` besides `ffplay`).
 
 **Adverts.** Every station has two programmes after the same clock: without adverts (the default) and with them. Tick
 **Adverts** on the PC, or switch **Adverts** on in the app. After about 9 to 15 minutes of songs a break of two or three
@@ -72,8 +78,9 @@ programme without adverts is the same as before.
 
 The audio config lists five podcasts with their episodes in a fixed order: **Drunk Kings** (5), **Final Act** (4),
 **Fuck Marry Murder** (6), **The Safe Trap** (3) and **Vice City True Stories** (2) – the same five the credits name. All
-20 episodes are in `audio.rpf`, whatever the progress in the game. They play **in the Android app** (not in the radio on
-the PC), on demand instead of by the clock: pick an episode, pause, seek, and the app remembers the place.
+20 episodes are in `audio.rpf`, whatever the progress in the game. They play on demand instead of by the clock, **in the
+Android app** and in the radio on the PC, listed below the stations: pick an episode, pause, seek,
+jump 15 seconds back or 30 forward, and the place in every episode is remembered.
 [All episodes with their length](docs/RADIO-PROGRESS.md#podcasts).
 
 ![Podcasts in the app](docs/screenshots/08-app-podcasts.png)
@@ -94,18 +101,23 @@ The phone app plays the same live programme as the PC: same UTC clock, same orde
 setting). It consists of the app
 and the station packs:
 
-* **`AWC-Radio.apk`** - the app (version 1.8), the same file for everybody, no game data inside. Android 7.0 or newer,
+* **`AWC-Radio.apk`** - the app (version 1.11), the same file for everybody, no game data inside. Android 7.0 or newer,
   English and German. Station grid, mini player and a large player in the colour of the station's logo; background playback
   with a media notification, lock-screen and headset buttons; sleep timer; **adverts** switch (off by default); **Android Auto** (switch on *Unknown sources* in
   its developer settings first, because the app does not come from the Play Store).
-* **Settings page** (app 1.9, not in a release yet) - crossfade on/off and length, adverts, pack folder and reload,
+* **Settings page** - crossfade on/off and length, adverts, pack folder and reload,
   battery settings, info and log; open it from the three-dot menu.
+* **Score tab** - the game's score from the `.scorepak` files: four groups, their sub
+  groups (a mission, an area) and pieces; a piece plays from its start and the group goes on. The names are the working
+  names from the game files and may give away the story. See the [extractor](../extractor/README.md#the-score) for how the
+  pieces are made.
 * **Radio alarm** - several alarms with weekdays, station, volume, gentle start, snooze and vibration. It rings on the phone's
   alarm volume with a screen over the lock screen. If nothing can be heard from the radio within 10 seconds (pack missing,
   player error, phone not yet unlocked after a restart), the phone's own alarm tone rings. It stops by itself after 30 minutes.
-* **Packs** - one file per station (`.radiopak`) and per podcast (`.podpak`), made on the PC: in AWC Radio click **Android packs…**, choose a
+* **Packs** - one file per station (`.radiopak`), per podcast (`.podpak`) and per score group (`.scorepak`), made on the PC: in AWC Radio click **Android packs…**, choose a
   folder and write them. Each holds the station's songs in the game's own quality (about 128 kbit/s, not re-encoded), its logo
-  and its programme data; about 4.7 GB for all 34 stations. A podcast pack holds the episodes and the cover (0.2 GB together). Copy them all into one folder on the phone and choose that folder in
+  and its programme data; about 4.8 GB for all 34 stations (with the DJ's lines). A podcast pack holds the episodes and the cover (0.2 GB together);
+  the four score packs hold the pieces of at least 30 seconds, mixed on the PC (1.6 GB, needs FFmpeg). Copy them all into one folder on the phone and choose that folder in
   the app. New or changed packs are picked up by themselves. Adverts are
   only in packs written by version 2.6.0 or later.
 
@@ -127,7 +139,9 @@ the script). `python android\test\run_robo.py <pack folder>` runs the screens an
 ```
 radio/
   awc_radio.py          The radio program (window, schedule, playback)
-  awc_android.py        Writes the packs for the Android app (per station and per podcast), and its dialog
+  awc_dj.py             The DJ's windows and lines for every song, and mixing them in on the PC
+  awc_radio_podcasts.py The podcasts in the radio on the PC
+  awc_android.py        Writes the packs for the Android app (per station, podcast and score group), and its dialog
   android/              The Android app: Java source, resources, build_apk.py, make_logo.py, tests
   Start AWC-Radio.bat   Launcher
   build_exe.bat         Builds dist\AWC-Radio.exe with PyInstaller

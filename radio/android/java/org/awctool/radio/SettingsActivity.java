@@ -148,6 +148,8 @@ public class SettingsActivity extends Activity implements PackStore.Listener {
         play.addView(sync);
         toggleRow(play, R.string.adverts_switch, R.string.adverts_what, RadioService.adverts(this),
                 on -> prefs.edit().putBoolean(RadioService.PREF_ADS, on).apply());
+        toggleRow(play, R.string.dj_switch, R.string.dj_what, RadioService.dj(this),
+                on -> prefs.edit().putBoolean(RadioService.PREF_DJ, on).apply());
 
         // ---- the packs
         LinearLayout packs = section(box, R.string.settings_packs);
@@ -311,6 +313,9 @@ public class SettingsActivity extends Activity implements PackStore.Listener {
         StringBuilder info = new StringBuilder(getString(R.string.info_body, version(), PackStore.folderName(this), c.packCount(),
                 c.stations.size(), songs, f.format(new Date())));
         if (!c.podcasts.isEmpty()) info.append('\n').append(getString(R.string.info_podcasts, c.podcasts.size()));
+        int pieces = 0;
+        for (Library.Station g : c.scores) pieces += g.songs.size();
+        if (pieces > 0) info.append('\n').append(getString(R.string.info_score, pieces));
         for (String p : c.problems) info.append('\n').append(getString(R.string.info_skipped, p));
         final String body = info.toString();
         final String log = AppLog.text();

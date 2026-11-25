@@ -55,8 +55,8 @@ Dieses Tool geht einen anderen Weg:
 Du kannst eine einzelne `.awc`, eine `.rpf` oder einen **ganzen Ordner** angeben – dann werden alle Unterordner nach
 `.rpf`- und `.awc`-Dateien durchsucht und alle gefundenen Musik-Streams aufgelistet.
 
-> Beispiel: 28,5-GB-`audio.rpf` → 6.636 AWC-Header, davon 2.968 Musik-Container mit 2.992 Streams
-> (Opus, 48 kHz) ≈ 96 Stunden Audio ≈ 5 GB als `.opus`.
+> Beispiel: 28,5-GB-`audio.rpf` → 6.636 AWC-Header, davon 3.008 Musik-Container mit 3.116 Streams
+> (Opus, 48 kHz) ≈ 101 Stunden Audio ≈ 6 GB als `.opus`.
 
 ## Rechtlicher Hinweis
 
@@ -173,6 +173,24 @@ länger). Ohne Haken erscheint wieder die Ansicht nach Lage im Archiv.
   entstehen die Ordner `Podcasts/<Name>/`.
 * Was die Konfiguration keinem Sender zuordnet, steht nach Lage unter **Keinem Sender zugeordnet**.
 
+### Der Score
+
+Der Knopf **Score …** öffnet ein eigenes Fenster für den Score des Spiels. Er liegt nicht als fertige Titel vor: Die
+Audio-Konfiguration beschreibt **Abschnitte** (Tempo, Instrumentenspuren, welche Aufnahme jede Spur spielt, als Schleife
+oder einmal) und ihre Abfolge; die Aufnahmen liegen in Sound-Banken. Das Tool liest das, sucht die Banken (ein Durchlauf
+durch das Archiv, beim ersten Mal einige Minuten) und bietet **Stücke** an: einen Abschnitt, den das Spiel durch ein
+Ereignis startet, samt denen, die von selbst folgen, mit FFmpeg aus ihren Spuren gemischt. Im Beispielarchiv sind das
+2.543 Stücke, rund 33 Stunden; 974 davon dauern mindestens 30 Sekunden.
+
+* Gruppen: **Offene Welt**, **Missionen**, **Stützpunkte**, **Aktivitäten**, jeweils mit Untergruppen. Die Namen sind
+  Arbeitsnamen der Entwickler (`CG_RAID_CAUGHT_SHOOTOUT_A`) – offizielle Titel gibt es nicht, und sie können die Handlung
+  verraten.
+* Doppelklick spielt ab; **Speichern** schreibt `Score/<Gruppe>/<Untergruppe>/<Titel>.opus`; **App-Packs** schreibt je
+  Gruppe ein `.scorepak` für [AWC Radio auf Android](../radio/README.de.md).
+* Ein Stück ist eine **Rekonstruktion**: Im Spiel kommen und gehen Spuren zusätzlich je nach Spielgeschehen.
+
+`--score` auf der Kommandozeile öffnet das Fenster sofort. Aufbau der Daten: [FORMAT.md](docs/FORMAT.md#9-the-score-interactive-music).
+
 ### Namen, Logos und Mixe
 
 6. **Gruppen benennen** (optional): Rechtsklick auf eine Zeile *Gruppe NN* → **Gruppe umbenennen…** (z. B. nach dem
@@ -211,7 +229,7 @@ länger). Ohne Haken erscheint wieder die Ansicht nach Lage im Archiv.
    geschrieben (braucht ffmpeg; der Schnitt ist eine Stream-Kopie, markergenau). Die Bedeutung der Marker ist
    erschlossen, siehe `docs/FORMAT.md`.
 
-Kommandozeile: `python awc_tool.py [--lang=en|de] [Ordner | datei.awc | datei.rpf ...]`
+Kommandozeile: `python awc_tool.py [--lang=en|de] [--score] [Ordner | datei.awc | datei.rpf ...]`
 
 ## Ausgabeformate und Dateinamen
 
@@ -340,6 +358,8 @@ extractor/
   awc_logos.py        Kleiner Leser für die Logo-Texturen im UI-Textur-Pool des Spiels
   awc_gamedata.py     Liest die Radiosender, ihre Playlists und Kategorien aus der Audio-Konfiguration des Spiels
   awc_speech.py       Liest die DJ-Sprachcontainer (Ansicht nach Radiosendern)
+  awc_score.py        Liest den Score: Abschnitte, Sound-Banken, Stücke, Mischen
+  awc_score_ui.py     Das Score-Fenster
   logos/              Selbst gezeichnete Bilder für Sender, die die Programme selbst bilden (make_station_logos.py)
   Start AWC-Tool.bat  Starter
   build_exe.bat       Baut dist\AWC-Tool.exe mit PyInstaller

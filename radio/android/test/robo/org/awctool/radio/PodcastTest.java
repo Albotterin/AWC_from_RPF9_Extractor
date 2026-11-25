@@ -281,8 +281,10 @@ public class PodcastTest {
     public void inTheCar() {
         Harness.settle();
         List<String> root = ids(radio.children("awc_root"));
-        Assert.assertEquals(35, root.size());                          // 34 stations and the folder of the podcasts
-        Assert.assertEquals("awc_podcasts", root.get(34));
+        int stations = PackStore.get(Harness.app()).stations.size();
+        boolean score = !PackStore.get(Harness.app()).scores.isEmpty();
+        Assert.assertEquals(stations + (score ? 2 : 1), root.size());  // the stations, the podcasts' folder, the score's
+        Assert.assertEquals("awc_podcasts", root.get(stations));
         List<String> shows = ids(radio.children("awc_podcasts"));
         Assert.assertEquals(5, shows.size());
         Assert.assertEquals("pod:Drunk Kings", shows.get(0));

@@ -3,7 +3,8 @@
 The Android app (AWC-Radio.apk, the same file for everybody, no game data in it) plays the stations live by the UTC
 clock, exactly like AWC Radio on the PC. Its audio comes from packs in a folder on the phone, made here from the
 user's own audio.rpf: one file per station (<station>.radiopak: its songs in the game's own quality, about 128 kbit/s,
-not re-encoded, its logo and its programme data) and one per podcast (<podcast>.podpak: the episodes and the cover).
+not re-encoded, its logo and its programme data), one per podcast (<podcast>.podpak: the episodes and the cover) and
+one per group of the game's score (score_<group>.scorepak: the pieces awc_score mixes, about 128 kbit/s; needs FFmpeg).
 The app reads every pack of the folder, so a station or podcast is added or updated by copying just its file. Packs
 that would come out the same are not written again.
 
@@ -18,8 +19,13 @@ Pack layout (little endian), read by android/java/org/awctool/radio/Pack.java:
                              "files":{"t/<key>":[offset,length],"logos/<name>.png":[..]}}
                  a talk station carries "kind":"talk"; a song may carry "m": [[start second, title, artist], ...], the
                  parts of a long DJ mix; "ads": [{"k","t","s"}] are the station's adverts (played only when switched on)
+                 the DJ (only said when switched on): a song may carry "dj": {"i"|"o": [window start, window end,
+                 [line keys]]} (over its intro, its outro), the station "voices": [{"k","s"}] (the lines) and
+                 "toads": [line keys] (said over a song before an advert break)
                  a podcast pack (.podpak, same layout) has "stations": [] and
                  "podcasts": [{"name","logo","episodes":[{"k","s"}]}] (the episodes in their order)
+                 a score pack (.scorepak, same layout) has "stations": [] and
+                 "scores": [{"name","group","pieces":[{"k","g": sub group,"t": title,"s"}]}] (in their order)
 "sig" is a fingerprint of the content: it tells whether an existing file is still up to date.
 
 A pack contains game audio: for personal use only, do not share it.
@@ -38,6 +44,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path[:0] = [HERE, os.path.join(os.path.dirname(HERE), "extractor")]   # the shared modules live with the extractor
+import awc_dj as dj  # noqa: E402
 import awc_i18n  # noqa: E402
 import awc_icons as icons  # noqa: E402
 
@@ -47,6 +54,10 @@ VERSION = 1
 HEADER = 32
 EXTENSION = ".radiopak"
 PODCAST_EXTENSION = ".podpak"
+SCORE_EXTENSION = ".scorepak"
+SCORE_NAMES = {"openworld": "Open World", "mission": "Missions", "compound": "Compounds", "activity": "Activities"}
+SCORE_MIN = 30.0                            # shorter pieces of the score (transitions, stingers) stay out of the packs
+SCORE_MIX = 2                               # raise when awc_score.render() sounds different: the packs are made anew
 BYTES_PER_SEC = 16200                       # the game's Opus streams are about 129 kbit/s
 
 
@@ -61,16 +72,17 @@ class ExportError(Exception):
 STR = {
     "en": {
         "title": "AWC Radio packs for Android",
-        "intro": "Makes one file per station (.radiopak) and per podcast (.podpak): a station's songs in the game's own quality (about 128 kbit/s), the logo and "
-                 "the programme. Install AWC-Radio.apk on the phone, copy the packs into one folder there (for example "
+        "intro": "Makes one file per station (.radiopak), per podcast (.podpak) and per group of the score (.scorepak, once the "
+                 "score has been read in AWC Tool; mixing it needs FFmpeg and a few minutes): a station's songs in the game's own "
+                 "quality (about 128 kbit/s), the logo and the programme. Install AWC-Radio.apk on the phone, copy the packs into one folder there (for example "
                  "\"AWC-Radio\") and choose that folder in the app. Later you only copy the new or changed files. For your own use "
                  "only: the packs contain game audio.",
-        "folder": "Folder for the packs on this PC", "browse": "Browse…", "stations": "Stations and podcasts (Ctrl/Shift for several)",
+        "folder": "Folder for the packs on this PC", "browse": "Browse…", "stations": "Stations, podcasts and score (Ctrl/Shift for several)",
         "all": "All", "none": "None", "changed_only": "New and changed",
         "new": "new", "changed": "changed", "current": "up to date",
         "size": "{n} pack(s) to write, about {s}. Up to date and skipped: {c}",
         "create": "Write packs", "cancel": "Cancel", "close": "Close",
-        "st_extract": "{station}: reading … {i}/{n}",
+        "st_extract": "{station}: reading … {i}/{n}", "st_mix": "{station}: mixing … {i}/{n}",
         "done": "{w} pack(s) written, {c} already up to date.\n\nFolder:\n{p}\n\nCopy the new files into the pack folder on the "
                 "phone (same names replace the old ones). Please do not share them: they contain game audio.",
         "err_space": "Not enough free disk space in the target folder (about {s} needed).", "err_pick": "Pick at least one station or podcast.",
@@ -79,16 +91,17 @@ STR = {
     },
     "de": {
         "title": "AWC Radio Packs für Android",
-        "intro": "Erzeugt eine Datei pro Sender (.radiopak) und pro Podcast (.podpak): die Songs eines Senders in der Originalqualität des Spiels (ca. 128 kbit/s), das "
-                 "Logo und das Programm. Auf dem Handy AWC-Radio.apk installieren, die Packs dort in einen Ordner kopieren (zum "
+        "intro": "Erzeugt eine Datei pro Sender (.radiopak), pro Podcast (.podpak) und pro Score-Gruppe (.scorepak, sobald der "
+                 "Score im AWC-Tool gelesen wurde; das Mischen braucht FFmpeg und einige Minuten): die Songs eines Senders in der "
+                 "Originalqualität des Spiels (ca. 128 kbit/s), das Logo und das Programm. Auf dem Handy AWC-Radio.apk installieren, die Packs dort in einen Ordner kopieren (zum "
                  "Beispiel „AWC-Radio“) und diesen Ordner in der App wählen. Später kopierst du nur die neuen oder geänderten "
                  "Dateien. Nur für den eigenen Gebrauch: die Packs enthalten Spiel-Audio.",
-        "folder": "Ordner für die Packs auf diesem PC", "browse": "Durchsuchen…", "stations": "Sender und Podcasts (Strg/Umschalt für mehrere)",
+        "folder": "Ordner für die Packs auf diesem PC", "browse": "Durchsuchen…", "stations": "Sender, Podcasts und Score (Strg/Umschalt für mehrere)",
         "all": "Alle", "none": "Keine", "changed_only": "Neue und geänderte",
         "new": "neu", "changed": "geändert", "current": "aktuell",
         "size": "{n} Pack(s) zu schreiben, etwa {s}. Aktuell und übersprungen: {c}",
         "create": "Packs schreiben", "cancel": "Abbrechen", "close": "Schließen",
-        "st_extract": "{station}: lese … {i}/{n}",
+        "st_extract": "{station}: lese … {i}/{n}", "st_mix": "{station}: mische … {i}/{n}",
         "done": "{w} Pack(s) geschrieben, {c} waren schon aktuell.\n\nOrdner:\n{p}\n\nDie neuen Dateien in den Pack-Ordner auf dem "
                 "Handy kopieren (gleiche Namen ersetzen die alten). Bitte nicht weitergeben: sie enthalten Spiel-Audio.",
         "err_space": "Im Zielordner ist nicht genug Platz frei (es werden etwa {s} gebraucht).", "err_pick": "Bitte mindestens einen Sender oder Podcast wählen.",
@@ -135,20 +148,41 @@ def estimate_bytes(stations):
     total = 0
     for st in stations.values():
         total += 150_000
-        for tr in st["songs"] + st["jingles"] + st.get("ads", []):
+        for tr in st.get("songs", []) + st.get("jingles", []) + st.get("ads", []) + st.get("pieces", []):
             total += tr["sec"] * BYTES_PER_SEC + 200
+        for tr in dj.station_lines(st):
+            total += tr["sec"] * BYTES_PER_SEC // 2 + 200          # speech is mono
     return int(total)
 
 
 # ------------------------------------------------------------------------------------------------ what a pack holds
-def pack_sources(index):
-    """Everything that gets a pack of its own: the stations and the podcasts of the radio index, {name: entry}."""
-    return dict(index["stations"], **index.get("podcasts", {}))
+def score_sources(rpf, min_sec=SCORE_MIN):
+    """{"Score: <group>": {"score": group, "pieces": [...]}} - empty until the score of this archive has been read."""
+    import awc_score  # noqa: PLC0415
+    out = {}
+    for piece in (awc_score.cached(rpf) if rpf else None) or ():
+        if piece["sec"] >= min_sec:
+            group = piece["group"]
+            out.setdefault("Score: " + SCORE_NAMES[group], {"score": group, "min": min_sec, "pieces": []})["pieces"].append(piece)
+    return out
 
 
-def pack_file(name, podcast=False):
-    """File name of a pack: 'The Chamber 106.6' -> 'the_chamber_106_6.radiopak', 'Final Act' -> 'final_act.podpak'."""
+def pack_sources(index, rpf="", min_sec=SCORE_MIN):
+    """Everything that gets a pack of its own: the stations and podcasts of the radio index and, with the path of the
+    archive, the groups of its score: {name: entry}."""
+    return dict(dict(index["stations"], **index.get("podcasts", {})), **score_sources(rpf, min_sec))
+
+
+def pack_file(name, podcast=False, score=""):
+    """File name of a pack: 'The Chamber 106.6' -> 'the_chamber_106_6.radiopak', 'Final Act' -> 'final_act.podpak',
+    the score's open world -> 'score_open_world.scorepak'."""
+    if score:
+        return "score_" + icons.slug(SCORE_NAMES[score]) + SCORE_EXTENSION
     return icons.slug(name) + (PODCAST_EXTENSION if podcast else EXTENSION)
+
+
+def file_for(name, entry):
+    return pack_file(name, entry.get("podcast", False), entry.get("score", ""))
 
 
 def _logo(name):
@@ -160,7 +194,10 @@ def _logo(name):
 
 
 def station_entry(name, st, has_logo):
-    """The station (or podcast) as it stands in the pack index."""
+    """The station (or podcast, or score group) as it stands in the pack index."""
+    if st.get("score"):
+        return {"name": SCORE_NAMES[st["score"]], "group": st["score"], "logo": "",
+                "pieces": [{"k": "s_" + x["id"], "g": x["sub"], "t": x["title"], "s": x["sec"]} for x in st["pieces"]]}
     logo = "logos/%s.png" % icons.slug(name) if has_logo else ""
     if st.get("podcast"):
         return {"name": name, "logo": logo, "episodes": [{"k": track_key(e), "s": e["sec"]} for e in st["songs"]]}
@@ -170,6 +207,15 @@ def station_entry(name, st, has_logo):
              "jingles": [{"k": track_key(j), "s": j["sec"]} for j in st["jingles"]]}
     if st.get("ads"):
         entry["ads"] = [{"k": track_key(a), "t": a["title"], "s": a["sec"]} for a in st["ads"]]
+    lines = dj.station_lines(st)
+    if lines:
+        key = lambda x: "%s_%s" % (x[0], x[1])  # noqa: E731
+        entry["voices"] = [{"k": track_key(x), "s": x["sec"]} for x in lines]
+        for song, own in zip(entry["songs"], st["songs"]):
+            if own.get("dj"):
+                song["dj"] = {w: [v[0], v[1], [key(x) for x in v[2]]] for w, v in own["dj"].items()}
+        if st.get("toads"):
+            entry["toads"] = [key(x) for x in st["toads"]]
     if any(s.get("parts") and not s.get("set") for s in st["songs"]):      # talk radio, not a club's DJ set
         entry["kind"] = "talk"
     return entry
@@ -177,9 +223,13 @@ def station_entry(name, st, has_logo):
 
 def signature(name, st, index):
     """Fingerprint of everything that goes into the pack of a station: programme, titles, source streams and logo."""
+    if st.get("score"):                                       # a piece's ID already says which stems it mixes
+        what = [VERSION, SCORE_MIX, station_entry(name, st, False)]
+        return hashlib.sha1(json.dumps(what, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
     logo = _logo(name)
     sources = [[(index["items"].get(str(base)) or {}).get("length"), base, i]
-               for tr in st["songs"] + st["jingles"] + st.get("ads", []) for base, i in tr.get("parts") or [(tr["base"], tr["idx"])]]
+               for tr in st["songs"] + st["jingles"] + st.get("ads", []) + dj.station_lines(st)
+               for base, i in tr.get("parts") or [(tr["base"], tr["idx"])]]
     h = hashlib.sha1(json.dumps([VERSION, station_entry(name, st, bool(logo)), sources], sort_keys=True,
                                 ensure_ascii=False).encode("utf-8"))
     h.update(logo)
@@ -198,8 +248,9 @@ def read_signature(path):
                 return ""
             f.seek(off)
             meta = json.loads(f.read(length).decode("utf-8"))
-            for st in meta.get("stations", []) + meta.get("podcasts", []):  # every item must be in the file
-                for item in st.get("songs", []) + st.get("jingles", []) + st.get("ads", []) + st.get("episodes", []):
+            for st in meta.get("stations", []) + meta.get("podcasts", []) + meta.get("scores", []):  # all must be in it
+                for item in (st.get("songs", []) + st.get("jingles", []) + st.get("ads", []) + st.get("episodes", [])
+                             + st.get("pieces", []) + st.get("voices", [])):
                     if "t/" + item["k"] not in meta["files"]:
                         return ""
             return str(meta.get("sig", ""))
@@ -211,7 +262,7 @@ def plan(stations, index, folder):
     """-> {station: (path, signature, "new" | "changed" | "current")} for the packs in `folder`."""
     out = {}
     for name, st in stations.items():
-        path = os.path.join(folder, pack_file(name, st.get("podcast", False)))
+        path = os.path.join(folder, file_for(name, st))
         sig = signature(name, st, index)
         state = "new" if not os.path.isfile(path) else "current" if read_signature(path) == sig else "changed"
         out[name] = (path, sig, state)
@@ -321,6 +372,48 @@ def _write_tracks(writer, tracks, index, rpf, work, pool, workers, cache_dirs, c
         raise ExportError(str(errors[0]))
 
 
+def _write_score(writer, pieces, min_sec, rpf, work, cancel, step):
+    """Mix the pieces of a score group and add them to the pack. Returns {file key: length} of those added: a piece
+    that turns out shorter than min_sec (mostly silence) is left out."""
+    import awc_score  # noqa: PLC0415
+    ffmpeg = find_ffmpeg()
+    if not ffmpeg:
+        raise ExportError("FFmpeg is needed to mix the score")
+
+    lengths = {}
+
+    def mix(piece):
+        if cancel.is_set():
+            return
+        key = "s_" + piece["id"]
+        dst = os.path.join(work, key + ".out")
+        seconds = awc_score.render(rpf, piece, dst, ffmpeg, cancel=cancel.is_set,
+                                   tags={"TITLE": piece["title"], "ALBUM": piece["sub"]})
+        if seconds >= min_sec:
+            writer.add_file("t/" + key, dst)
+            lengths[key] = round(seconds, 2)
+        os.remove(dst)
+        step()
+
+    try:
+        with ThreadPoolExecutor(max_workers=max(1, min(4, (os.cpu_count() or 2) - 1))) as pool:
+            futures = [pool.submit(mix, x) for x in pieces]
+            try:
+                for fu in futures:
+                    fu.result()
+            except BaseException:
+                for fu in futures:
+                    fu.cancel()
+                raise
+    except InterruptedError:
+        raise Cancelled() from None
+    except awc_score.ScoreError as e:
+        raise ExportError(str(e)) from None
+    if cancel.is_set():
+        raise Cancelled()
+    return lengths
+
+
 def export_packs(stations, index, rpf, folder, progress=None, cancel=None, cache_dirs=()):
     """Write one pack per station into `folder`; packs that are up to date stay as they are.
 
@@ -343,7 +436,9 @@ def export_packs(stations, index, rpf, folder, progress=None, cancel=None, cache
     need = sum(sizes) * 1.05 + max(sizes)                        # an old pack stays until the new one is complete
     if shutil.disk_usage(folder).free < need + 50_000_000:
         raise ExportError(t("err_space", s=human(need)))
-    jobs = {n: {track_key(tr): tr for tr in stations[n]["songs"] + stations[n]["jingles"] + stations[n].get("ads", [])} for n in write}
+    jobs = {n: {x["id"]: x for x in stations[n]["pieces"]} if stations[n].get("score") else
+            {track_key(tr): tr for tr in stations[n]["songs"] + stations[n]["jingles"] + stations[n].get("ads", [])
+             + dj.station_lines(stations[n])} for n in write}
     total, done = sum(len(j) for j in jobs.values()), [0]
     work = os.path.join(folder, ".awc_pack_work")
     shutil.rmtree(work, ignore_errors=True)
@@ -356,21 +451,33 @@ def export_packs(stations, index, rpf, folder, progress=None, cancel=None, cache
                 writer = PackWriter(path + ".part")
                 count = [0]
 
+                score = stations[name].get("score")
+
                 def step():
                     count[0] += 1
                     done[0] += 1
-                    progress(0.99 * (done[0] - 1) / total, t("st_extract", station=name, i=count[0], n=len(jobs[name])))
+                    progress(0.99 * (done[0] - 1) / total,
+                             t("st_mix" if score else "st_extract", station=name, i=count[0], n=len(jobs[name])))
 
                 try:
-                    _write_tracks(writer, jobs[name], index, rpf, work, pool, workers, cache_dirs, cancel, step)
-                    logo = _logo(name)
+                    lengths = {}
+                    if score:
+                        lengths = _write_score(writer, stations[name]["pieces"], stations[name].get("min", SCORE_MIN), rpf, work,
+                                               cancel, step)
+                    else:
+                        _write_tracks(writer, jobs[name], index, rpf, work, pool, workers, cache_dirs, cancel, step)
+                    logo = b"" if score else _logo(name)
                     entry = station_entry(name, stations[name], bool(logo))
+                    if score:                                 # the pieces that are in it, with their real length
+                        entry["pieces"] = [dict(x, s=lengths[x["k"]]) for x in entry["pieces"] if x["k"] in lengths]
                     if logo:
                         writer.add_bytes(entry["logo"], logo)
                     meta = {"v": VERSION, "created": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                             "sig": sig, "stations": [entry]}
                     if stations[name].get("podcast"):
                         meta.update(stations=[], podcasts=[entry])
+                    if score:
+                        meta.update(stations=[], scores=[entry])
                     writer.finish(meta)
                     os.replace(path + ".part", path)
                 except BaseException:
@@ -396,7 +503,7 @@ def open_dialog(app):
     from tkinter import filedialog, messagebox, ttk
 
     import awc_radio as radio
-    sources = pack_sources(app.index)
+    sources = pack_sources(app.index, app.cfg.get("rpf", ""))
     names = list(sources)
     win = tk.Toplevel(app)
     win.title(t("title"))
@@ -473,7 +580,7 @@ def open_dialog(app):
         for nm in names:
             st = sources[nm]
             line = "%s%s   –   %s   (%d)" % ("Podcast: " if st.get("podcast") else "", nm,
-                                             human(estimate_bytes({nm: st})), len(st["songs"]))
+                                             human(estimate_bytes({nm: st})), len(st.get("songs", st.get("pieces", []))))
             if nm in state:
                 line += "   ·   %s" % t(state[nm])
             lb.insert("end", line)
@@ -570,15 +677,15 @@ def open_dialog(app):
 def main(argv=None):
     import argparse
     import awc_radio as radio
-    ap = argparse.ArgumentParser(description="Write AWC Radio packs (.radiopak, .podpak) for the Android app")
+    ap = argparse.ArgumentParser(description="Write AWC Radio packs (.radiopak, .podpak, .scorepak) for the Android app")
     ap.add_argument("folder", help="folder for the packs (one file per station and podcast); up-to-date files are left alone")
-    ap.add_argument("--stations", nargs="*", help="station and podcast names (default: all)")
+    ap.add_argument("--stations", nargs="*", help='station, podcast and score names such as "Score: Open World" (default: all)')
     a = ap.parse_args(argv)
     cfg = radio.load_settings()
     idx = radio.load_index(cfg["rpf"], cfg.get("pool", ""))
     if not idx:
         raise SystemExit("no radio index yet: start AWC Radio once")
-    stations = {k: v for k, v in pack_sources(idx).items() if not a.stations or k in a.stations}
+    stations = {k: v for k, v in pack_sources(idx, cfg["rpf"]).items() if not a.stations or k in a.stations}
     os.makedirs(a.folder, exist_ok=True)
     t0 = time.time()
     try:

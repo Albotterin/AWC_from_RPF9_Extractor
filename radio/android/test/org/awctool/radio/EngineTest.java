@@ -68,6 +68,76 @@ public class EngineTest {
 
     static int checks = 0;
 
+    /** A station whose songs all have a window at the start and one at the end, with a line for each. */
+    static Schedule djStation(long seed) {
+        Random r = new Random(seed);
+        List<Schedule.Track> s = new ArrayList<>(), j = new ArrayList<>();
+        for (int i = 0; i < 14; i++) {
+            Schedule.Track t = new Schedule.Track((1000 + i) + "_0", "s" + i, "a", 120 + r.nextInt(100) + r.nextDouble());
+            t.intro = new Schedule.Window(4.0, 18.0, List.of(new Schedule.Track((5000 + i) + "_0", "", "", 5 + r.nextDouble()),
+                    new Schedule.Track((6000 + i) + "_0", "", "", 7 + r.nextDouble())));
+            t.outro = new Schedule.Window(t.sec - 25, t.sec - 8, List.of(new Schedule.Track((7000 + i) + "_0", "", "", 6 + r.nextDouble())));
+            s.add(t);
+        }
+        for (int i = 0; i < 4; i++) j.add(new Schedule.Track((9000 + i) + "_0", "", "", 5 + r.nextDouble()));
+        return new Schedule("Talk Over FM", s, j);
+    }
+
+    /** The DJ: every line of the programme is said at its time, the music steps back for it and comes back. */
+    static void dj(double start, double seconds, boolean on) {
+        Schedule sch = djStation(7);
+        FakeClock clock = new FakeClock();
+        clock.t = start;
+        List<Fake> all = new ArrayList<>();
+        Engine eng = new Engine(sch, clock, track -> {
+            Fake f = new Fake(track, clock, 0.15);
+            all.add(f);
+            return f;
+        });
+        eng.setDj(on);
+        List<Schedule.Item> items = sch.itemsFrom(start, 80);
+        int ducked = 0, full = 0;
+        while (clock.t < start + seconds) {
+            long delay = eng.tick();
+            double now = clock.t;
+            check(eng.openPlayers() <= 4 && eng.openLines() <= 4, "dj: players " + eng.openPlayers() + " + " + eng.openLines());
+            for (Schedule.Item it : items) {
+                for (Schedule.Voice v : sch.voices(it)) {
+                    double from = it.start + v.at, to = from + v.line.sec;
+                    if (now < from + 0.2 || now > to - 0.2 || from < start + 1) continue;
+                    Fake line = null, music = null;
+                    for (Fake f : all) {
+                        if (f.released || !f.started) continue;
+                        if (f.track == v.line) line = f;
+                        if (f.track == it.track) music = f;
+                    }
+                    if (!on) {
+                        check(line == null, "dj off: silent");
+                        continue;
+                    }
+                    check(line != null, "dj: line " + v.line.key + " is not said at " + (now - from));
+                    check(Math.abs(line.position() - (now - from)) < 0.35, "dj: line drifts " + (line.position() - (now - from)));
+                    check(line.vol > 0.99f, "dj: line volume " + line.vol);
+                    check(music != null && Math.abs(music.vol - Engine.DUCK) < 0.02, "dj: music " + (music == null ? -1 : music.vol));
+                    ducked++;
+                }
+                if (now > it.start + 25 && now < it.end - 40) {                  // between the windows
+                    for (Fake f : all) {
+                        if (f.track == it.track && f.started && !f.released) {
+                            check(f.vol > 0.99f, "dj: music stays down " + f.vol);
+                            full++;
+                        }
+                    }
+                }
+            }
+            clock.t += delay / 1000.0;
+        }
+        eng.stop();
+        for (Fake f : all) check(f.released, "dj: player of " + f.track.key + " leaked");
+        check((ducked > 100) == on && full > 1000, "dj: ducked " + ducked + ", full " + full);
+        System.out.println(String.format("  %-34s ok  (%d players, music ducked in %d ticks)", "DJ " + (on ? "on" : "off"), all.size(), ducked));
+    }
+
     static void check(boolean ok, String msg) {
         checks++;
         if (!ok) throw new AssertionError(msg);
@@ -194,6 +264,9 @@ public class EngineTest {
             rules(s, fade, false);
             run("crossfade " + (int) fade + " s", s, 1_700_000_000.0, 3600, null, true);
         }
+        dj(1_700_000_000.0, 3600, true);
+        dj(1_700_000_000.0, 1800, false);
+
         Schedule talk = station("Talk FM", 6, 4, 31, 8, true);
         rules(talk, 8, true);
         run("talk radio, never faded", talk, 1_700_000_000.0, 3600, null, true);

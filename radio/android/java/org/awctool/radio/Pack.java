@@ -28,6 +28,7 @@ import java.util.Map;
  *   idx          UTF-8 JSON: {"v":1,"created":"...","sig":"...","stations":[{name,logo,kind,songs:[{k,t,a,s}],
  *                jingles:[{k,s}]}],"files":{"t/<key>":[offset,length],"logos/<name>.png":[offset,length]}}
  *        A podcast pack (.podpak, same layout) has "stations": [] and "podcasts":[{name,logo,episodes:[{k,s}]}].
+ *        A score pack (.scorepak) has "stations": [] and "scores":[{name,group,pieces:[{k,g,t,s}]}].
  *
  * The songs are played straight out of this file (MediaPlayer with file descriptor, offset and length), nothing is
  * copied or unpacked on the phone.
@@ -51,6 +52,7 @@ final class Pack {
     private final Map<String, Entry> files = new HashMap<>();
     private final List<Library.Station> stations = new ArrayList<>();
     private final List<Library.Station> podcasts = new ArrayList<>();
+    private final List<Library.Station> scores = new ArrayList<>();
     final String created;
 
     /** @param owner closed together with the pack (the ParcelFileDescriptor on Android), may be null */
@@ -90,6 +92,9 @@ final class Pack {
             JSONArray pods = root.optJSONArray("podcasts");
             if (pods != null) Library.parsePodcasts(pods, podcasts);
             for (Library.Station p : podcasts) p.pack = this;
+            JSONArray groups = root.optJSONArray("scores");
+            if (groups != null) Library.parseScores(groups, scores);
+            for (Library.Station g : scores) g.pack = this;
         } catch (IOException e) {
             close();
             throw e;
@@ -113,6 +118,10 @@ final class Pack {
 
     List<Library.Station> podcasts() {
         return podcasts;
+    }
+
+    List<Library.Station> scores() {
+        return scores;
     }
 
     Entry entry(String path) {

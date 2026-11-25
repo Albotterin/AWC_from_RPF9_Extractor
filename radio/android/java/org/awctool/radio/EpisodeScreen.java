@@ -1,6 +1,7 @@
 package org.awctool.radio;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
@@ -13,8 +14,9 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 
 /**
- * The large player of a podcast: the cover, the place in the episode (it can be dragged), back and forward, the episode
- * before and after, the sleep timer and the way to the list of episodes.
+ * The large player of what is played on demand. A podcast: the cover, the place in the episode (it can be dragged), back
+ * and forward, the episode before and after, the sleep timer and the way to the list of episodes. A group of the score
+ * is shown the same way, with the piece's name and without the jumps back and forward.
  */
 final class EpisodeScreen extends LinearLayout {
     interface Actions {
@@ -37,9 +39,10 @@ final class EpisodeScreen extends LinearLayout {
 
     private final Activity activity;
     private final Ui.SquareImage cover;
-    private final TextView name, title, position, left, sleep, next;
+    private final TextView kind, name, title, position, left, sleep, next, list;
     private final SeekBar bar;
-    private final ImageButton toggle;
+    private final ImageButton toggle, before, after;
+    private final FrameLayout back, forward;
     private Library.Station shown;
     private int colorShown;
     private double length;
@@ -58,7 +61,7 @@ final class EpisodeScreen extends LinearLayout {
         ImageButton close = Ui.icon(a, R.drawable.ic_down, a.getString(R.string.act_close), 48, Color.WHITE);
         close.setOnClickListener(v -> actions.close());
         top.addView(close, new LayoutParams(dp(48), dp(48)));
-        TextView kind = Ui.strong(a, a.getString(R.string.podcast), 13, Color.WHITE);
+        kind = Ui.strong(a, a.getString(R.string.podcast), 13, Color.WHITE);
         kind.setGravity(Gravity.CENTER);
         top.addView(kind, new LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         top.addView(new TextView(a), new LayoutParams(dp(48), dp(48)));
@@ -131,17 +134,17 @@ final class EpisodeScreen extends LinearLayout {
 
         LinearLayout controls = new LinearLayout(a);
         controls.setGravity(Gravity.CENTER);
-        ImageButton before = Ui.icon(a, R.drawable.ic_prev, a.getString(R.string.act_prev_episode), 48, Color.WHITE);
-        ImageButton after = Ui.icon(a, R.drawable.ic_next, a.getString(R.string.act_next_episode), 48, Color.WHITE);
+        before = Ui.icon(a, R.drawable.ic_prev, a.getString(R.string.act_prev_episode), 48, Color.WHITE);
+        after = Ui.icon(a, R.drawable.ic_next, a.getString(R.string.act_next_episode), 48, Color.WHITE);
         toggle = Ui.icon(a, R.drawable.ic_play, a.getString(R.string.act_resume), 72, Ui.NIGHT);
         toggle.setBackground(Ui.ripple(Ui.circle(Color.WHITE), Ui.circle(Color.WHITE)));
         toggle.setElevation(dp(6));
         before.setOnClickListener(v -> actions.skip(-1));
         after.setOnClickListener(v -> actions.skip(1));
         toggle.setOnClickListener(v -> actions.toggle());
-        FrameLayout back = jumpButton(R.drawable.ic_rewind, R.string.act_rewind, RadioService.BACK_SECONDS);
+        back = jumpButton(R.drawable.ic_rewind, R.string.act_rewind, RadioService.BACK_SECONDS);
         back.getChildAt(0).setOnClickListener(v -> actions.jump(-RadioService.BACK_SECONDS));
-        FrameLayout forward = jumpButton(R.drawable.ic_forward, R.string.act_forward, RadioService.FORWARD_SECONDS);
+        forward = jumpButton(R.drawable.ic_forward, R.string.act_forward, RadioService.FORWARD_SECONDS);
         forward.getChildAt(0).setOnClickListener(v -> actions.jump(RadioService.FORWARD_SECONDS));
         int side = dp(48), jump = dp(small ? 52 : 58), big = dp(small ? 60 : 72);
         controls.addView(before, new LayoutParams(side, side));
@@ -161,7 +164,7 @@ final class EpisodeScreen extends LinearLayout {
         extras.setPadding(dp(6), dp(wide || small ? 6 : 16), dp(6), 0);
         sleep = extra(a.getString(R.string.menu_sleep), small);
         sleep.setOnClickListener(v -> actions.sleep());
-        TextView list = extra(a.getString(R.string.all_episodes), small);
+        list = extra(a.getString(R.string.all_episodes), small);
         list.setOnClickListener(v -> {
             if (shown != null) actions.episodes(shown.name);
         });
@@ -230,21 +233,37 @@ final class EpisodeScreen extends LinearLayout {
         set(left, "-" + Ui.fmt(Math.max(0, length - at)));
     }
 
-    /** Shows the podcast that the radio service is playing. */
+    /** The words and buttons of a podcast or of the score. */
+    private void kindOf(boolean score) {
+        Context c = getContext();
+        set(kind, c.getString(score ? R.string.tab_score : R.string.podcast));
+        back.setVisibility(score ? GONE : VISIBLE);
+        forward.setVisibility(score ? GONE : VISIBLE);
+        before.setContentDescription(c.getString(score ? R.string.act_prev_piece : R.string.act_prev_episode));
+        after.setContentDescription(c.getString(score ? R.string.act_next_piece : R.string.act_next_episode));
+        bar.setContentDescription(c.getString(score ? R.string.act_seek_piece : R.string.act_seek));
+        set(list, c.getString(score ? R.string.score_all_pieces : R.string.all_episodes));
+    }
+
+    /** Shows the podcast or score group that the radio service is playing. */
     void show(Library.Station podcast, RadioService radio) {
+        boolean score = podcast.score != null;
         if (podcast != shown) {
             shown = podcast;
             cover.setImageBitmap(Logos.get(podcast, 256));
-            cover.setContentDescription(podcast.name);
+            cover.setContentDescription(Ui.nameOf(getContext(), podcast));
             paint(Logos.color(podcast).tint);
-            set(name, podcast.name);
+            kindOf(score);
+            if (!score) set(name, podcast.name);
         }
+        if (score) set(name, radio.title);
         boolean playing = radio.state == RadioService.PLAYING;
         toggle.setImageResource(playing ? R.drawable.ic_pause : R.drawable.ic_play);
         toggle.setContentDescription(getContext().getString(playing ? R.string.act_pause : R.string.act_resume));
         int i = radio.episodeIndex();
-        boolean failed = radio.title.equals(getContext().getString(R.string.episode_error));
-        set(title, failed ? radio.title : getContext().getString(R.string.episode_of, i + 1, podcast.songs.size()));
+        boolean failed = radio.title.equals(getContext().getString(score ? R.string.piece_error : R.string.episode_error));
+        set(title, score ? radio.artist + " • " + Ui.nameOf(getContext(), podcast)
+                : failed ? radio.title : getContext().getString(R.string.episode_of, i + 1, podcast.songs.size()));
         length = radio.duration();
         if (!dragging) {
             double at = radio.position();

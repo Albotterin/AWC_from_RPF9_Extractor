@@ -162,6 +162,19 @@ class AwcStream:
         return tr("stream_label", i=self.index, id="%08X" % self.id)
 
 
+MUSIC_FLAGS = 0x25      # low byte of the header flags of a multichannel (music) AWC
+
+
+def _chunk_places(head, flags, count, info_off):
+    """Where a header may hold the chunks the music is found by: any 4 byte step, and - for a music AWC with an odd
+    stream count, whose table does not lie on such a step - the places of its table (behind the stream starts, count + 1
+    block numbers and the stream IDs)."""
+    places = [range(0x10, info_off - 7, 4)]
+    if flags & 0xFF == MUSIC_FLAGS and count & 1:
+        places.append(range(20 + 10 * count, info_off - 7, 8))
+    return places
+
+
 class AwcFile:
     """An AWC file: either a standalone file or a slice (base/length) inside a larger
     file, e.g. an RPF archive."""
@@ -188,20 +201,23 @@ class AwcFile:
             hdr = f.read(0x10)
             if len(hdr) < 0x10 or hdr[:4] != b"ADAT":
                 raise AwcError(tr("err_not_awc"))
-            _magic, _ver, _flags, _n, info_off = struct.unpack("<4sHHII", hdr)
+            _magic, _ver, flags, count, info_off = struct.unpack("<4sHHII", hdr)
             if info_off < 0x10 or info_off > 0x10000:
                 raise AwcError(tr("err_header"))
             f.seek(self.base)
             head = f.read(info_off)
-            chunks = {}
-            for i in range(0x10, info_off - 7, 4):
-                v = struct.unpack_from("<Q", head, i)[0]
-                tag = v >> 56
-                off = v & 0xFFFFFFF
-                size = (v >> 28) & 0xFFFFFFF
-                if tag in BLOCK_CHUNK_TAGS and off >= info_off and off < self.size + 0x10000000:
-                    chunks.setdefault(tag, (off, size))
-            if 0x48 not in chunks or 0x55 not in chunks:
+            for places in _chunk_places(head, flags, count, info_off):
+                chunks = {}
+                for i in places:
+                    v = struct.unpack_from("<Q", head, i)[0]
+                    tag = v >> 56
+                    off = v & 0xFFFFFFF
+                    size = (v >> 28) & 0xFFFFFFF
+                    if tag in BLOCK_CHUNK_TAGS and off >= info_off and off < self.size + 0x10000000:
+                        chunks.setdefault(tag, (off, size))
+                if 0x48 in chunks and 0x55 in chunks:
+                    break
+            else:
                 raise AwcError(tr("err_not_music"))
             f.seek(self.base + chunks[0x48][0])
             fmt = f.read(chunks[0x48][1])
@@ -361,12 +377,16 @@ def _probe_adat(g, pos, container_size):
     ver, flags, n, info_off = struct.unpack_from("<HHII", head, 4)
     if ver != 1 or not (1 <= n <= 65536) or not (0x10 <= info_off <= 0xFFF0):
         return None
-    end = 0
-    for i in range(0x10, min(info_off, len(head)) - 7, 4):
-        v = struct.unpack_from("<Q", head, i)[0]
-        tag, off, size = v >> 56, v & 0xFFFFFFF, (v >> 28) & 0xFFFFFFF
-        if tag in BLOCK_CHUNK_TAGS and off >= info_off and pos + off + size <= container_size:
-            end = max(end, off + size)
+    for places in _chunk_places(head, flags, n, min(info_off, len(head))):
+        end, found = 0, set()
+        for i in places:
+            v = struct.unpack_from("<Q", head, i)[0]
+            tag, off, size = v >> 56, v & 0xFFFFFFF, (v >> 28) & 0xFFFFFFF
+            if tag in BLOCK_CHUNK_TAGS and off >= info_off and pos + off + size <= container_size:
+                end = max(end, off + size)
+                found.add(tag)
+        if 0x48 in found and 0x55 in found:
+            break
     return {"length": end or None}
 
 
@@ -452,7 +472,7 @@ def scan_container_cached(path, progress=None, cancel=None, use_cache=True):
         try:
             with open(cf, "r", encoding="utf-8") as fh:
                 c = json.load(fh)
-            if c.get("size") == st.st_size and c.get("mtime") == int(st.st_mtime) and c.get("v") == 5:
+            if c.get("size") == st.st_size and c.get("mtime") == int(st.st_mtime) and c.get("v") == 6:
                 for it in c["items"]:
                     it["path"] = path          # the archive may have been moved/renamed since the scan
                 add_groups(c["items"])
@@ -463,7 +483,7 @@ def scan_container_cached(path, progress=None, cancel=None, use_cache=True):
     add_groups(items)
     try:
         with open(cf, "w", encoding="utf-8") as fh:
-            json.dump({"v": 5, "path": path, "size": st.st_size, "mtime": int(st.st_mtime),
+            json.dump({"v": 6, "path": path, "size": st.st_size, "mtime": int(st.st_mtime),
                        "total": total, "items": items}, fh)
     except OSError:
         pass
