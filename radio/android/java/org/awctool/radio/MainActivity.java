@@ -232,6 +232,11 @@ public class MainActivity extends Activity implements PackStore.Listener {
                 }
 
                 @Override
+                public void adverts(boolean on) {
+                    setAdverts(on);
+                }
+
+                @Override
                 public void alarm() {
                     Library.Station st = shownStation();
                     AlarmEditActivity.open(MainActivity.this, 0, st == null ? null : st.name);
@@ -532,10 +537,19 @@ public class MainActivity extends Activity implements PackStore.Listener {
         Toast.makeText(this, minutes > 0 ? getString(R.string.sleep_set, minutes) : getString(R.string.sleep_cleared), Toast.LENGTH_SHORT).show();
     }
 
+    /** The advert switch: remembered for all stations; a playing station goes on with its other programme. */
+    private void setAdverts(boolean on) {
+        getSharedPreferences(RadioService.PREFS, MODE_PRIVATE).edit().putBoolean(RadioService.PREF_ADS, on).apply();
+        command(RadioService.ACTION_ADS);
+        Toast.makeText(this, on ? R.string.adverts_on : R.string.adverts_off, Toast.LENGTH_SHORT).show();
+    }
+
     // ------------------------------------------------------------------------------------------ menu and dialogs
     private void showMenu() {
         List<Ui.Choice> m = new ArrayList<>();
         m.add(new Ui.Choice(getString(R.string.menu_sleep), null, false, this::showSleepSheet));
+        boolean ads = RadioService.adverts(this);
+        m.add(new Ui.Choice(getString(ads ? R.string.menu_adverts_off : R.string.menu_adverts_on), null, false, () -> setAdverts(!ads)));
         m.add(new Ui.Choice(getString(R.string.menu_reload), null, false, this::reload));
         m.add(new Ui.Choice(getString(R.string.menu_folder), null, false, this::pickFolder));
         m.add(new Ui.Choice(getString(R.string.menu_battery), null, false, this::openBatterySettings));

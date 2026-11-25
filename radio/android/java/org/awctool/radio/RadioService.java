@@ -45,6 +45,7 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
     static final String ACTION_NEXT = "org.awctool.radio.NEXT";
     static final String ACTION_PREV = "org.awctool.radio.PREV";
     static final String ACTION_SLEEP = "org.awctool.radio.SLEEP";
+    static final String ACTION_ADS = "org.awctool.radio.ADS";            // the advert switch changed
     static final String EXTRA_STATION = "station";        // the station's name
     static final String EXTRA_MINUTES = "minutes";
     static final String EXTRA_QUERY = "query";            // a spoken station name from the voice assistant
@@ -55,7 +56,7 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
     private static final String CHANNEL = "radio";
     private static final long PAUSE_TIMEOUT_MS = 30L * 60 * 1000;     // a pause that is forgotten ends the service
     private static final long SLEEP_FADE_MS = 8000;
-    static final String PREFS = "radio", PREF_LAST = "lastName";
+    static final String PREFS = "radio", PREF_LAST = "lastName", PREF_ADS = "ads";
     private static final long WAKE_LOCK_MS = 30L * 60 * 1000;
 
     public final class LocalBinder extends Binder {
@@ -370,6 +371,8 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
                 skip(+1);
             } else if (ACTION_PREV.equals(action)) {
                 skip(-1);
+            } else if (ACTION_ADS.equals(action)) {
+                applyAdverts();
             } else if (ACTION_SLEEP.equals(action)) {
                 setSleepTimer(intent.getIntExtra(EXTRA_MINUTES, 0));
             } else if (ACTION_STOP.equals(action)) {
@@ -456,7 +459,25 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
 
     private Engine newEngine(Library.Station st) {
         final Pack p = st.pack;
-        return new Engine(st.schedule, clock, track -> new PackPlayer(p, "t/" + track.key, AudioAttributes.USAGE_MEDIA));
+        return new Engine(st.programme(adverts(this)), clock, track -> new PackPlayer(p, "t/" + track.key, AudioAttributes.USAGE_MEDIA));
+    }
+
+    /** Whether the listener wants advert breaks (off unless switched on). */
+    static boolean adverts(Context c) {
+        return c.getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(PREF_ADS, false);
+    }
+
+    /** The switch changed: the station goes on with its other programme. */
+    private void applyAdverts() {
+        if (station == null || state == STOPPED) return;
+        AppLog.d("adverts " + (adverts(this) ? "on" : "off"));
+        if (state == PLAYING) {
+            play(stationIndex);
+        } else {
+            if (engine != null) engine.stop();
+            engine = newEngine(station);
+            lastItemShown = null;
+        }
     }
 
     /** Packs were added, replaced or removed: keep playing the same station if it is still there. */
@@ -603,18 +624,22 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
         updateNotification();
     }
 
+    static String advertTitle(Context c, Schedule.Track t) {
+        return t.title.isEmpty() ? c.getString(R.string.advert) : t.title;
+    }
+
     private void onItemChanged() {
         Schedule.Item it = engine.current();
         if (it == null || it == lastItemShown) return;
         lastItemShown = it;
         partShown = -2;
         jingle = it.jingle;
-        title = jingle ? getString(R.string.jingle) : it.track.title;
-        artist = jingle ? "" : it.track.artist;
+        title = jingle ? getString(R.string.jingle) : it.ad ? advertTitle(this, it.track) : it.track.title;
+        artist = jingle ? "" : it.ad ? (it.track.title.isEmpty() ? "" : getString(R.string.advert)) : it.track.artist;
         itemStart = it.start;
         itemEnd = it.end;
         Schedule.Item nx = engine.itemAfter(it);
-        nextText = nx == null ? "" : nx.jingle ? getString(R.string.jingle)
+        nextText = nx == null ? "" : nx.jingle ? getString(R.string.jingle) : nx.ad ? getString(R.string.advert)
                 : (nx.track.artist.isEmpty() ? nx.track.title : nx.track.artist + " - " + nx.track.title);
         AppLog.d("on air: " + (jingle ? "jingle" : artist + " - " + title) + " (" + it.track.key + ")"
                 + (engine.failures() > 0 ? ", player failures so far: " + engine.failures() : ""));

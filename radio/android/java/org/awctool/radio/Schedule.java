@@ -13,12 +13,15 @@ import java.util.zip.CRC32;
  * The programme of one station: a pure function of the station and the UTC clock.
  *
  * This is a line-by-line port of class Schedule in awc_radio.py and must give exactly the same result (same order,
- * same times, same crossfades), so that the phone and the PC play the same song at the same second.
+ * same times, same crossfades), so that the phone and the PC play the same song at the same second. A station with
+ * adverts has a second programme with advert breaks (built when a list of adverts is given).
  * Times are UNIX seconds (double), like time.time() in Python.
  */
 public final class Schedule {
     public static final double DAY = 86400.0;
     public static final double FADE = 3.0;
+    public static final double AD_FADE = 0.5;
+    private static final int AD_AFTER = 540, AD_AFTER_SPAN = 361;   // an advert break after 9 to 15 minutes of songs
 
     public static final class Track {
         public final String key;      // "<base>_<idx>", also the file name of the audio
@@ -64,13 +67,14 @@ public final class Schedule {
      *  start and fades out for fadeOut seconds before end (the next item starts when the fade-out begins). */
     public static final class Item {
         public final double start, end, fadeIn, fadeOut;
-        public final boolean jingle;
+        public final boolean jingle, ad;
         public final Track track;
 
-        Item(double start, double end, boolean jingle, Track track, double fadeIn, double fadeOut) {
+        Item(double start, double end, boolean jingle, boolean ad, Track track, double fadeIn, double fadeOut) {
             this.start = start;
             this.end = end;
             this.jingle = jingle;
+            this.ad = ad;
             this.track = track;
             this.fadeIn = fadeIn;
             this.fadeOut = fadeOut;
@@ -79,13 +83,14 @@ public final class Schedule {
 
     private static final class Day {
         final double[] starts;
-        final boolean[] jingle;
+        final boolean[] jingle, ad;
         final Track[] tracks;
         final double[] fadeIn, fadeOut;
 
         Day(int n) {
             starts = new double[n];
             jingle = new boolean[n];
+            ad = new boolean[n];
             tracks = new Track[n];
             fadeIn = new double[n];
             fadeOut = new double[n];
@@ -95,15 +100,23 @@ public final class Schedule {
     private final String name;
     private final List<Track> songs;
     private final List<Track> jingles;
+    private final List<Track> ads;
     private final Map<Integer, Day> days = new HashMap<>();
 
     public Schedule(String name, List<Track> songs, List<Track> jingles) {
+        this(name, songs, jingles, Collections.<Track>emptyList());
+    }
+
+    /** With a non-empty list of adverts: the programme with advert breaks. */
+    public Schedule(String name, List<Track> songs, List<Track> jingles, List<Track> ads) {
         this.name = name;
         Comparator<Track> byKey = (a, b) -> a.key.compareTo(b.key);
         this.songs = new ArrayList<>(songs);
         this.jingles = new ArrayList<>(jingles);
+        this.ads = new ArrayList<>(ads);
         Collections.sort(this.songs, byKey);
         Collections.sort(this.jingles, byKey);
+        Collections.sort(this.ads, byKey);
     }
 
     /** Stable hash: crc32 of the parts joined with '|' (see _h in awc_radio.py). */
@@ -118,12 +131,31 @@ public final class Schedule {
         return crc.getValue();
     }
 
+    /** Python: sorted(list, key=hash, reverse=True) - descending, equal hashes keep their order (stable). */
+    private List<Track> shuffled(List<Track> list, int d, String tag, int pass) {
+        final Map<Track, Long> hashes = new HashMap<>();
+        for (Track t : list) hashes.put(t, tag == null ? h(name, d, pass, t.key) : h(name, d, tag, pass, t.key));
+        List<Track> out = new ArrayList<>(list);
+        Collections.sort(out, (a, b) -> Long.compare(hashes.get(b), hashes.get(a)));
+        return out;
+    }
+
+    /** The next to be taken (the last of the deck) must not be the one just played. */
+    private static void swapRepeat(List<Track> deck, Track last) {
+        if (deck.size() > 1 && deck.get(deck.size() - 1) == last) {
+            Track tmp = deck.get(deck.size() - 1);
+            deck.set(deck.size() - 1, deck.get(0));
+            deck.set(0, tmp);
+        }
+    }
+
     private Day day(int d) {
         Day cached = days.get(d);
         if (cached != null) return cached;
 
         List<Double> starts = new ArrayList<>();
         List<Boolean> kinds = new ArrayList<>();
+        List<Boolean> adverts = new ArrayList<>();
         List<Track> tracks = new ArrayList<>();
         List<Double> fin = new ArrayList<>();
         List<Double> fout = new ArrayList<>();
@@ -134,10 +166,37 @@ public final class Schedule {
         double prevStart = 0.0, prevSec = 0.0;
         int count = 0;
         int target = 2 + (int) (h(name, d, "target", 0) % 3);
+        double played = 0.0;                                  // seconds of songs since the last advert break
+        int bn = 0, apass = 0;
+        boolean afterBreak = false, prevAd = false;
+        List<Track> block = new ArrayList<>(), adDeck = new ArrayList<>();
+        Track lastAd = null;
+        long threshold = AD_AFTER + h(name, d, "adt", 0) % AD_AFTER_SPAN;
         while (true) {
-            boolean isJingle;
+            boolean isJingle, isAd = false;
             Track tr;
-            if (!jingles.isEmpty() && count >= target) {
+            if (!ads.isEmpty() && block.isEmpty() && !afterBreak && played >= threshold) {
+                bn++;
+                int n = 2 + (int) (h(name, d, "adn", bn) % 2);
+                for (int k = 0; k < n; k++) {
+                    if (adDeck.isEmpty()) {
+                        apass++;
+                        adDeck = shuffled(ads, d, "ads", apass);
+                        swapRepeat(adDeck, lastAd);
+                    }
+                    lastAd = adDeck.remove(adDeck.size() - 1);
+                    block.add(lastAd);
+                }
+                played = 0.0;
+                threshold = AD_AFTER + h(name, d, "adt", bn) % AD_AFTER_SPAN;
+            }
+            if (!block.isEmpty()) {
+                tr = block.remove(0);
+                isAd = true;
+                isJingle = false;
+                afterBreak = block.isEmpty() && !jingles.isEmpty();       // "you are listening to ..." after the break
+            } else if (!jingles.isEmpty() && (afterBreak || count >= target)) {
+                afterBreak = false;
                 jn++;
                 count = 0;
                 target = 2 + (int) (h(name, d, "target", jn) % 3);
@@ -150,27 +209,20 @@ public final class Schedule {
             } else {
                 if (deck.isEmpty()) {
                     npass++;
-                    final int pass = npass;
-                    final Map<Track, Long> hashes = new HashMap<>();
-                    for (Track s : songs) hashes.put(s, h(name, d, pass, s.key));
-                    deck = new ArrayList<>(songs);
-                    // Python: sorted(..., key=hash, reverse=True) - descending, equal keys keep their order (stable)
-                    Collections.sort(deck, (a, b) -> Long.compare(hashes.get(b), hashes.get(a)));
-                    if (deck.size() > 1 && deck.get(deck.size() - 1) == lastSong) {   // no repeat across two passes
-                        Track tmp = deck.get(deck.size() - 1);
-                        deck.set(deck.size() - 1, deck.get(0));
-                        deck.set(0, tmp);
-                    }
+                    deck = shuffled(songs, d, null, npass);
+                    swapRepeat(deck, lastSong);                                       // no repeat across two passes
                 }
                 tr = deck.remove(deck.size() - 1);
                 lastSong = tr;
                 count++;
                 isJingle = false;
+                played += Math.max(1.0, tr.sec);
             }
             double sec = Math.max(1.0, tr.sec);
             double ov, start;
             if (!starts.isEmpty()) {
                 ov = Math.min(FADE, Math.min(0.25 * prevSec, 0.25 * sec));     // crossfade with the previous item
+                if (isAd || prevAd) ov = Math.min(ov, AD_FADE);
                 start = prevStart + prevSec - ov;
                 if (start >= DAY) break;
                 fout.set(fout.size() - 1, ov);
@@ -180,6 +232,8 @@ public final class Schedule {
             }
             starts.add(start);
             kinds.add(isJingle);
+            adverts.add(isAd);
+            prevAd = isAd;
             tracks.add(tr);
             fin.add(ov);
             fout.add(0.0);
@@ -190,6 +244,7 @@ public final class Schedule {
         for (int i = 0; i < starts.size(); i++) {
             out.starts[i] = starts.get(i);
             out.jingle[i] = kinds.get(i);
+            out.ad[i] = adverts.get(i);
             out.tracks[i] = tracks.get(i);
             out.fadeIn[i] = fin.get(i);
             out.fadeOut[i] = fout.get(i);
@@ -221,7 +276,7 @@ public final class Schedule {
             }
             Track tr = day.tracks[i];
             double end = Math.min(day.starts[i] + Math.max(1.0, tr.sec), DAY);
-            out.add(new Item(d * DAY + day.starts[i], d * DAY + end, day.jingle[i], tr, day.fadeIn[i], day.fadeOut[i]));
+            out.add(new Item(d * DAY + day.starts[i], d * DAY + end, day.jingle[i], day.ad[i], tr, day.fadeIn[i], day.fadeOut[i]));
             i++;
         }
         return out;

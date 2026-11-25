@@ -88,42 +88,42 @@ What the audio config says these places play. Their recordings are not in the cr
 
 As of the current version: **34 stations**, about 69.7 hours of programme (without jingles).
 
-| Station | Content | Jingles | Length |
-|---|---|---:|---:|
-| Afrobank FM | 31 songs | 35 | 123 min |
-| Back Country Radio | 24 songs | 63 | 74 min |
-| Bodega The DJ | 36 songs | 0 | 104 min |
-| The Chamber 106.6 | 22 songs | 47 | 97 min |
-| Circoloco Records Radio | 27 songs | 74 | 98 min |
-| Cocoteo FM | 30 songs | 56 | 92 min |
-| Dirty South Classics | 39 songs | 50 | 149 min |
-| DJ Stevie J | 19 songs | 0 | 53 min |
-| Emotion 98.3 | 35 songs | 34 | 149 min |
-| Flash FM | 83 songs | 78 | 286 min |
-| Gloriana Blues Radio | 23 songs | 49 | 72 min |
-| Honey FM | 54 songs | 62 | 224 min |
-| Jack of Hearts | 1 DJ set | 0 | 100 min |
-| Kaleidoscope FM | 18 songs | 35 | 73 min |
-| Leonida Jazz Radio | 36 songs | 36 | 159 min |
-| Radio La Ola | 25 songs | 44 | 117 min |
-| Radio On-U | 16 songs | 0 | 57 min |
-| Radio On-U (Mix) | 1 mix | 0 | 50 min |
-| The Sniper Of La Perle | 22 songs | 0 | 100 min |
-| The Sniper Of La Perle (Mix) | 1 mix | 0 | 40 min |
-| Stockyard FM | 37 songs | 44 | 137 min |
-| Symphony FM | 16 songs | 54 | 130 min |
-| Thrillbilly Mud Club | 20 songs | 0 | 84 min |
-| V-Rock | 70 songs | 36 | 269 min |
-| The Vault (Club) | 1 DJ set | 0 | 84 min |
-| The Vault Radio | 1 mix | 0 | 84 min |
-| Vice City FM | 72 songs | 56 | 309 min |
-| Vice City Rap Radio | 82 songs | 48 | 226 min |
-| VYB | 1 DJ set | 0 | 45 min |
-| The Wipe Talk Radio | 11 shows | 54 | 155 min |
-| WKTT Talk Radio | 4 shows | 37 | 72 min |
-| Worldwide FM | 40 songs | 37 | 189 min |
-| Worldwide FM (Mix) | 1 mix | 0 | 121 min |
-| Clubmixes | 1 club mix | 0 | 61 min |
+| Station | Content | Jingles | Adverts | Length |
+|---|---|---:|---:|---:|
+| Afrobank FM | 31 songs | 35 | 38 | 123 min |
+| Back Country Radio | 24 songs | 63 | 47 | 74 min |
+| Bodega The DJ | 36 songs | 0 | – | 104 min |
+| The Chamber 106.6 | 22 songs | 47 | 28 | 97 min |
+| Circoloco Records Radio | 27 songs | 74 | 44 | 98 min |
+| Cocoteo FM | 30 songs | 56 | 70 | 92 min |
+| Dirty South Classics | 39 songs | 50 | 65 | 149 min |
+| DJ Stevie J | 19 songs | 0 | – | 53 min |
+| Emotion 98.3 | 35 songs | 34 | 41 | 149 min |
+| Flash FM | 83 songs | 78 | 70 | 286 min |
+| Gloriana Blues Radio | 23 songs | 49 | 23 | 72 min |
+| Honey FM | 54 songs | 62 | 68 | 224 min |
+| Jack of Hearts | 1 DJ set | 0 | – | 100 min |
+| Kaleidoscope FM | 18 songs | 35 | 21 | 73 min |
+| Leonida Jazz Radio | 36 songs | 36 | 22 | 159 min |
+| Radio La Ola | 25 songs | 44 | 35 | 117 min |
+| Radio On-U | 16 songs | 0 | – | 57 min |
+| Radio On-U (Mix) | 1 mix | 0 | – | 50 min |
+| The Sniper Of La Perle | 22 songs | 0 | – | 100 min |
+| The Sniper Of La Perle (Mix) | 1 mix | 0 | – | 40 min |
+| Stockyard FM | 37 songs | 44 | 52 | 137 min |
+| Symphony FM | 16 songs | 29 | 25 | 130 min |
+| Thrillbilly Mud Club | 20 songs | 0 | – | 84 min |
+| V-Rock | 70 songs | 36 | 55 | 269 min |
+| The Vault (Club) | 1 DJ set | 0 | – | 84 min |
+| The Vault Radio | 1 mix | 0 | – | 84 min |
+| Vice City FM | 72 songs | 56 | 62 | 309 min |
+| Vice City Rap Radio | 82 songs | 48 | 54 | 226 min |
+| VYB | 1 DJ set | 0 | – | 45 min |
+| The Wipe Talk Radio | 11 shows | 54 | – | 155 min |
+| WKTT Talk Radio | 4 shows | 37 | – | 72 min |
+| Worldwide FM | 40 songs | 37 | – | 189 min |
+| Worldwide FM (Mix) | 1 mix | 0 | – | 121 min |
+| Clubmixes | 1 club mix | 0 | – | 61 min |
 
 ## How it is measured
 

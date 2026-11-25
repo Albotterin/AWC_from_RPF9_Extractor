@@ -50,6 +50,8 @@ This tool takes a different route:
 5. Because the archive's table of contents (and with it every file name) is unreadable, it **groups the AWCs by their
    position in the archive** – files of one folder are stored back to back, so a group is typically one radio station
    or one folder. You can **name the groups yourself** (right-click), and the names become export folder names.
+6. It can also show an archive **by radio station**: the stations are read from the game's audio config, each with its
+   logo and with its songs, **DJ intros and outros**, **adverts**, jingles and talk.
 
 You can point it at a single `.awc`, a single `.rpf`, or a **whole folder** – it searches all subfolders for
 every `.rpf` and `.awc` file and lists all music streams it finds.
@@ -77,6 +79,7 @@ every `.rpf` and `.awc` file and lists all music streams it finds.
 | 📂 **Folder mode** | Choose a folder – all subfolders are searched for `*.rpf` and `*.awc`. |
 | 🌳 **Tree view** | Container → group → AWC → stream, with stream ID, codec, stereo/mono, duration and size. |
 | 🗂 **Groups** | AWCs are clustered by their position in the archive (≈ one folder / radio station each). Right-click a group → **Rename group…**; the name is used for the export folder. |
+| 📻 **View by radio station** | Station → category → stream, with the station logo: songs, DJ sets, DJ intros/outros and links, adverts, jingles, DJ talk, music beds, talk shows. Extraction writes one folder per station and category. |
 | ▶️ **Player** | Play any stream straight from the archive (play/pause/stop, seek bar, volume). Uses `ffplay`. |
 | 💾 **Extraction** | Opus (lossless remux), FLAC, WAV (16-bit PCM) or MP3 (320 kbit/s). Select streams, whole AWCs or whole containers. |
 | ⏱ **Duration filter** | "Only streams longer than N seconds" – skips the many short snippets. |
@@ -87,6 +90,11 @@ every `.rpf` and `.awc` file and lists all music streams it finds.
 | ❌ **Cancelable** | Scans and extractions can be cancelled; partial files are removed. |
 
 ## Screenshots
+
+**By radio station.** The stations of the game with their logos; here the DJ intros of one station, named after the song
+they announce.
+
+![View by radio station](docs/screenshots/09-stations.png)
 
 **Browsing the music containers of an archive.** Multi-stream AWCs (here: 3 stereo streams) expand into their
 streams. The selection can be extracted or played.
@@ -156,6 +164,23 @@ On Windows you can also double-click `Start AWC-Tool.bat` in this folder, or tak
    **output folder**, and click **Extract selected**. **Extract all streams** processes everything in the list.
    *Selected → FLAC* and *Selected → WAV* are one-click shortcuts.
 5. Use **Only streams longer than (sec.)** to skip short snippets (e.g. `60` keeps only streams of a minute or more).
+### View by radio station
+
+**Group by radio station** is ticked by default. After the scan the tool reads the stations from the audio config at the
+start of the archive and looks for the DJ speech between the music banks (some seconds more). Untick it to get the view
+by position back.
+
+* Each station has folders for **Songs**, **DJ set**, **DJ intros, outros and links**, **Adverts**, **Station idents and
+  jingles**, **DJ talk**, **Show intros and outros**, **Music beds**, **Talk and news** and **Other** (only those it has).
+* The **DJ intros and outros** are mono speech lines; they are only listed in this view. A line gets the name of its song
+  where the stream ID matches the game's naming pattern; the others are numbered.
+* **Adverts** are shared between stations and numbered once for the whole archive (`Advert 001`, …). The config holds no
+  product names. Right-click → **Set title / artist…** names one, or list names in
+  `%APPDATA%\AWC-Tool\advert_names.json` as `{"<stream ID, hex>": "<name>"}`.
+* Whatever the config assigns to no station is listed by position under **Not assigned to a station**.
+
+### Names, logos and mixes
+
 6. **Name the groups** (optional): right-click a *Group NN* row → **Rename group…** (e.g. after listening to a few
    tracks). Names are stored in `%APPDATA%\AWC-Tool\group_names.json` and become part of the export folder name.
 7. **Names** (optional) – the AWC files only contain 32-bit hash IDs, no names:
@@ -180,7 +205,7 @@ On Windows you can also double-click `Start AWC-Tool.bat` in this folder, or tak
    the game's UI texture pool (`data\ttdb\ui\ttdb_ui.ttpf`, next to `audio.rpf`) into `%APPDATA%\AWC-Tool\icons\`; the
    small reader `awc_logos.py` handles exactly these textures (BC1 / BC7 in zlib chunks, nothing is decrypted), so nothing
    has to be downloaded. This happens after a scan; the button **Station logos…** repeats the step. The logos are saved at
-   the game's full size (256 × 256). 23 stations are known; the station comes from the credits list (see step 7). Group
+   the game's full size (256 × 256). 27 station logos are known; the station comes from the credits list (see step 7). Group
    rows get a small logo, and FLAC/MP3 exports carry the logo as cover picture. Nothing from the game is shipped with the
    tool.
 9. **Station mixes** (optional): a few very long streams (40-120 min) are whole radio mixes. The game stores a
@@ -231,6 +256,10 @@ AWC-Export/audio/group_04_My station name/audio_956_at_000000015034A000_stream0_
 * `000000015034A000` – byte offset of the AWC inside the archive,
 * `stream0` / `1D7CA6CC` – stream index and the stream's 32-bit ID (a hash; real names are not stored in the AWC).
 
+In the **view by radio station** the folders are `<output folder>/<container name>/<station>/<category>/`, and the files
+are named after what the view shows (`Artist - Title`, `DJ intro - Song (1)`, `Advert 001`). An advert that several of
+the chosen stations play is written into each of their folders.
+
 ## How it works (short version)
 
 ```
@@ -244,6 +273,8 @@ audio.rpf (28 GB)
 ```
 
 The full byte-level description is in **[docs/FORMAT.md](docs/FORMAT.md)**.
+The DJ speech lies in AWCs of another layout (many short lines per file); `awc_speech.py` reads those for the view by
+station ([FORMAT.md, section 8](docs/FORMAT.md#8-speech-containers-dj-lines)).
 
 ## Grouping: which files belong together?
 
@@ -262,6 +293,8 @@ the game config). A group is *probably* one folder, but that is an inference, no
 Handy: `Only streams longer than (sec.)` with `90` keeps just the real tracks.
 
 In code: `awc_core.add_groups(items)` sets `item["g"]` (1-based) on the items returned by the scanner.
+
+Where the game's radio config can be read, the [view by radio station](#view-by-radio-station) needs no guessing.
 
 ## Using the code as a library
 
@@ -302,8 +335,10 @@ To add a language, edit `awc_i18n.py`: add an entry to `LANGUAGES` and a table w
 
 ## Limitations
 
-* **Only music containers with the Opus codec (`0x0B`)** are supported. Other AWC kinds (sound effects, speech,
-  Vorbis/ADPCM/XMA banks, …) are detected as "not a music container" and skipped.
+* **Only Opus (`0x0B`)** is supported: the music containers, and in the view by station the DJ speech containers of the
+  radio. Other AWC kinds (sound effects, other speech, Vorbis/ADPCM/XMA banks, …) are skipped.
+* **Adverts have no product names** and some DJ lines no recognised name: the AWCs and the radio config don't hold them.
+* The view by station depends on the game's radio config; it was developed with one archive.
 * The **RPF9 table of contents is not parsed** (it appears to be encrypted/obfuscated), so there are **no real
   file names** – only offsets and stream IDs. The tool relies on the fact that the AWC payloads inside the archive
   are stored uncompressed and unencrypted.
@@ -339,6 +374,8 @@ extractor/
   awc_credits.py      Parses the public credits page and matches its songs to stream IDs
   awc_icons.py        Optional: cuts the station logos out of the game
   awc_logos.py        Small reader for the logo textures of the game's UI texture pool
+  awc_gamedata.py     Reads the radio stations, their playlists and categories from the game's audio config
+  awc_speech.py       Reads the DJ speech containers (view by radio station)
   logos/              Pictures drawn for stations the programs invent themselves (make_station_logos.py)
   Start AWC-Tool.bat  Launcher
   build_exe.bat       Builds dist\AWC-Tool.exe with PyInstaller

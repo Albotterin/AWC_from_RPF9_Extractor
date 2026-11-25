@@ -47,6 +47,7 @@ python radio/awc_radio.py        # the radio
 * Scans `.rpf` archives of any size for audio containers – no table of contents needed.
 * Writes the original Opus packets 1:1 into `.opus` files (no re-encoding); optionally FLAC, WAV or MP3.
 * Plays every stream straight from the archive.
+* Shows an archive **by radio station**: songs, DJ intros and outros, adverts, jingles and talk, with the station logo.
 * Names streams from the game's own config, from the public credits page or from your own lists; station logos optional.
 * English and German interface.
 
@@ -58,13 +59,14 @@ python radio/awc_radio.py        # the radio
   **The Vault**, **Thrillbilly Mud Club**), read with their playlists from the game's own audio config.
 * A live programme by the UTC clock: every station keeps running, everybody with the same time hears the same song.
 * Jingles, DJ talk and crossfades between the songs; long DJ mixes show the title of the current part.
+* **Adverts on demand**: every station with or without advert breaks (default: without).
 * An [**Android app**](#-awc-radio-app-for-android) plays the same programme on the phone and in the car, and wakes you with it.
 
 ➡️ [**Radio guide**](radio/README.md)
 
 ## 📱 AWC Radio app for Android
 
-The radio for your pocket, your car and your bedside. **`AWC-Radio.apk`** (version 1.5) plays the same live programme as
+The radio for your pocket, your car and your bedside. **`AWC-Radio.apk`** (version 1.6) plays the same live programme as
 the PC: same UTC clock, same order, same crossfades – with station packs from the same version, phone and PC play the same
 song at the same time.
 
@@ -74,6 +76,7 @@ song at the same time.
 | ⏰ **Radio alarm** | Several alarms with weekdays, station, volume, gentle start and snooze; a sunrise screen over the lock screen. If the radio cannot be heard, the phone's own alarm tone rings; alarms survive a restart |
 | 🚗 **Android Auto** | The stations as a grid with their logos, song and station on the player screen, voice commands such as *"play Radio On-U on AWC Radio"* |
 | 😴 **Sleep timer** | Stops the radio after the time you choose |
+| 📢 **Adverts** | A switch in the player and the menu, off by default; on 18 stations |
 | 📦 **Station packs** | One file (`.radiopak`) per station in a folder on the phone: add or update single stations without copying everything again |
 | 🔒 **Offline** | The app has no internet permission: everything comes from the packs on the phone |
 | 🌍 **Languages** | English and German |
@@ -82,7 +85,7 @@ song at the same time.
 **Set it up**
 
 1. Install `AWC-Radio.apk` (from the [latest release](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/latest), or build it from [`radio/android/`](radio/README.md#awc-radio-for-android)). Allow notifications: the alarm needs them.
-2. On the PC, click **Android packs…** in AWC Radio, choose a folder and write the packs (original quality, about 4.2 GB for all 34 stations). Later only new or changed packs are written.
+2. On the PC, click **Android packs…** in AWC Radio, choose a folder and write the packs (original quality, about 4.7 GB for all 34 stations). Later only new or changed packs are written.
 3. Copy the `.radiopak` files into one folder on the phone, start the app and choose that folder once.
 4. For Android Auto: in the Android Auto settings tap *Version* about ten times, open the developer settings in the three-dot menu and switch on *Unknown sources*.
 
@@ -95,7 +98,7 @@ song at the same time.
 
 ## Progress
 
-Status **2026-11-25** (v2.5.0), measured with a 28.5 GB `audio.rpf`.
+Status **2026-11-25** (v2.6.0), measured with a 28.5 GB `audio.rpf`.
 
 | Area | State | |
 |---|---|---|
@@ -104,7 +107,9 @@ Status **2026-11-25** (v2.5.0), measured with a 28.5 GB `audio.rpf`.
 | Talk radio | all 5 shows the credits name, **15 episodes** | ✅ |
 | Stations in AWC Radio | 34 (including 3 "(Mix)" stations, 4 venues and "Clubmixes") | ✅ |
 | Venues | Jack of Hearts (100 min DJ set), VYB (45 min), The Vault (Club, 84 min), Thrillbilly Mud Club (20 songs) | ✅ |
-| Android app | version 1.5: radio alarm, new design, one pack per station, Android Auto | ✅ |
+| Adverts | 239 spots, optional in the programme of 18 stations | ✅ |
+| Extractor by station | 28 stations with logo, 3,417 DJ lines | ✅ |
+| Android app | version 1.6: optional adverts, radio alarm, one pack per station, Android Auto | ✅ |
 | The Vault Radio | plays as one long mix; its 24 listed songs are not separate files | 🎚 |
 
 ![AWC Radio – station progress](radio/docs/radio-progress.svg)
@@ -117,8 +122,10 @@ Details for every station: [radio progress](radio/docs/RADIO-PROGRESS.md).
 - [ ] The 8 original songs of "Honey FM – Liquid City"
 - [ ] The five podcasts the game config names
 - [ ] One 61-minute club mix belongs to no track list of the config; it stays in "Clubmixes"
-- [ ] App 1.5 (new design, alarm) has been tested on the PC (Robolectric), still little on real phones
-- [ ] Extractor: only music containers with the Opus codec; the RPF9 table of contents is not read, so there are no file names
+- [ ] The product names of the adverts are not known
+- [ ] The radio does not yet speak the DJ intros and outros over the songs
+- [ ] App 1.6 has been tested on the PC (Robolectric), still little on real phones
+- [ ] Extractor: Opus only (music and the DJ speech of the radio); the RPF9 table of contents is not read, so there are no file names
 
 ### Milestones
 
@@ -136,6 +143,7 @@ Details for every station: [radio progress](radio/docs/RADIO-PROGRESS.md).
 | [v2.4.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.4.0) | 2026-11-25 | 📻 Talk radio and complete station playlists |
 | [v2.4.1](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.4.1) | 2026-11-25 | 🎛 📻 Own station logo reader, no download needed |
 | [v2.5.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.5.0) | 2026-11-25 | 📻 One pack per station, app 1.5 with radio alarm and new design, venue stations |
+| [v2.6.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.6.0) | 2026-11-25 | 📻 Optional adverts (app 1.6) · 🎛 View by radio station with DJ intros, outros and adverts |
 
 ## Repository layout
 

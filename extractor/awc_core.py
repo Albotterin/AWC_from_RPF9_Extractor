@@ -553,7 +553,11 @@ class AwcRef:
 
     def open(self):
         if self._awc is None:
-            self._awc = AwcFile(self.path, self.base, self.item["length"], self.name)
+            if self.item.get("kind") == "speech":
+                import awc_speech  # noqa: PLC0415  (awc_speech builds on this module)
+                self._awc = awc_speech.SpeechFile(self.path, self.base, self.item["length"], self.name)
+            else:
+                self._awc = AwcFile(self.path, self.base, self.item["length"], self.name)
         return self._awc
 
     def extract(self, jobs, progress=None, cancel=None, tags=None):

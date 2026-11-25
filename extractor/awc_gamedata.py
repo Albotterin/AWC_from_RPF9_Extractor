@@ -16,15 +16,14 @@ table (u32 count, count x (name hash, x)). Objects refer to each other by their 
 """
 import bisect
 import collections
+import json
 import os
 import struct
-import sys
 import zlib
 
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "extractor"))   # shared modules
-import awc_config as gamecfg  # noqa: E402
-import awc_credits as credits  # noqa: E402
-from awc_names import STREAM_ID_MASK, joaat  # noqa: E402
+import awc_config as gamecfg
+import awc_credits as credits
+from awc_names import STREAM_ID_MASK, joaat
 
 MAGIC = 0x045A88EA
 BLOCK = 0x10000
@@ -32,6 +31,12 @@ NONE = 0xFFFFFFFF
 TYPE_LIST_OF_LISTS, TYPE_ARTIST, TYPE_TITLE, TYPE_TRACK, TYPE_STATION, TYPE_TRACKLIST = 2, 7, 12, 15, 16, 17
 SOUND_WRAPPER, SOUND_SIMPLE = 8, 12
 MUSIC_CATEGORY = 0x2BE42A81                 # category of the track lists that hold the music
+# every track list has a category: joaat("radio_track_category_<kind>")
+CATEGORIES = {joaat("radio_track_category_" + k): k for k in (
+    "music", "advert", "ident", "dj_banter", "dj_banter_night", "dj_banter_to_ads", "dj_banter_from_ads", "dj_banter_from_news",
+    "dj_banter_story", "music_bed", "music_night", "music_dj2", "music_b", "showintro", "showintro_night", "showintro_dj2", "showoutro",
+    "showoutro_night", "showoutro_dj2", "ident_night", "ident_b", "talk", "talk_night", "news")}
+AD_MIN = 3.0
 SONG_MIN = 45.0                             # seconds
 PART_MIN = 60.0                             # a talk station's own streams of this length are parts of a show
 JINGLE_MIN, JINGLE_MAX = 2.0, 25.0
@@ -55,7 +60,7 @@ TALK_STATIONS = {
                               {"askdrnita": "Ask Dr. Nita", "elotrolado": "El Otro Lado", "shegotassets": "She Got Assets"}),
 }
 
-Track = collections.namedtuple("Track", "wave title artists music")          # wave = (bank hash, stream hash)
+Track = collections.namedtuple("Track", "wave title artists music kind", defaults=("",))      # wave = (bank hash, stream hash)
 
 # DJ sets of venues: the track list "core.radiostation.<name>_music" holds what the club plays.
 # (track list name, station name, resident DJ)
@@ -173,7 +178,7 @@ def _title(game, ref):
     return _cstr(d[:96], 12), artists
 
 
-def _tracks(game, sounds, ref, music, seen, out):
+def _tracks(game, sounds, ref, music, seen, out, kind=""):
     h = game.hash_at(ref)
     d = None if h is None else game.get(h)
     if not d or h in seen:
@@ -183,15 +188,16 @@ def _tracks(game, sounds, ref, music, seen, out):
         wave = _wave(sounds, game.hash_at(_u32(d, 12)))
         if wave:
             title, artists = _title(game, _u32(d, 16) if len(d) >= 20 else NONE)
-            out.append(Track(wave, title, artists, music))
+            out.append(Track(wave, title, artists, music, kind))
     elif d[0] == TYPE_LIST_OF_LISTS:
         for k in range(_u32(d, 8)):
-            _tracks(game, sounds, _u32(d, 12 + 4 * k), music, seen, out)
+            _tracks(game, sounds, _u32(d, 12 + 4 * k), music, seen, out, kind)
     elif d[0] == TYPE_TRACKLIST:
+        kind = CATEGORIES.get(game.hash_at(_u32(d, 8)), kind)
         if _u32(d, 68) != NONE:
-            _tracks(game, sounds, _u32(d, 68), music, seen, out)
+            _tracks(game, sounds, _u32(d, 68), music, seen, out, kind)
         for k in range(_u32(d, 72)):
-            _tracks(game, sounds, _u32(d, 76 + 4 * k), music, seen, out)
+            _tracks(game, sounds, _u32(d, 76 + 4 * k), music, seen, out, kind)
 
 
 def parse(files):
@@ -529,15 +535,36 @@ def _name_episodes(episodes, station):
         tr["title"], tr["artist"] = (name[0], "Episode %d" % name[1]) if name else (station, "Show %d" % n)
 
 
+def advert_waves(game):
+    """The adverts of all stations, as the config marks them: {(bank hash, stream hash)}."""
+    return {tr.wave for lists in game.values() for lst in lists for tr in lst if tr.kind == "advert"}
+
+
+def advert_keys(items, game):
+    """The (bank position, stream index) of every advert."""
+    banks = _Banks(items, game)
+    out = set()
+    for h, lists in game.items():
+        for lst in lists:
+            for tr in lst:
+                if tr.kind == "advert":
+                    hit = banks.find(h, tr.wave)
+                    if hit:
+                        out.add((hit[0]["base"], hit[1]["i"]))
+    return out
+
+
 def build(items, game, songs, found, cfg_names):
-    """-> {station: {"songs": [track], "jingles": [track]}} for the stations the config defines.
+    """-> {station: {"songs": [track], "jingles": [track], "ads": [track]}} for the stations the config defines.
 
     items      scan items            game       result of read()
     songs      credits list          found      {stream id: (title, artist, station)} matched with it
     cfg_names  {stream id: name} from the config strings
     Songs: tracks of the music lists and tracks with a title. Jingles: short streams only this station uses (idents
-    and DJ talk). Talk radio: every track list with long own streams is one show, its streams are the parts."""
+    and DJ talk). Talk radio: every track list with long own streams is one show, its streams are the parts.
+    Adverts (the lists the config marks so) are kept apart: "ads" is only played when the listener wants them."""
     banks = _Banks(items, game)
+    adverts = advert_waves(game)
     spelling = credits.artist_names(songs)
     out = {}
     for h, lists in game.items():
@@ -579,11 +606,102 @@ def build(items, game, songs, found, cfg_names):
         for lst in lists:
             for tr in lst:
                 hit = banks.find(h, tr.wave)
-                if hit and tr.wave in banks.own and not tr.title and JINGLE_MIN <= hit[1]["sec"] <= JINGLE_MAX:
+                if hit and tr.wave in banks.own and tr.wave not in adverts and not tr.title and JINGLE_MIN <= hit[1]["sec"] <= JINGLE_MAX:
                     key = (hit[0]["base"], hit[1]["i"])
                     if key not in used:
                         used.add(key)
                         st["jingles"].append(_track(*hit))
+        ads = {}
+        for lst in lists:
+            for tr in lst:
+                hit = banks.find(h, tr.wave) if tr.kind == "advert" else None
+                if hit and hit[1]["sec"] >= AD_MIN:
+                    ads.setdefault((hit[0]["base"], hit[1]["i"]), _track(*hit, advert_name(hit[1]["id"])))
+        if ads:
+            st["ads"] = [ads[k] for k in sorted(ads)]
         if st["songs"]:
             out[station] = st
     return out
+
+
+# ------------------------------------------------------------------------------------------------ for the extractor
+# more station objects and track lists than the radio plays: (object name or "core.radiostation.<key>_music", station)
+VIEW_OBJECTS = (("radio_on_u", "Radio On-U"), ("radio_wwfm", "Worldwide FM"), ("radio_the_vault", "The Vault Radio"),
+                ("radio_mudclub", "Thrillbilly Mud Club"))
+VIEW_LISTS = (("club_joh_bodega", "Jack of Hearts"), ("club_joh_tracks", "Jack of Hearts"), ("club_vyb_stevie_j", "VYB"),
+              ("dj_mixes_the_vault", "The Vault (Club)"), ("haitian_mixtape", "The Sniper Of La Perle"))
+
+
+def catalog(files):
+    """-> {station name: [Track, ...]} of everything the config assigns to a station or club; Track.kind is the
+    category of its list ("music", "advert", "ident", "dj_banter", ... , "set" for a club, "" for unknown ones)."""
+    metas, game = _game_file(files)
+    if game is None:
+        return {}
+    stations = {h: n for h, n in MUSIC_STATIONS.items()}
+    stations.update({h: v[0] for h, v in TALK_STATIONS.items()})
+    stations.update({joaat(k): n for k, n in VIEW_OBJECTS})
+    probe = []
+    d = game.get(joaat("radio_flash_fm"))
+    for k in range(_u32(d, 60)):
+        lst = game.follow(_u32(d, 64 + 12 * k))
+        if lst and lst[0] == TYPE_TRACKLIST:
+            for i in range(_u32(lst, 72)):
+                tr = game.follow(_u32(lst, 76 + 4 * i))
+                if tr and tr[0] == TYPE_TRACK:
+                    probe.append(game.hash_at(_u32(tr, 12)))
+    sounds = max(metas, key=lambda m: sum(1 for h in probe if h in m.index))
+    out = {}
+    for h, name in stations.items():
+        d = game.get(h)
+        if not d or d[0] != TYPE_STATION:
+            continue
+        seen = set()
+        for k in range(_u32(d, 60)):
+            found = []
+            _tracks(game, sounds, _u32(d, 64 + 12 * k), False, seen, found)
+            out.setdefault(name, []).extend(found)
+    for key, name in VIEW_LISTS:
+        tracks = []
+        _club_tracks(game, sounds, joaat("core.radiostation.%s_music" % key), set(), tracks)
+        for layers in tracks:
+            for wave in layers:
+                out.setdefault(name, []).append(Track(wave, "", [], True, "set" if key != "haitian_mixtape" else "music"))
+    return out
+
+
+def assign(items, stations):
+    """-> [(station, kind, track, item, stream)] : the streams of the scan that the tracks of catalog() mean."""
+    banks = _Banks(items, {name: [tracks] for name, tracks in stations.items()})
+    mixes = {}
+    for it in items:
+        if it.get("cues"):
+            for s in it["streams"]:
+                mixes.setdefault(s["id"] & STREAM_ID_MASK, (it, s))
+    out, seen = [], set()
+    for name, tracks in stations.items():
+        for tr in tracks:
+            hit = banks.find(name, tr.wave) or mixes.get(tr.wave[1] & STREAM_ID_MASK)
+            if hit and (name, hit[0]["base"], hit[1]["i"]) not in seen:
+                seen.add((name, hit[0]["base"], hit[1]["i"]))
+                out.append((name, tr.kind, tr, hit[0], hit[1]))
+    return out
+
+
+def show_parts():
+    """{stream id: (show title, episode, part)} for the parts of the talk shows, as their streams are named."""
+    return {joaat("%s_%s_ep%d_pt%d" % (prefix, key, e, p)) & STREAM_ID_MASK: (title, e, p)
+            for _name, prefix, shows in TALK_STATIONS.values() for key, title in shows.items()
+            for e in range(1, 13) for p in range(1, 16)}
+
+
+def advert_name(stream_id, _cache={}):
+    """The product an advert is for, if known: from advert_names.json in the tool's data folder ({"<ID hex>": name})."""
+    if "names" not in _cache:
+        path = os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~"), "AWC-Tool", "advert_names.json")
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                _cache["names"] = {int(k, 16) & STREAM_ID_MASK: str(v) for k, v in json.load(f).items()}
+        except (OSError, ValueError, AttributeError):
+            _cache["names"] = {}
+    return _cache["names"].get(stream_id & STREAM_ID_MASK, "")

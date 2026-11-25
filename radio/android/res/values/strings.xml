@@ -114,4 +114,12 @@
     <string name="warn_allow">Allow in settings</string>
     <string name="notif_alarm">Alarm</string>
     <string name="notif_alarm_info">Snoozed and missed alarms</string>
+
+    <string name="advert">Advert</string>
+    <string name="adverts_switch">Adverts</string>
+    <string name="adverts_none">This station has no adverts</string>
+    <string name="adverts_on">Adverts on: breaks between the songs</string>
+    <string name="adverts_off">Adverts off</string>
+    <string name="menu_adverts_on">Turn adverts on</string>
+    <string name="menu_adverts_off">Turn adverts off</string>
 </resources>

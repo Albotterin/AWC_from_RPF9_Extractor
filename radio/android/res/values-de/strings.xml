@@ -114,4 +114,12 @@
     <string name="warn_allow">In den Einstellungen erlauben</string>
     <string name="notif_alarm">Wecker</string>
     <string name="notif_alarm_info">Schlummernde und verpasste Wecker</string>
+
+    <string name="advert">Werbung</string>
+    <string name="adverts_switch">Werbung</string>
+    <string name="adverts_none">Dieser Sender hat keine Werbung</string>
+    <string name="adverts_on">Werbung an: Pausen zwischen den Songs</string>
+    <string name="adverts_off">Werbung aus</string>
+    <string name="menu_adverts_on">Werbung einschalten</string>
+    <string name="menu_adverts_off">Werbung ausschalten</string>
 </resources>

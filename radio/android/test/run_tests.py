@@ -80,6 +80,7 @@ def main():
     catalog = os.path.isfile(json_jar)
     if catalog:
         srcs += sources("Library.java", "Pack.java", "Catalog.java", "Alarm.java", "StationColor.java")
+        srcs += [tests("ProgramDump.java")]
         srcs += [tests("CatalogTest.java"), tests("AlarmTest.java")]
     cp = OUT + (os.pathsep + json_jar if catalog else "")
     r = subprocess.run(["javac", "-encoding", "UTF-8", "-cp", cp, "-d", OUT] + srcs)
@@ -99,6 +100,61 @@ def main():
         r = subprocess.run(["java", "-cp", cp, "org.awctool.radio.CatalogTest"] + args)
         if r.returncode:
             sys.exit(r.returncode)
+    for folder in sys.argv[1:]:
+        compare_programmes(cp, folder)
+
+
+def compare_programmes(cp, folder):
+    """The app and the PC must put the same item on air at the same moment, with and without adverts."""
+    import json
+    import struct
+
+    find_python_modules()
+    for d in (os.path.join(os.path.dirname(os.path.dirname(HERE)), "radio"),):
+        if os.path.isdir(d):
+            sys.path.insert(0, d)
+    import awc_radio as radio
+    moments = [1795000000.0, 1795046399.5, 1795132800.0, time.time(), 1811111111.25]
+    out = os.path.join(OUT, "programme.txt")
+    r = subprocess.run(["java", "-cp", cp, "org.awctool.radio.ProgramDump", folder, out] + [repr(m) for m in moments])
+    if r.returncode:
+        sys.exit(r.returncode)
+
+    def track(entry):
+        base, rest = entry["k"].split("_", 1)
+        idx, _x, parts = rest.partition("x")
+        tr = {"base": int(base), "idx": int(idx), "sec": entry["s"], "title": entry.get("t", "")}
+        if parts:
+            tr["parts"] = [0] * int(parts)
+        return tr
+
+    want = []
+    for name in sorted(f for f in os.listdir(folder) if f.endswith(".radiopak")):
+        with open(os.path.join(folder, name), "rb") as f:
+            offset, length = struct.unpack_from("<QQ", f.read(32), 16)
+            f.seek(offset)
+            st = json.loads(f.read(length))["stations"][0]
+        station = {"songs": [track(x) for x in st["songs"]], "jingles": [track(x) for x in st["jingles"]],
+                   "ads": [track(x) for x in st.get("ads", [])]}
+        programmes = [("no", radio.Schedule(st["name"], station)), ("ads", radio.Schedule(st["name"], station, True))]
+        for i, now in enumerate(moments):
+            for tag, schedule in programmes:
+                for start, end, kind, tr, fin, fout in schedule.items_from(now, 40):
+                    want.append("%s|%d|%s|%s|%s|%.6f|%.6f|%.6f|%.6f" % (st["name"], i, tag, kind, radio._tkey(tr), start, end, fin, fout))
+    with open(out, encoding="utf-8") as f:
+        got = f.read().splitlines()
+    got.sort()
+    want.sort()
+    ads = sum(1 for x in want if "|ad|" in x)
+    bad = [(a, b) for a, b in zip(got, want) if a != b]
+    if len(got) != len(want) or bad:
+        print("programme differs: %d lines from the app, %d from the PC; first: %s" % (len(got), len(want), bad[:3]))
+        sys.exit(1)
+    leaked = sum(1 for x in want if "|no|ad|" in x)
+    if leaked or not ads:
+        print("adverts: %d in the advert programme, %d in the advert-free one" % (ads, leaked))
+        sys.exit(1)
+    print("Programme: app and PC identical (%d items compared, %d of them adverts, none in the advert-free programme)" % (len(want), ads))
 
 
 if __name__ == "__main__":

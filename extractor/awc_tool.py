@@ -8,8 +8,10 @@ Requires Python 3 (tkinter) and ffmpeg/ffplay in the PATH (or next to the progra
 Run:  python awc_tool.py [--lang=en|de] [folder | file.awc | file.rpf ...]
 """
 import bisect
+import collections
 import os
 import queue
+import re
 import shutil
 import subprocess
 import sys
@@ -25,8 +27,10 @@ import awc_core as core  # noqa: E402
 import awc_i18n  # noqa: E402
 import awc_config as gamecfg  # noqa: E402
 import awc_credits as credits  # noqa: E402
+import awc_gamedata as gamedata  # noqa: E402
 import awc_icons as icons  # noqa: E402
 import awc_names as names  # noqa: E402
+import awc_speech as speech  # noqa: E402
 from awc_core import AwcError, AwcFile, AwcRef  # noqa: E402
 from awc_i18n import LANGUAGES, tr  # noqa: E402
 
@@ -120,6 +124,12 @@ class App(tk.Tk):
         self._small_icons = {}     # logo path -> small PhotoImage for the tree
         self.cue_info = {}         # ref.key -> [(standalone AWC name, stream id) or None] per cue of a mix
         self.cache = {}            # (ref.key, stream_idx) -> (opus_path, seconds)  (playback/extract cache)
+        self.loaded = []           # the scanned containers, in the order they were added
+        self.station_data = {}     # container path -> what _stations_read() found, or None
+        self.node_info = {}        # stream node of the view by station -> (category, number, entry, station)
+        self.stream_nodes = {}     # (ref.key, stream_idx) -> its nodes there (an advert runs on several stations)
+        self.cur_node = None       # the row that was played or chosen last, for its name and logo
+        self.rebuild_pending = False
         self.busy = False
         self.cancel_flag = False
         self._i18n = []            # (widget, option, key) for live re-translation
@@ -178,10 +188,12 @@ class App(tk.Tk):
         self._set_play_btn()
         self.status.config(text=tr(self._status[0], **self._status[1]))
         if self.cur:
-            self.lbl_now.config(text="%s  –  %s" % (self.cur[0].name, self._stream_text(self.cur[1])))
+            self.lbl_now.config(text="%s  –  %s" % (self.cur[0].name, self._label_of(*self.cur)))
         else:
             self.lbl_now.config(text=tr("lbl_no_track"))
         self._retranslate_tree()
+        if self.by_station.get() and any(self.station_data.values()):
+            self._rebuild_tree()
         self._update_count()
         self._update_ui()
 
@@ -192,11 +204,31 @@ class App(tk.Tk):
     def _gname(self, cpath, g):
         return self.group_names.get(self._gkey(cpath), {}).get(str(g), "")
 
+    def _node_of(self, ref, s):
+        """The row of the view by station that stands for a stream: the one used last, else its first; or None."""
+        nodes = self.stream_nodes.get((ref.key, s.index))
+        if not nodes:
+            return None
+        return self.cur_node if self.cur_node in nodes else nodes[0]
+
+    def _label_of(self, ref, s):
+        node = self._node_of(ref, s)
+        return self._station_label(*self.node_info[node][:3]) if node else self._stream_text(s)
+
+    def _place(self, iid):
+        """(name, station, output sub folder) of a row of the view by station."""
+        category, number, entry, station = self.node_info[iid]
+        return (self._station_label(category, number, entry), station,
+                os.path.join(safe_name(station), safe_name(tr("cat_" + category))))
+
     def _stream_text(self, s):
         label = names.track_label(self.names.get(s.id))
         return "%s   [%s]" % (label, s.label) if label else s.label
 
     def _station(self, ref, s):
+        node = self._node_of(ref, s)
+        if node:
+            return self.node_info[node][3]
         rec = self.names.get(s.id) or {}
         st = rec.get("station")
         if st:
@@ -235,7 +267,8 @@ class App(tk.Tk):
                 self.tree.set(iid, "ch", tr("n_awc", n=obj[2]))
             elif kind == "stream":
                 ref, s = obj
-                self.tree.item(iid, text=self._stream_text(s))
+                if iid not in self.node_info:
+                    self.tree.item(iid, text=self._stream_text(s))
                 self.tree.set(iid, "ch", tr("stereo") if s.opus_channels == 2 else tr("mono"))
             elif kind == "cue":
                 self.tree.item(iid, text=self._cue_text(obj[0], obj[2]))
@@ -302,6 +335,9 @@ class App(tk.Tk):
         self._reg(ttk.Button(nrow2, command=self.icons_button), "text", "btn_icons").pack(side="left", padx=(6, 0))
         self.split_mixes = tk.BooleanVar(value=False)
         self._reg(ttk.Checkbutton(nrow2, variable=self.split_mixes), "text", "chk_split").pack(side="left", padx=14)
+        self.by_station = tk.BooleanVar(value=True)
+        self._reg(ttk.Checkbutton(nrow2, variable=self.by_station, command=self._view_changed), "text",
+                  "chk_by_station").pack(side="left")
 
         pl = self._reg(ttk.LabelFrame(self), "text", "lf_player")
         pl.pack(fill="x", **pad)
@@ -418,65 +454,10 @@ class App(tk.Tk):
         n_awc = n_str = 0
         for c in res:
             self.containers.add(c["path"])
-            items = c["items"]
-            tot_sec = sum(max((s["sec"] for s in it["streams"]), default=0) for it in items)
-            try:
-                csize = fmt_size(os.path.getsize(c["path"]))
-            except OSError:
-                csize = ""
-            cid = self.tree.insert("", "end", text="%s  [%s]" % (c["path"], c["kind"].upper()), open=False,
-                                   values=("", "", tr("n_awc", n=len(items)), fmt_time(tot_sec), csize))
-            self.nodes[cid] = ("container", c)
-            # per-group totals (groups = clusters of AWCs that sit together in the archive, see core.add_groups)
-            gstat = {}
-            for it in items:
-                st = gstat.setdefault(it.get("g", 0), [0, 0.0, 0])
-                st[0] += 1
-                st[1] += max((s["sec"] for s in it["streams"]), default=0)
-                st[2] += it["length"] or 0
-            tids = {}          # (group, track number) -> standalone AWC item that carries that number
-            for it in items:
-                if it.get("tid") is not None:
-                    tids.setdefault((it.get("g", 0), it["tid"]), it)
-            gnodes = {}
-            for it in sorted(items, key=lambda x: x["base"]):
-                ref = AwcRef(it)
-                self.refs[ref.key] = ref
-                n_awc += 1
-                nsec = max((s.est_seconds for s in ref.streams), default=0)
-                if not ref.in_rpf:
-                    parent = cid          # standalone AWC: streams directly under the container node
-                    self.tree.item(cid, text=ref.path)
-                else:
-                    gparent = cid
-                    if ref.group:
-                        if ref.group not in gnodes:
-                            n, sec, size = gstat[ref.group]
-                            gnodes[ref.group] = self.tree.insert(
-                                cid, "end", text=self._group_text(c["path"], ref.group), open=False,
-                                values=("", "", tr("n_awc", n=n), fmt_time(sec), fmt_size(size)))
-                            self.nodes[gnodes[ref.group]] = ("group", (c["path"], ref.group, n))
-                        gparent = gnodes[ref.group]
-                    parent = self.tree.insert(gparent, "end", text=ref.name, open=False,
-                                              values=("", "", len(ref.streams), "~" + fmt_time(nsec),
-                                                      fmt_size(ref.size)))
-                    self.nodes[parent] = ("awc", ref)
-                for s in ref.streams:
-                    sid = self.tree.insert(parent, "end", text=self._stream_text(s),
-                                           values=("%08X" % s.id, s.codec_name,
-                                                   tr("stereo") if s.opus_channels == 2 else tr("mono"),
-                                                   "~" + fmt_time(s.est_seconds), ""))
-                    self.nodes[sid] = ("stream", (ref, s))
-                    n_str += 1
-                    if ref.cues:
-                        links = self.cue_info.setdefault(ref.key, [])
-                        for k, (t, val) in enumerate(ref.cues):
-                            cand = tids.get((ref.group, val))
-                            if len(links) <= k:
-                                links.append((cand["name"], cand["streams"][0]["id"]) if cand else None)
-                            cid2 = self.tree.insert(sid, "end", text="", values=("", "", "", fmt_time(t), ""))
-                            self.nodes[cid2] = ("cue", (ref, s, k))
-                            self.tree.item(cid2, text=self._cue_text(ref, k))
+            self.loaded.append(c)
+            self._insert_container(c)
+            n_awc += len(c["items"])
+            n_str += sum(len(it["streams"]) for it in c["items"])
         self._update_count()
         self._refresh_names()
         self._group_icons()
@@ -486,9 +467,287 @@ class App(tk.Tk):
             self.set_status("st_scan_done", c=len(res), a=n_awc, s=n_str)
             if icons.missing_stations() and self._icons_pools():
                 self._icons_start(quiet=True)
+            if self.by_station.get():
+                self._stations_start()
+
+    def _insert_container(self, c, only=None, parent_node=None):
+        """The view by position of a container: groups, AWCs, streams. `only` limits it to these AWC keys (what the
+        view by station could not assign), below `parent_node`."""
+        items = c["items"] if only is None else [it for it in c["items"] if AwcRef(it).key in only]
+        if not items:
+            return
+        tot_sec = sum(max((s["sec"] for s in it["streams"]), default=0) for it in items)
+        try:
+            csize = fmt_size(os.path.getsize(c["path"]))
+        except OSError:
+            csize = ""
+        if parent_node is None:
+            cid = self.tree.insert("", "end", text="%s  [%s]" % (c["path"], c["kind"].upper()), open=False,
+                                   values=("", "", tr("n_awc", n=len(items)), fmt_time(tot_sec), csize))
+            self.nodes[cid] = ("container", c)
+        else:
+            cid = self.tree.insert(parent_node, "end", text=tr("grp_other_position"), open=False,
+                                   values=("", "", tr("n_awc", n=len(items)), fmt_time(tot_sec), ""))
+            self.nodes[cid] = ("folder", None)
+        # per-group totals (groups = clusters of AWCs that sit together in the archive, see core.add_groups)
+        gstat = {}
+        for it in items:
+            st = gstat.setdefault(it.get("g", 0), [0, 0.0, 0])
+            st[0] += 1
+            st[1] += max((s["sec"] for s in it["streams"]), default=0)
+            st[2] += it["length"] or 0
+        tids = {}          # (group, track number) -> standalone AWC item that carries that number
+        for it in items:
+            if it.get("tid") is not None:
+                tids.setdefault((it.get("g", 0), it["tid"]), it)
+        gnodes = {}
+        for it in sorted(items, key=lambda x: x["base"]):
+            ref = AwcRef(it)
+            ref = self.refs.setdefault(ref.key, ref)
+            nsec = max((s.est_seconds for s in ref.streams), default=0)
+            if not ref.in_rpf:
+                parent = cid          # standalone AWC: streams directly under the container node
+                self.tree.item(cid, text=ref.path)
+            else:
+                gparent = cid
+                if ref.group:
+                    if ref.group not in gnodes:
+                        n, sec, size = gstat[ref.group]
+                        gnodes[ref.group] = self.tree.insert(
+                            cid, "end", text=self._group_text(c["path"], ref.group), open=False,
+                            values=("", "", tr("n_awc", n=n), fmt_time(sec), fmt_size(size)))
+                        self.nodes[gnodes[ref.group]] = ("group", (c["path"], ref.group, n))
+                    gparent = gnodes[ref.group]
+                parent = self.tree.insert(gparent, "end", text=ref.name, open=False,
+                                          values=("", "", len(ref.streams), "~" + fmt_time(nsec),
+                                                  fmt_size(ref.size)))
+                self.nodes[parent] = ("awc", ref)
+            for s in ref.streams:
+                sid = self.tree.insert(parent, "end", text=self._stream_text(s),
+                                       values=("%08X" % s.id, s.codec_name,
+                                               tr("stereo") if s.opus_channels == 2 else tr("mono"),
+                                               "~" + fmt_time(s.est_seconds), ""))
+                self.nodes[sid] = ("stream", (ref, s))
+                if ref.cues:
+                    links = self.cue_info.setdefault(ref.key, [])
+                    for k, (t, val) in enumerate(ref.cues):
+                        cand = tids.get((ref.group, val))
+                        if len(links) <= k:
+                            links.append((cand["name"], cand["streams"][0]["id"]) if cand else None)
+                        cid2 = self.tree.insert(sid, "end", text="", values=("", "", "", fmt_time(t), ""))
+                        self.nodes[cid2] = ("cue", (ref, s, k))
+                        self.tree.item(cid2, text=self._cue_text(ref, k))
+
+    # ------------------------------------------------------------------ view by radio station
+    CATEGORY_ORDER = ("music", "set", "speech", "advert", "ident", "banter", "show", "bed", "talk", "other")
+
+    @staticmethod
+    def _category(kind):
+        if kind.startswith("music_bed"):
+            return "bed"
+        if kind.startswith("music"):
+            return "music"
+        for start, cat in (("dj_banter", "banter"), ("ident", "ident"), ("show", "show"), ("talk", "talk"), ("news", "talk")):
+            if kind.startswith(start):
+                return cat
+        return kind if kind in ("advert", "set") else "other"
+
+    def _view_changed(self):
+        if self.by_station.get():
+            self._stations_start()
+        self._rebuild_tree()
+
+    def _stations_start(self):
+        todo = [c for c in self.loaded if c["kind"] == "rpf" and c["path"] not in self.station_data]
+        if not todo:
+            return
+        for c in todo:
+            self.station_data[c["path"]] = None                 # being read
+        self.set_status("st_stations_reading")
+        titles = {rec.get("title", "") for rec in self.names.tracks.values()}
+        threading.Thread(target=self._stations_worker, args=(todo, titles), daemon=True).start()
+
+    def _stations_worker(self, containers, titles):
+        for c in containers:
+            path = c["path"]
+            try:
+                data = self._stations_read(path, c["items"], titles, cancel=lambda p=path: p not in self.containers)
+            except Exception as e:  # noqa: BLE001  (an archive without this config keeps the view by position)
+                self.q.put(("status", str(e)))
+                data = None
+            self.q.put(("stations", path, data))
+
+    def _stations_read(self, path, items, titles, cancel=None):
+        """{"stations": {station: {category: [(AWC key, stream index, kind, title, extra, stream id)]}},
+        "speech": [scan items of the speech containers]} or None if the archive has no radio config.
+
+        For music the extra is the list of artists, for DJ lines [number of the take]."""
+        stations = gamedata.catalog(gamedata.config_files(path))
+        if not stations:
+            return None
+        placed = gamedata.assign(items, stations)
+        if not placed:
+            return None
+        out = {}
+        talk = {v[0] for v in gamedata.TALK_STATIONS.values()}
+        parts = gamedata.show_parts()
+        adverts = {(item["base"], s["i"]) for _n, kind, _t, item, s in placed if kind == "advert"}
+        for station, kind, track, item, s in placed:
+            category, title, extra = self._category(kind), track.title, track.artists
+            part = parts.get(s["id"] & names.STREAM_ID_MASK) if station in talk else None
+            if (item["base"], s["i"]) in adverts:
+                category, kind = "advert", "advert"
+            elif part:
+                category, kind, title, extra = "talk", "part", part[0], [part[1], part[2]]
+            elif category == "other":                       # lists with a category of their own
+                category = "talk" if station in talk else "ident" if s["sec"] <= gamedata.JINGLE_MAX else "other"
+            out.setdefault(station, {}).setdefault(category, []).append(
+                (AwcRef(item).key, s["i"], kind, title, extra, s["id"]))
+        # the speech containers lie between the music banks of their station
+        where = sorted((item["base"], station) for station, kind, _t, item, _s in placed if kind.startswith(("music", "ident")))
+        found = speech.find(path, items, where[0][0], where[-1][0], cancel=cancel) if where else []
+        song_of = {}                                            # song name as in the line names -> stations that play it
+        for station, tracks in stations.items():
+            for t in tracks:
+                if t.title:
+                    song_of.setdefault(t.title.lower(), set()).add(station)
+        words = set(song_of)
+        words |= {re.sub(r"[^a-z0-9]+", "_", t.lower()).strip("_") for t in titles if t}
+        try:
+            words |= {s.lower() for s in gamecfg.read_config_strings(path)[0] if re.fullmatch(r"[A-Z0-9_]{4,60}", s)}
+        except (OSError, ValueError):
+            pass
+        lines = speech.line_names([s["id"] for it in found for s in it["streams"]], words - {""})
+        bases = [b for b, _s in where]
+        for it in found:
+            # the station whose songs the lines announce; without such a line, the one around it in the archive
+            votes = collections.Counter(st for s in it["streams"]
+                                        for st in song_of.get(lines.get(s["id"], ("", "", 0))[1], ()))
+            if votes:
+                station = votes.most_common(1)[0][0]
+            else:
+                station = where[max(0, bisect.bisect_left(bases, it["base"]) - 1)][1]
+            key = AwcRef(it).key
+            for s in it["streams"]:
+                kind, song, number = lines.get(s["id"], ("", "", 0))
+                out.setdefault(station, {}).setdefault("speech", []).append((key, s["i"], kind, song, [number], s["id"]))
+        return {"stations": out, "speech": found}
+
+    def _stations_done(self, path, data):
+        if path not in self.containers:
+            return                                              # cleared meanwhile
+        self.station_data[path] = data
+        if data is None:
+            self.set_status("st_stations_none")
+            return
+        for it in data["speech"]:
+            ref = AwcRef(it)
+            self.refs.setdefault(ref.key, ref)
+        if self.by_station.get():
+            self._rebuild_tree()
+        adverts = {(e[0], e[1]) for v in data["stations"].values() for e in v.get("advert", ())}
+        self.set_status("st_stations_done", s=len(data["stations"]), a=len(adverts),
+                        d=sum(len(v.get("speech", ())) for v in data["stations"].values()))
+        if icons.missing_stations() and self._icons_pools():
+            self._icons_start(quiet=True)
+
+    def _rebuild_tree(self):
+        if self.busy:                       # an extraction reads the folders of the current view: rebuild afterwards
+            self.rebuild_pending = True
+            return
+        self.rebuild_pending = False
+        self.tree.delete(*self.tree.get_children())
+        self.nodes.clear()
+        self.node_info.clear()
+        self.stream_nodes.clear()
+        self.cur_node = None
+        for c in self.loaded:
+            data = self.station_data.get(c["path"])
+            if self.by_station.get() and data:
+                self._insert_station_view(c, data)
+            else:
+                self._insert_container(c)
+        self._update_count()
+        self._refresh_names()
+        self._group_icons()
+
+    def _station_label(self, category, number, entry):
+        _key, _idx, kind, title, extra, sid = entry
+        named = names.track_label(self.names.get(sid))          # a name the user gave or imported comes first
+        if category == "advert":
+            name = named or gamedata.advert_name(sid)
+            return tr("lbl_advert_named", name=name) if name else tr("lbl_advert", n="%03d" % number)
+        if named:
+            return named
+        if kind == "part":
+            return tr("lbl_part", show=title, e=extra[0], p=extra[1])
+        if category in ("music", "set") and title:
+            artists = ", ".join(gamecfg.pretty(a) for a in extra if a != "SPECIAL")
+            return ("%s – %s" % (artists, gamecfg.pretty(title))) if artists else gamecfg.pretty(title)
+        if category == "speech":
+            take = extra[0] or number
+            if kind in ("intro", "outro") and title:
+                return tr("lbl_" + kind, song=gamecfg.pretty(title), n=take)
+            if kind in ("intro", "outro"):
+                return tr("lbl_%s_general" % kind, n=take)
+            return tr("lbl_" + kind, n=take) if kind else tr("lbl_line", n=number)
+        return tr("lbl_item", kind=tr("one_" + category), n=number)
+
+    def _insert_station_view(self, c, data):
+        cid = self.tree.insert("", "end", text="%s  [%s]" % (c["path"], c["kind"].upper()), open=True,
+                               values=("", "", tr("n_awc", n=len(c["items"])), "", ""))
+        self.nodes[cid] = ("container", c)
+        # the adverts are shared between the stations: one numbering for all, in archive order
+        adverts = sorted({(self.refs[e[0]].base, e[1], e[0]) for v in data["stations"].values() for e in v.get("advert", ())})
+        advert_no = {(key, i): n for n, (_b, i, key) in enumerate(adverts, 1)}
+        used = set()
+        for station in sorted(data["stations"], key=lambda n: re.sub("^the ", "", n.lower())):
+            cats = data["stations"][station]
+            total = sum(len(v) for v in cats.values())
+            seconds = sum(self.refs[e[0]].streams[e[1]].est_seconds for v in cats.values() for e in v)
+            snode = self.tree.insert(cid, "end", text=" " + station, open=False,
+                                     values=("", "", tr("n_streams", n=total), fmt_time(seconds), ""))
+            self.nodes[snode] = ("folder", station)
+            for category in self.CATEGORY_ORDER:
+                entries = cats.get(category)
+                if not entries:
+                    continue
+                if category == "speech":                        # intros, outros, links; by song and take
+                    rank = {"intro": 0, "outro": 1, "to_ads": 2, "to_news": 3, "": 4}
+                    entries = sorted(entries, key=lambda e: (rank[e[2]], not e[3], e[3], e[4][0], self.refs[e[0]].base, e[1]))
+                else:                                           # talk shows by episode and part, the rest as stored
+                    entries = sorted(entries, key=lambda e: ((0, e[3], e[4]) if e[2] == "part" else (1, "", []))
+                                     + (self.refs[e[0]].base, e[1]))
+                seconds = sum(self.refs[e[0]].streams[e[1]].est_seconds for e in entries)
+                cnode = self.tree.insert(snode, "end", text=tr("cat_" + category), open=False,
+                                         values=("", "", tr("n_streams", n=len(entries)), fmt_time(seconds), ""))
+                self.nodes[cnode] = ("folder", None)
+                for number, entry in enumerate(entries, 1):
+                    ref = self.refs[entry[0]]
+                    s = ref.streams[entry[1]]
+                    used.add(ref.key)
+                    if category == "advert":
+                        number = advert_no[(entry[0], entry[1])]
+                    label = self._station_label(category, number, entry)
+                    node = self.tree.insert(cnode, "end", text=label, values=(
+                        "%08X" % s.id, s.codec_name, tr("stereo") if s.opus_channels == 2 else tr("mono"),
+                        "~" + fmt_time(s.est_seconds), ""))
+                    self.nodes[node] = ("stream", (ref, s))
+                    self.node_info[node] = (category, number, entry, station)
+                    self.stream_nodes.setdefault((ref.key, s.index), []).append(node)
+                    if ref.cues:                                # a DJ set keeps its track markers
+                        links = self.cue_info.setdefault(ref.key, [])
+                        for m, (t, _val) in enumerate(ref.cues):
+                            if len(links) <= m:
+                                links.append(None)
+                            mark = self.tree.insert(node, "end", text="", values=("", "", "", fmt_time(t), ""))
+                            self.nodes[mark] = ("cue", (ref, s, m))
+                            self.tree.item(mark, text=self._cue_text(ref, m))
+        rest = {AwcRef(it).key for it in c["items"]} - used
+        self._insert_container(c, only=rest, parent_node=cid)
 
     def _update_count(self):
-        streams = [v[1][1] for v in self.nodes.values() if v[0] == "stream"]
+        streams = [s for _r, s in self._all_streams()]
         if streams:
             self.lbl_count.config(text=tr("count_label", n=len(streams), t=fmt_time(sum(s.est_seconds for s in streams))))
         else:
@@ -505,6 +764,12 @@ class App(tk.Tk):
         self.nodes.clear()
         self.refs.clear()
         self.containers.clear()
+        self.loaded.clear()
+        self.station_data.clear()
+        self.node_info.clear()
+        self.stream_nodes.clear()
+        self.cur_node = None
+        self.cue_info.clear()
         self.cache.clear()
         self._update_count()
         for f in os.listdir(self.cache_dir):
@@ -515,8 +780,9 @@ class App(tk.Tk):
 
     def _streams_under(self, iid, out, seen):
         if self.nodes.get(iid, (None,))[0] == "stream":
-            if iid not in seen:
-                seen.add(iid)
+            ref, s = self.nodes[iid][1]
+            if (ref.key, s.index) not in seen:                  # an advert hangs under several stations
+                seen.add((ref.key, s.index))
                 out.append(self.nodes[iid][1])
             return
         for ch in self.tree.get_children(iid):
@@ -528,8 +794,22 @@ class App(tk.Tk):
             self._streams_under(iid, out, seen)
         return out
 
+    def _rows_under(self, iids):
+        """The rows of the view by station among `iids` and below them, in the order of the tree."""
+        out, seen, todo = [], set(), list(reversed(list(iids)))
+        while todo:
+            iid = todo.pop()
+            if iid in seen:
+                continue
+            seen.add(iid)
+            if iid in self.node_info:
+                out.append(iid)
+            else:
+                todo.extend(reversed(self.tree.get_children(iid)))
+        return out
+
     def _all_streams(self):
-        return [v[1] for v in self.nodes.values() if v[0] == "stream"]
+        return list({(v[1][0].key, v[1][1].index): v[1] for v in self.nodes.values() if v[0] == "stream"}.values())
 
     def _context_menu(self, e):
         iid = self.tree.identify_row(e.y)
@@ -815,17 +1095,22 @@ class App(tk.Tk):
         return done
 
     def _group_icons(self):
-        """Small station logo in front of every group row (the first station of the group)."""
+        """Small station logo in front of every group row (the first station of the group) and every station row."""
         for iid, (kind, obj) in self.nodes.items():
-            if kind != "group":
+            if kind == "group":
+                first = self._group_station_name(obj[0], obj[1]).split(" + ")[0]
+            elif kind == "folder" and obj:
+                first = obj
+            else:
                 continue
-            first = self._group_station_name(obj[0], obj[1]).split(" + ")[0]
             path = icons.icon_path(first)
             if not path:
                 continue
             if path not in self._small_icons:
                 try:
-                    self._small_icons[path] = tk.PhotoImage(file=path).subsample(6, 6)      # 128 -> 21 px
+                    image = tk.PhotoImage(file=path)
+                    step = max(1, -(-max(image.width(), image.height()) // 21))             # fits into a tree row
+                    self._small_icons[path] = image.subsample(step, step)
                 except tk.TclError:
                     continue
             self.tree.item(iid, image=self._small_icons[path])
@@ -881,17 +1166,18 @@ class App(tk.Tk):
 
     def _refresh_names(self):
         self._runs = None
-        known = 0
         for iid, (kind, obj) in self.nodes.items():
-            if kind == "stream":
+            if kind == "stream" and iid in self.node_info:
+                self.tree.item(iid, text=self._station_label(*self.node_info[iid][:3]))
+            elif kind == "stream":
                 self.tree.item(iid, text=self._stream_text(obj[1]))
-                known += 1 if self.names.get(obj[1].id) else 0
             elif kind == "cue":
                 self.tree.item(iid, text=self._cue_text(obj[0], obj[2]))
-        total = len(self._all_streams())
-        self.lbl_named.config(text=tr("lbl_named", k=known, n=total) if total else "")
+        streams = self._all_streams()
+        known = sum(1 for _r, s in streams if self.names.get(s.id))
+        self.lbl_named.config(text=tr("lbl_named", k=known, n=len(streams)) if streams else "")
         if self.cur:
-            self.lbl_now.config(text="%s  –  %s" % (self.cur[0].name, self._stream_text(self.cur[1])))
+            self.lbl_now.config(text="%s  –  %s" % (self.cur[0].name, self._label_of(*self.cur)))
 
     def name_stream(self, iid, clear=False):
         s = self.nodes[iid][1][1]
@@ -953,6 +1239,7 @@ class App(tk.Tk):
         iid = self.tree.identify_row(e.y)
         kind = self.nodes.get(iid, (None,))[0] if iid else None
         if kind == "stream":
+            self.cur_node = iid
             self._load_and_play(*self.nodes[iid][1], start=0.0)
         elif kind == "cue":
             ref, s, k = self.nodes[iid][1]
@@ -982,6 +1269,8 @@ class App(tk.Tk):
             b.config(state=st)
         self.btn_cancel.config(state="normal" if busy and not scanning else "disabled")
         self.btn_scan_cancel.config(state="normal" if busy and scanning else "disabled")
+        if not busy and self.rebuild_pending:
+            self._rebuild_tree()
 
     def extract(self, everything, fmt_id=None):
         if self.busy:
@@ -1028,12 +1317,22 @@ class App(tk.Tk):
         if len(items) > 20 or est > 5e9:
             if not messagebox.askyesno(tr("dlg_confirm_title"), msg + "\n\n" + tr("dlg_continue")):
                 return
+        # name, station and folder of every stream: from the rows that were chosen (all rows for "extract all")
+        wanted = {(a.key, s.index) for a, s in items}
+        places = {}
+        for iid in self._rows_under(self.tree.get_children() if everything else self.tree.selection()):
+            a, s = self.nodes[iid][1]
+            if (a.key, s.index) in wanted:
+                place = self._place(iid)
+                have = places.setdefault((a.key, s.index), [])
+                if all(p[2] != place[2] for p in have):
+                    have.append(place)
         self.cancel_flag = False
         self._set_busy(True)
-        threading.Thread(target=self._extract_worker, args=(items, out, ext, ff_args, self.write_playlist.get(), split),
-                         daemon=True).start()
+        threading.Thread(target=self._extract_worker,
+                         args=(items, out, ext, ff_args, self.write_playlist.get(), split, places), daemon=True).start()
 
-    def _extract_worker(self, items, out, ext, ff_args, playlist=True, split=False):
+    def _extract_worker(self, items, out, ext, ff_args, playlist=True, split=False, places=None):
         try:
             # group by AWC so that every AWC is read only once
             groups, order = {}, []
@@ -1049,27 +1348,37 @@ class App(tk.Tk):
             for gi, k in enumerate(order):
                 ref, streams = groups[k]
                 w = max(1, ref.size) / float(total)
-                folder = os.path.join(out, safe_name(ref.container), self._group_dir(ref)) if ref.in_rpf else out
-                os.makedirs(folder, exist_ok=True)
-                jobs, final, tags, labels = {}, {}, {}, {}
+                jobs, final, tags, labels, copies = {}, {}, {}, {}, {}
                 for s in streams:
-                    rec = self.names.get(s.id)
-                    entries = lists.setdefault(folder, [])
-                    if rec:
-                        labels[s.index] = names.track_label(rec)
-                        tags[s.index] = names.make_tags(rec, self._station(ref, s), len(entries) + 1)
-                        stem = names.safe_filename(labels[s.index].replace(" – ", " - "))
-                        n, name = 2, stem
-                        while (folder, name.lower()) in used:
-                            name = "%s (%d)" % (stem, n)
-                            n += 1
-                        used.add((folder, name.lower()))
-                        name += "." + ext
-                    else:
-                        base = ref.name if ref.in_rpf else os.path.splitext(ref.name)[0]
-                        name = "%s_stream%d_%08X.%s" % (safe_name(base), s.index, s.id, ext)
-                    entries.append((name, s.est_seconds, labels.get(s.index, "")))
-                    final[s.index] = os.path.join(folder, name)
+                    shown = (places or {}).get((ref.key, s.index)) or [(None, None, self._group_dir(ref))]
+                    for where, (label, station, sub) in enumerate(shown):
+                        folder = os.path.join(out, safe_name(ref.container), sub) if ref.in_rpf else out
+                        os.makedirs(folder, exist_ok=True)
+                        rec = self.names.get(s.id)
+                        if label and not rec:
+                            rec = {"title": label}
+                        entries = lists.setdefault(folder, [])
+                        if rec:
+                            text = label or names.track_label(rec)
+                            stem = names.safe_filename(text.replace(" – ", " - ").replace(": ", " - "))
+                            n, name = 2, stem
+                            while (folder, name.lower()) in used:
+                                name = "%s (%d)" % (stem, n)
+                                n += 1
+                            used.add((folder, name.lower()))
+                            name += "." + ext
+                        else:
+                            text = ""
+                            base = ref.name if ref.in_rpf else os.path.splitext(ref.name)[0]
+                            name = "%s_stream%d_%08X.%s" % (safe_name(base), s.index, s.id, ext)
+                        entries.append((name, s.est_seconds, text))
+                        if where:                      # the same audio for another station: copied when it is done
+                            copies.setdefault(s.index, []).append(os.path.join(folder, name))
+                            continue
+                        final[s.index] = os.path.join(folder, name)
+                        if rec:
+                            labels[s.index] = text
+                            tags[s.index] = names.make_tags(rec, station or self._station(ref, s), len(entries))
                     jobs[s.index] = final[s.index] if ext == "opus" else os.path.join(
                         self.cache_dir, "x_%d_%d_%d.opus" % (os.getpid(), gi, s.index))
                 self.q.put(("statuskey", "st_group", {"i": gi + 1, "n": len(order), "name": ref.name,
@@ -1089,7 +1398,9 @@ class App(tk.Tk):
                                 cancel=lambda: self.cancel_flag, tags=tags)
                 if ext != "opus":
                     for s in streams:
-                        cover = icons.icon_path(self._station(ref, s)) if ext in ("flac", "mp3") and ref.in_rpf else ""
+                        shown = (places or {}).get((ref.key, s.index))
+                        station = shown[0][1] if shown else self._station(ref, s)
+                        cover = icons.icon_path(station) if ext in ("flac", "mp3") and ref.in_rpf else ""
                         self._ffmpeg_convert(jobs[s.index], final[s.index],
                                              ff_args + names.ffmpeg_meta_args(tags.get(s.index)), s.est_seconds,
                                              done + share, w * 0.5 / len(streams), cover=cover)
@@ -1098,6 +1409,9 @@ class App(tk.Tk):
                                 os.remove(jobs[s.index])
                             except OSError:
                                 pass
+                for index, targets in copies.items():
+                    for target in targets:
+                        shutil.copyfile(final[index], target)
                 if split and ref.cues:
                     for s in streams:
                         self._split_mix(final[s.index], ref, s)
@@ -1177,7 +1491,7 @@ class App(tk.Tk):
         self.cur = (ref, s)
         self.duration = s.est_seconds
         self.pos = start
-        self.lbl_now.config(text="%s  –  %s" % (ref.name, self._stream_text(s)))
+        self.lbl_now.config(text="%s  –  %s" % (ref.name, self._label_of(ref, s)))
         self._set_icon(ref, s)
         c = self.cache.get((ref.key, s.index))
         if c and os.path.isfile(c[0]):
@@ -1214,6 +1528,7 @@ class App(tk.Tk):
             if not sel:
                 messagebox.showinfo(tr("dlg_player_title"), tr("dlg_select_first"))
                 return
+            self.cur_node = next(iter(self._rows_under(self.tree.selection())), None)
             self._load_and_play(*sel[0], start=0.0)
         else:
             self._load_and_play(self.cur[0], self.cur[1], start=self.pos)
@@ -1322,6 +1637,8 @@ class App(tk.Tk):
                     self._apply_credits(msg[1], msg[2])
                 elif kind == "credits_fail":
                     self._credits_failed(msg[1], msg[2], msg[3])
+                elif kind == "stations":
+                    self._stations_done(msg[1], msg[2])
                 elif kind == "icons":
                     self._icons_done(*msg[1:])
                 elif kind == "done":

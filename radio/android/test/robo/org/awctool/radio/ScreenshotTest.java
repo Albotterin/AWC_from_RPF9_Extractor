@@ -113,7 +113,7 @@ public class ScreenshotTest {
         ActivityController<MainActivity> c = Robolectric.buildActivity(MainActivity.class).setup();
         Harness.settle();
         MainActivity a = c.get();
-        Assert.assertEquals(30, PackStore.get(a).stations.size());
+        Assert.assertEquals(Harness.folder().list((d, n) -> n.endsWith(".radiopak")).length, PackStore.get(a).stations.size());
         shot(a, "01_radio_idle", null);
 
         RadioService s = playing("Flash FM");
@@ -145,6 +145,16 @@ public class ScreenshotTest {
             Harness.pass(600);
             shot(a, "05_player_" + name.split(" ")[0], null);
         }
+        Harness.app().getSharedPreferences(RadioService.PREFS, 0).edit().putBoolean(RadioService.PREF_ADS, true).commit();
+        s = playing("Flash FM");
+        ReflectionHelpers.setField(a, "service", s);
+        Harness.pass(600);
+        s.title = "Werbung";
+        s.artist = "Werbung";
+        s.nextText = "Werbung";
+        Harness.pass(600);
+        shot(a, "07_player_advert", null);
+
         a.onBackPressed();
         Harness.pass(800);
         shot(a, "06_radio_after_back", null);

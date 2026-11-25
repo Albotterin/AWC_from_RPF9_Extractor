@@ -208,7 +208,7 @@ public class AlarmService extends Service {
             }
             station = list.get(i);
             final Pack pack = station.pack;
-            engine = new Engine(station.schedule, () -> System.currentTimeMillis() / 1000.0, track -> {
+            engine = new Engine(station.programme(RadioService.adverts(this)), () -> System.currentTimeMillis() / 1000.0, track -> {
                 PackPlayer p = new PackPlayer(pack, "t/" + track.key, AudioAttributes.USAGE_ALARM);
                 players.add(p);
                 return p;
@@ -258,8 +258,8 @@ public class AlarmService extends Service {
             engine.takeChanged();
             Schedule.Item it = engine.current();
             if (it != null) {
-                String t = it.jingle ? getString(R.string.jingle) : it.track.title;
-                String a = it.jingle ? "" : it.track.artist;
+                String t = it.jingle ? getString(R.string.jingle) : it.ad ? RadioService.advertTitle(this, it.track) : it.track.title;
+                String a = it.jingle ? "" : it.ad ? (it.track.title.isEmpty() ? "" : getString(R.string.advert)) : it.track.artist;
                 if (!it.jingle && it.track.partStart != null) {
                     int k = it.track.partAt(System.currentTimeMillis() / 1000.0 - it.start);
                     if (k >= 0 && !it.track.partTitle[k].isEmpty()) {

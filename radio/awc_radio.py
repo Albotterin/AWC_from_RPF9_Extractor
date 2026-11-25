@@ -33,7 +33,7 @@ NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 SONG_MIN, SONG_MAX = 60.0, 1500.0          # seconds: shorter is not a song, longer is a mix
 JINGLE_MIN, JINGLE_MAX = 2.0, 25.0         # unnamed short streams of a station are used as jingles
 MIN_SONGS = 5                              # a station needs at least this many songs to be listed
-INDEX_VERSION = 6
+INDEX_VERSION = 7
 
 BG, PANEL, CARD, CARD_SEL, FG, DIM, ACCENT = "#14161c", "#1c1f27", "#232733", "#2f3550", "#eceef4", "#8b91a3", "#ff5a36"
 
@@ -50,7 +50,7 @@ STR = {
         "err_ffplay": "ffplay was not found. Put ffplay.exe next to the program or into your PATH.",
         "err_credits": "The credits page could not be downloaded:\n{e}\n\nPick the page saved from your browser instead?",
         "err_html": "HTML page", "err_generic": "Something went wrong:\n{e}", "err_nostations": "No station with songs was found.",
-        "kind_song": "SONG", "kind_jingle": "JINGLE", "btn_play": "▶ Play (live)", "btn_pause": "⏸ Pause",
+        "kind_song": "SONG", "kind_jingle": "JINGLE", "kind_ad": "ADVERT", "advert": "Advert", "chk_ads": "Adverts", "btn_play": "▶ Play (live)", "btn_pause": "⏸ Pause",
         "sync_hint": "Live: the stations run by the UTC clock, everyone with the same time hears the same song.", "lbl_volume": "Volume", "n_songs": "{n} songs", "n_shows": "{n} shows", "kind_show": "SHOW", "st_loading": "Loading …",
         "lbl_next": "Up next:", "tune": "Tune in to a station on the left", "no_logo_hint": "",
     },
@@ -66,7 +66,7 @@ STR = {
         "err_ffplay": "ffplay wurde nicht gefunden. ffplay.exe neben das Programm legen oder in den PATH aufnehmen.",
         "err_credits": "Die Credits-Seite konnte nicht geladen werden:\n{e}\n\nStattdessen die im Browser gespeicherte Seite wählen?",
         "err_html": "HTML-Seite", "err_generic": "Es ist ein Fehler aufgetreten:\n{e}", "err_nostations": "Es wurde kein Sender mit Songs gefunden.",
-        "kind_song": "SONG", "kind_jingle": "JINGLE", "btn_play": "▶ Abspielen (live)", "btn_pause": "⏸ Pause",
+        "kind_song": "SONG", "kind_jingle": "JINGLE", "kind_ad": "WERBUNG", "advert": "Werbung", "chk_ads": "Werbung", "btn_play": "▶ Abspielen (live)", "btn_pause": "⏸ Pause",
         "sync_hint": "Live: Die Sender laufen nach der UTC-Uhrzeit, alle mit derselben Zeit hören denselben Song.", "lbl_volume": "Lautstärke", "n_songs": "{n} Songs", "n_shows": "{n} Sendungen", "kind_show": "SENDUNG", "st_loading": "Lade …",
         "lbl_next": "Als Nächstes:", "tune": "Links einen Sender wählen", "no_logo_hint": "",
     },
@@ -413,10 +413,13 @@ def make_index(rpf, pool, get_songs, status=None, progress=None):
                 if hit:
                     tr_["title"], tr_["artist"] = hit
     add_venues(stations, items, rpf, songs, matched, cfg_names)
+    adverts = gamedata.advert_keys(items, game)
+    for st in stations.values():                        # an advert is never a jingle: it only runs when adverts are wanted
+        st["jingles"] = [j for j in st["jingles"] if (j["base"], j["idx"]) not in adverts]
     stations = dict(sorted(stations.items(), key=lambda kv: sort_key(kv[0])))
     used = {}
     for st in stations.values():
-        for tr_ in st["songs"] + st["jingles"]:
+        for tr_ in st["songs"] + st["jingles"] + st.get("ads", []):
             for base, _idx in tr_.get("parts") or [(tr_["base"], tr_["idx"])]:
                 used[base] = None
     by_base = {it["base"]: it for it in items}
@@ -451,6 +454,8 @@ def add_venues(stations, items, rpf, songs, found, cfg_names):
 DAY = 86400.0
 FADE = 3.0                                 # seconds of crossfade between two items (shorter around short jingles)
 LEAD = 0.4                                 # ffplay needs about this long to start; its start position is moved on by it
+AD_FADE = 0.5                              # adverts are talk: only a short overlap around them
+AD_AFTER = (540, 361)                      # with adverts: a break after 9 to 15 minutes of programme (540 + 0..360 s)
 
 
 def segment_at(tr_, pos):
@@ -487,12 +492,17 @@ class Schedule:
     would cross midnight UTC is cut there.
 
     Neighbouring items overlap by a few seconds (a crossfade like on a real radio): the next one starts while the
-    previous one fades out. The overlap only depends on the two tracks, so it is the same for everybody as well."""
+    previous one fades out. The overlap only depends on the two tracks, so it is the same for everybody as well.
 
-    def __init__(self, name, station):
+    Every station has a second programme with adverts (ads=True, for stations that have an advert list): after 9 to 15
+    minutes of songs comes a break of two or three adverts, then a jingle. Without adverts the programme is the same as
+    for a station that has none."""
+
+    def __init__(self, name, station, ads=False):
         self.name = name
         self.songs = sorted(station["songs"], key=_tkey)
         self.jingles = sorted(station["jingles"], key=_tkey)
+        self.ads = sorted(station.get("ads", []), key=_tkey) if ads else []
         self.days = {}
 
     def _day(self, d):
@@ -502,10 +512,28 @@ class Schedule:
         name = self.name
         starts, entries = [], []
         deck, npass, last_song, last_jingle, jn = [], 0, None, None, 0
-        prev_start, prev_sec = 0.0, 0.0
+        prev_start, prev_sec, prev_kind = 0.0, 0.0, ""
         count, target = 0, 2 + _h(name, d, "target", 0) % 3
+        played, bn, after_break = 0.0, 0, False              # played: seconds of songs since the last advert break
+        block, ad_deck, apass, last_ad = [], [], 0, None
+        threshold = AD_AFTER[0] + _h(name, d, "adt", 0) % AD_AFTER[1]
         while True:
-            if self.jingles and count >= target:
+            if self.ads and not block and not after_break and played >= threshold:
+                bn += 1
+                for _k in range(2 + _h(name, d, "adn", bn) % 2):
+                    if not ad_deck:
+                        apass += 1
+                        ad_deck = sorted(self.ads, key=lambda s: _h(name, d, "ads", apass, _tkey(s)), reverse=True)
+                        if len(ad_deck) > 1 and ad_deck[-1] is last_ad:
+                            ad_deck[-1], ad_deck[0] = ad_deck[0], ad_deck[-1]
+                    last_ad = ad_deck.pop()
+                    block.append(last_ad)
+                played, threshold = 0.0, AD_AFTER[0] + _h(name, d, "adt", bn) % AD_AFTER[1]
+            if block:
+                tr_, kind = block.pop(0), "ad"
+                after_break = not block and bool(self.jingles)           # "you are listening to ..." after the break
+            elif self.jingles and (after_break or count >= target):
+                after_break = False
                 jn += 1
                 count, target = 0, 2 + _h(name, d, "target", jn) % 3
                 pool = [j for j in self.jingles if j is not last_jingle] or self.jingles
@@ -520,9 +548,12 @@ class Schedule:
                 last_song = tr_ = deck.pop()
                 count += 1
                 kind = "song"
+                played += max(1.0, tr_["sec"])
             sec = max(1.0, tr_["sec"])
             if entries:
                 ov = min(FADE, 0.25 * prev_sec, 0.25 * sec)       # crossfade with the previous item
+                if kind == "ad" or prev_kind == "ad":
+                    ov = min(ov, AD_FADE)
                 start = prev_start + prev_sec - ov
                 if start >= DAY:
                     break
@@ -531,7 +562,7 @@ class Schedule:
                 ov, start = 0.0, 0.0
             starts.append(start)
             entries.append([kind, tr_, ov, 0.0])
-            prev_start, prev_sec = start, sec
+            prev_start, prev_sec, prev_kind = start, sec, kind
         if len(self.days) > 4:
             self.days.clear()
         self.days[d] = (starts, entries)
@@ -662,6 +693,8 @@ class RadioApp(tk.Tk):
         ttk.Button(top, text=t("btn_settings"), command=self._show_setup).pack(side="right", padx=8, pady=6)
         ttk.Button(top, text=t("btn_rescan"), command=lambda: self._start_clicked(force=True)).pack(side="right")
         ttk.Button(top, text=t("btn_android"), command=self._android).pack(side="right", padx=8)
+        self.var_ads = tk.BooleanVar(value=bool(self.cfg.get("ads", False)))         # off unless the listener wants them
+        ttk.Checkbutton(top, text=t("chk_ads"), variable=self.var_ads, command=self._toggle_ads).pack(side="right", padx=8)
         body = tk.Frame(self.radio, bg=BG)
         body.pack(fill="both", expand=True)
         left = tk.Frame(body, bg=BG, width=390)
@@ -954,13 +987,22 @@ class RadioApp(tk.Tk):
             self.want.queue.clear()
         self.upcoming = []
         self.fail_count = 0
-        self.sched = Schedule(name, self.stations[name])
+        self.sched = Schedule(name, self.stations[name], self.var_ads.get())
         self.cur = None
         self._mark_selected()
         self._see_card(name)
         self._draw_logo(self.big, name, 150)
         self.lbl_station.config(text=name)
         self._sync()
+
+    def _toggle_ads(self):
+        """The other programme of the station: with or without advert breaks."""
+        self.cfg["ads"] = bool(self.var_ads.get())
+        save_settings(self.cfg)
+        if self.station and self.state in ("playing", "loading"):
+            self._tune(self.station)
+        elif self.station:
+            self.sched = Schedule(self.station, self.stations[self.station], self.var_ads.get())
 
     def _track_key(self, tr_):
         return _tkey(tr_)
@@ -969,7 +1011,10 @@ class RadioApp(tk.Tk):
         if self.upcoming:
             _s, _e, kind, tr_, _fi, _fo = self.upcoming[0]
             pair = (tr_["title"], tr_["artist"]) if _is_show(tr_) else (tr_["artist"], tr_["title"])
-            label = t("kind_jingle") if kind == "jingle" else "%s - %s" % pair if tr_["artist"] else tr_["title"]
+            if kind == "ad":
+                label = " - ".join(x for x in (t("advert"), tr_["title"]) if x)
+            else:
+                label = t("kind_jingle") if kind == "jingle" else "%s - %s" % pair if tr_["artist"] else tr_["title"]
             self.lbl_next.config(text="%s %s" % (t("lbl_next"), label))
 
     def _set_cur(self, item):
@@ -977,8 +1022,8 @@ class RadioApp(tk.Tk):
         self.cur_item = item
         self.cur_start, self.cur_end, kind, tr_, _fi, _fo = item
         self.cur = (kind, tr_)
-        self.lbl_kind.config(text=t("kind_jingle" if kind == "jingle" else "kind_show" if _is_show(tr_) else "kind_song"))
-        self.lbl_title.config(text=("♪ " + t("kind_jingle")) if kind == "jingle" else tr_["title"])
+        self.lbl_kind.config(text=t("kind_jingle" if kind == "jingle" else "kind_ad" if kind == "ad" else "kind_show" if _is_show(tr_) else "kind_song"))
+        self.lbl_title.config(text=("♪ " + t("kind_jingle")) if kind == "jingle" else (tr_["title"] or t("advert")) if kind == "ad" else tr_["title"])
         self.lbl_artist.config(text=tr_["artist"] if kind == "song" else self.station or "")
         self.lbl_len.config(text=fmt_time(tr_["sec"]))
         self.seg_shown = None

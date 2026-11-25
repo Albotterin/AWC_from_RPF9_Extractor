@@ -4,7 +4,7 @@
 
 The part of `audio.rpf` before the first AWC holds the game's audio config: a few metadata files, each cut into blocks of
 64 KiB that are stored as plain zlib streams aligned to 16 bytes (a block that does not shrink is stored as it is). Nothing
-is encrypted. `awc_gamedata.py` reads it; the meanings below are inferred from the data.
+is encrypted. [`awc_gamedata.py`](../../extractor/awc_gamedata.py) reads it; the meanings below are inferred from the data.
 
 A metadata file (all little endian):
 
@@ -38,6 +38,29 @@ its own DJ links); the banks of one station lie together in the archive, so the 
 category with name hash `0x2BE42A81` hold the music; short streams that only one station uses are idents and DJ talk.
 The talk stations have one track list per show episode with its parts in order; the stream names follow the pattern
 `<station>_<show>_ep<n>_pt<m>`.
+
+## Track list categories
+
+The category of a track list (`+8`) is `joaat("radio_track_category_<kind>")` with the kinds `music`, `music_night`,
+`music_b`, `music_dj2`, `music_bed`, `advert`, `ident` (also `_night`, `_b`), `dj_banter` (also `_night`, `_to_ads`,
+`_from_ads`, `_from_news`, `_story`), `showintro` and `showoutro` (also `_night`, `_dj2`), `talk` (also `_night`) and
+`news`. Some stations and the talk shows use further categories whose names are not known. The extractor groups a
+station's streams by these.
+
+## Adverts
+
+In the sample archive 18 stations list adverts, 239 different ones, each station its own selection (21 to 70).
+
+* No advert runs on all of them. 199 run on two or more stations (at most 12), 40 on one only - 25 of those are Symphony
+  FM's own short ones.
+* 28 adverts run only on **Cocoteo FM** and **Radio La Ola** (23 on both, 3 only on Cocoteo FM, 2 only on La Ola). The two
+  stations also play adverts they share with others (Cocoteo FM 44 of its 70, La Ola 10 of its 35).
+* A comparison of the sound (spectral landmarks and half-second waveform windows) finds for 13 of those 28 another advert
+  with partly the same soundtrack, usually stored right next to it; 12 of these 13 counterparts do not run on the two
+  stations. That fits two language versions of one spot - listeners report the exclusive ones as Spanish. The programs
+  do not recognise languages.
+
+AWC Radio plays the adverts of a station only in its programme "with adverts".
 
 ## Places that play their own music
 

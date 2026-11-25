@@ -47,6 +47,7 @@ python radio/awc_radio.py        # das Radio
 * Durchsucht `.rpf`-Archive jeder Größe nach Audio-Containern – ohne Inhaltsverzeichnis.
 * Schreibt die originalen Opus-Pakete 1:1 in `.opus`-Dateien (keine Neukodierung); optional FLAC, WAV oder MP3.
 * Spielt jeden Stream direkt aus dem Archiv.
+* Zeigt das Archiv **nach Radiosendern**: Songs, DJ-Intros und -Outros, Werbespots, Jingles und Talk, mit Senderlogo.
 * Benennt Streams aus der Spiel-Konfiguration, von der öffentlichen Credits-Seite oder aus eigenen Listen; Sender-Logos optional.
 * Oberfläche auf Deutsch und Englisch.
 
@@ -58,13 +59,14 @@ python radio/awc_radio.py        # das Radio
   **The Vault**, **Thrillbilly Mud Club**), samt Playlists aus der Audio-Konfiguration des Spiels gelesen.
 * Ein Live-Programm nach der UTC-Uhr: Jeder Sender läuft weiter, alle mit derselben Uhrzeit hören denselben Song.
 * Jingles, DJ-Ansagen und Überblendungen zwischen den Songs; lange DJ-Mixe zeigen den Titel des aktuellen Abschnitts.
+* **Werbung wahlweise**: jeder Sender mit oder ohne Werbeblöcke (Standard: ohne).
 * Eine [**Android-App**](#-die-awc-radio-app-für-android) spielt dasselbe Programm auf dem Handy und im Auto – und weckt dich damit.
 
 ➡️ [**Radio-Anleitung**](radio/README.de.md)
 
 ## 📱 Die AWC-Radio-App für Android
 
-Das Radio für die Hosentasche, fürs Auto und für den Nachttisch. **`AWC-Radio.apk`** (Version 1.5) spielt dasselbe
+Das Radio für die Hosentasche, fürs Auto und für den Nachttisch. **`AWC-Radio.apk`** (Version 1.6) spielt dasselbe
 Live-Programm wie der PC: gleiche UTC-Uhr, gleiche Reihenfolge, gleiche Überblendungen – mit Sender-Packs derselben Version
 spielen Handy und PC zur selben Zeit denselben Song.
 
@@ -74,6 +76,7 @@ spielen Handy und PC zur selben Zeit denselben Song.
 | ⏰ **Radiowecker** | Mehrere Wecker mit Wochentagen, Sender, Lautstärke, sanftem Start und Schlummern; ein Sonnenaufgang-Bildschirm über dem Sperrbildschirm. Ist das Radio nicht zu hören, klingelt der Weckton des Handys; Wecker bleiben nach einem Neustart erhalten |
 | 🚗 **Android Auto** | Die Sender als Raster mit ihren Logos, Song und Sender auf dem Player-Bildschirm, Sprachbefehle wie *„Spiele Radio On-U auf AWC Radio“* |
 | 😴 **Einschlaftimer** | Stoppt das Radio nach der gewählten Zeit |
+| 📢 **Werbung** | Schalter im Player und im Menü, von Haus aus aus; bei 18 Sendern |
 | 📦 **Sender-Packs** | Eine Datei (`.radiopak`) je Sender in einem Ordner auf dem Handy: einzelne Sender hinzufügen oder aktualisieren, ohne alles neu zu kopieren |
 | 🔒 **Offline** | Die App hat keine Internet-Berechtigung: Alles kommt aus den Packs auf dem Handy |
 | 🌍 **Sprachen** | Deutsch und Englisch |
@@ -82,7 +85,7 @@ spielen Handy und PC zur selben Zeit denselben Song.
 **Einrichten**
 
 1. `AWC-Radio.apk` installieren (aus dem [neuesten Release](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/latest) oder selbst gebaut aus [`radio/android/`](radio/README.de.md#awc-radio-für-android)). Benachrichtigungen erlauben: Der Wecker braucht sie.
-2. Am PC in AWC Radio auf **Android-Packs…** klicken, einen Ordner wählen und die Packs schreiben (Originalqualität, etwa 4,2 GB für alle 34 Sender). Später werden nur neue oder geänderte Packs geschrieben.
+2. Am PC in AWC Radio auf **Android-Packs…** klicken, einen Ordner wählen und die Packs schreiben (Originalqualität, etwa 4,7 GB für alle 34 Sender). Später werden nur neue oder geänderte Packs geschrieben.
 3. Die `.radiopak`-Dateien in einen Ordner auf dem Handy kopieren, die App starten und diesen Ordner einmal wählen.
 4. Für Android Auto: in den Einstellungen von Android Auto etwa zehnmal auf *Version* tippen, im Drei-Punkte-Menü die Entwicklereinstellungen öffnen und *Unbekannte Quellen* aktivieren.
 
@@ -95,7 +98,7 @@ spielen Handy und PC zur selben Zeit denselben Song.
 
 ## Fortschritt
 
-Stand **2026-11-25** (v2.5.0), gemessen an einer 28,5 GB großen `audio.rpf`.
+Stand **2026-11-25** (v2.6.0), gemessen an einer 28,5 GB großen `audio.rpf`.
 
 | Bereich | Stand | |
 |---|---|---|
@@ -104,7 +107,9 @@ Stand **2026-11-25** (v2.5.0), gemessen an einer 28,5 GB großen `audio.rpf`.
 | Talk-Radio | alle 5 in den Credits genannten Sendungen, **15 Folgen** | ✅ |
 | Sender in AWC Radio | 34 (darunter 3 „(Mix)“-Sender, 4 Orte aus dem Spiel und „Clubmixes“) | ✅ |
 | Orte aus dem Spiel | Jack of Hearts (100 Min. DJ-Set), VYB (45 Min.), The Vault (Club, 84 Min.), Thrillbilly Mud Club (20 Songs) | ✅ |
-| Android-App | Version 1.5: Radiowecker, neues Design, ein Pack je Sender, Android Auto | ✅ |
+| Werbung | 239 Spots, wahlweise im Programm von 18 Sendern | ✅ |
+| Extractor nach Sendern | 28 Sender mit Logo, 3.417 DJ-Zeilen | ✅ |
+| Android-App | Version 1.6: Werbung wahlweise, Radiowecker, ein Pack je Sender, Android Auto | ✅ |
 | The Vault Radio | läuft als ein langer Mix; seine 24 gelisteten Songs sind keine Einzeldateien | 🎚 |
 
 ![AWC Radio – Fortschritt der Sender](radio/docs/radio-progress.svg)
@@ -117,8 +122,10 @@ Details zu jedem Sender: [Fortschritt des Radios](radio/docs/RADIO-PROGRESS.de.m
 - [ ] Die 8 eigens geschriebenen Songs von „Honey FM – Liquid City“
 - [ ] Die fünf Podcasts, die die Spiel-Konfiguration nennt
 - [ ] Ein 61 Minuten langer Club-Mix steht in keiner Titelliste der Konfiguration; er bleibt in „Clubmixes“
-- [ ] App 1.5 (neues Design, Wecker) ist am PC getestet (Robolectric), auf echten Handys noch wenig
-- [ ] Extractor: nur Musik-Container mit Opus-Codec; das RPF9-Inhaltsverzeichnis wird nicht gelesen, es gibt also keine Dateinamen
+- [ ] Die Produktnamen der Werbespots sind nicht bekannt
+- [ ] Das Radio spricht die DJ-Intros und -Outros noch nicht über die Songs
+- [ ] App 1.6 ist am PC getestet (Robolectric), auf echten Handys noch wenig
+- [ ] Extractor: nur Opus (Musik und die DJ-Sprache des Radios); das RPF9-Inhaltsverzeichnis wird nicht gelesen, es gibt also keine Dateinamen
 
 ### Meilensteine
 
@@ -136,6 +143,7 @@ Details zu jedem Sender: [Fortschritt des Radios](radio/docs/RADIO-PROGRESS.de.m
 | [v2.4.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.4.0) | 2026-11-25 | 📻 Talk-Radio und vollständige Sender-Playlists |
 | [v2.4.1](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.4.1) | 2026-11-25 | 🎛 📻 Eigener Leser für die Sender-Logos, kein Download nötig |
 | [v2.5.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.5.0) | 2026-11-25 | 📻 Ein Pack je Sender, App 1.5 mit Radiowecker und neuem Design, Sender für Orte aus dem Spiel |
+| [v2.6.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.6.0) | 2026-11-25 | 📻 Werbung wahlweise (App 1.6) · 🎛 Ansicht nach Radiosendern mit DJ-Intros, Outros und Werbung |
 
 ## Aufbau des Repositorys
 

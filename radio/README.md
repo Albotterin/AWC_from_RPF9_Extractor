@@ -54,7 +54,13 @@ clock hears the same song at the same second (accurate to about a second; the on
 cut). Neighbouring songs and jingles are **crossfaded** for 3 seconds (shorter around short jingles), at the same moment
 for everybody. There is no skip button - like on a real radio; after a pause, play resumes live. Later starts are
 instant. **Jingles** are the short recordings (idents and DJ talk) that only this station uses; for the club DJ sets they
-are an educated guess. The adverts that several stations share are not played. Needs `ffplay` like the extractor.
+are an educated guess. Needs `ffplay` like the extractor.
+
+**Adverts.** Every station has two programmes after the same clock: without adverts (the default) and with them. Tick
+**Adverts** on the PC, or switch **Adverts** on in the app. After about 9 to 15 minutes of songs a break of two or three
+spots follows, with a jingle back into the music - on average a break roughly every quarter of an hour and about a tenth
+of the air time. 18 of the 34 stations have adverts in the game; each plays the ones the audio config lists for it. The
+programme without adverts is the same as before.
 
 ## Stations and progress
 
@@ -71,17 +77,18 @@ The current list of all stations with their content and length: [all stations](d
 The phone app plays the same live programme as the PC: same UTC clock, same order, same crossfades. It consists of the app
 and the station packs:
 
-* **`AWC-Radio.apk`** - the app (version 1.5), the same file for everybody, no game data inside. Android 7.0 or newer,
+* **`AWC-Radio.apk`** - the app (version 1.6), the same file for everybody, no game data inside. Android 7.0 or newer,
   English and German. Station grid, mini player and a large player in the colour of the station's logo; background playback
-  with a media notification, lock-screen and headset buttons; sleep timer; **Android Auto** (switch on *Unknown sources* in
+  with a media notification, lock-screen and headset buttons; sleep timer; **adverts** switch (off by default); **Android Auto** (switch on *Unknown sources* in
   its developer settings first, because the app does not come from the Play Store).
 * **Radio alarm** - several alarms with weekdays, station, volume, gentle start, snooze and vibration. It rings on the phone's
   alarm volume with a screen over the lock screen. If nothing can be heard from the radio within 10 seconds (pack missing,
   player error, phone not yet unlocked after a restart), the phone's own alarm tone rings. It stops by itself after 30 minutes.
 * **Station packs (`.radiopak`)** - one file per station, made on the PC: in AWC Radio click **Android packs…**, choose a
   folder and write them. Each holds the station's songs in the game's own quality (about 128 kbit/s, not re-encoded), its logo
-  and its programme data; about 4.2 GB for all 34 stations. Copy them into one folder on the phone and choose that folder in
-  the app. New or changed packs are picked up by themselves.
+  and its programme data; about 4.7 GB for all 34 stations. Copy them into one folder on the phone and choose that folder in
+  the app. New or changed packs are picked up by themselves. Adverts are
+  only in packs written by version 2.6.0 or later.
 
 The packs contain game audio and pictures: for your own use only, do not share them. Without a pack the app is empty.
 `python awc_radio.py --export-pack <folder> [--stations "Name" ...]` writes packs without opening a window.
@@ -101,7 +108,6 @@ the script). `python android\test\run_robo.py <pack folder>` runs the screens an
 ```
 radio/
   awc_radio.py          The radio program (window, schedule, playback)
-  awc_gamedata.py       Reads the radio stations and their playlists from the game's audio config
   awc_android.py        Writes one station pack (.radiopak) per station for the Android app, and its dialog
   android/              The Android app: Java source, resources, build_apk.py, make_logo.py, tests
   Start AWC-Radio.bat   Launcher

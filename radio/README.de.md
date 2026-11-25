@@ -56,8 +56,13 @@ genau; der Song, der über Mitternacht UTC laufen würde, wird abgeschnitten). A
 3 Sekunden lang **überblendet** (um kurze Jingles herum kürzer), für alle im selben Moment. Es gibt keinen
 Überspringen-Knopf – wie bei einem echten Radio; nach einer Pause geht es live weiter. Spätere Starts gehen sofort. Als
 **Jingles** dienen die kurzen Aufnahmen (Senderkennungen und DJ-Ansagen), die nur dieser Sender benutzt; bei den
-Club-DJ-Sets ist das eine begründete Vermutung. Die Werbung, die sich mehrere Sender teilen, wird nicht gespielt. Braucht
-wie der Extractor `ffplay`.
+Club-DJ-Sets ist das eine begründete Vermutung. Braucht wie der Extractor `ffplay`.
+
+**Werbung.** Jeder Sender hat zwei Programme nach derselben Uhr: ohne Werbung (Standard) und mit Werbung. Am PC dafür den
+Haken **Werbung** setzen, in der App den Schalter **Werbung** einschalten. Nach etwa 9 bis 15 Minuten Musik folgt ein Block
+mit zwei oder drei Spots, danach führt ein Jingle zurück zur Musik – im Mittel etwa ein Block je Viertelstunde und rund
+ein Zehntel der Sendezeit. 18 der 34 Sender haben im Spiel Werbung; jeder spielt die Spots, die die Audio-Konfiguration
+für ihn nennt. Das Programm ohne Werbung ist dasselbe wie bisher.
 
 ## Sender und Fortschritt
 
@@ -74,9 +79,9 @@ Die aktuelle Liste aller Sender mit Inhalt und Länge: [alle Sender](docs/RADIO-
 Die Handy-App spielt dasselbe Live-Programm wie der PC: gleiche UTC-Uhr, gleiche Reihenfolge, gleiche Überblendungen.
 Dazu gehören die App und die Sender-Packs:
 
-* **`AWC-Radio.apk`** - die App (Version 1.5), für alle dieselbe Datei, ohne Spieldaten. Android 7.0 oder neuer, Deutsch und
+* **`AWC-Radio.apk`** - die App (Version 1.6), für alle dieselbe Datei, ohne Spieldaten. Android 7.0 oder neuer, Deutsch und
   Englisch. Senderraster, kleiner Player und großer Player in der Farbe des Senderlogos; Wiedergabe im Hintergrund mit
-  Medien-Benachrichtigung, Sperrbildschirm- und Kopfhörertasten; Einschlaftimer; **Android Auto** (vorher in dessen
+  Medien-Benachrichtigung, Sperrbildschirm- und Kopfhörertasten; Einschlaftimer; Schalter für **Werbung** (von Haus aus aus); **Android Auto** (vorher in dessen
   Entwicklereinstellungen „Unbekannte Quellen“ aktivieren, weil die App nicht aus dem Play Store kommt).
 * **Radiowecker** - mehrere Wecker mit Wochentagen, Sender, Lautstärke, sanftem Start, Schlummern und Vibration. Er klingelt
   mit der Weckerlautstärke des Handys und zeigt einen Bildschirm über dem Sperrbildschirm. Ist vom Radio nach 10 Sekunden
@@ -84,8 +89,9 @@ Dazu gehören die App und die Sender-Packs:
   Handys. Nach 30 Minuten hört er von selbst auf.
 * **Sender-Packs (`.radiopak`)** - eine Datei je Sender, am PC erzeugt: in AWC Radio auf **Android-Packs…** klicken, einen
   Ordner wählen und schreiben. Jedes enthält die Songs des Senders in der Originalqualität des Spiels (ca. 128 kbit/s, nicht
-  neu kodiert), sein Logo und die Programmdaten; etwa 4,2 GB für alle 34 Sender. In einen Ordner auf dem Handy kopieren und
-  diesen in der App wählen. Neue oder geänderte Packs werden von selbst übernommen.
+  neu kodiert), sein Logo und die Programmdaten; etwa 4,7 GB für alle 34 Sender. In einen Ordner auf dem Handy kopieren und
+  diesen in der App wählen. Neue oder geänderte Packs werden von selbst übernommen. Die Werbung
+  steckt erst in Packs, die ab Version 2.6.0 geschrieben wurden.
 
 Die Packs enthalten Spiel-Audio und Bilder: nur für den eigenen Gebrauch, bitte nicht weitergeben. Ohne Pack ist die App leer.
 `python awc_radio.py --export-pack <Ordner> [--stations "Name" ...]` schreibt Packs ohne Fenster.
@@ -105,7 +111,6 @@ Skript). `python android\test\run_robo.py <Pack-Ordner>` führt Bildschirme und 
 ```
 radio/
   awc_radio.py          Das Radio-Programm (Fenster, Programmplan, Wiedergabe)
-  awc_gamedata.py       Liest die Radiosender und ihre Playlists aus der Audio-Konfiguration des Spiels
   awc_android.py        Schreibt je Sender ein Pack (.radiopak) für die Android-App, samt Dialog
   android/              Die Android-App: Java-Quelltext, Ressourcen, build_apk.py, make_logo.py, Tests
   Start AWC-Radio.bat   Starter

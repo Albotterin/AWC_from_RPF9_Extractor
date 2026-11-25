@@ -16,7 +16,7 @@ Pack layout (little endian), read by android/java/org/awctool/radio/Pack.java:
     idx          UTF-8 JSON {"v":1,"created":..,"sig":..,"stations":[one station],
                              "files":{"t/<key>":[offset,length],"logos/<name>.png":[..]}}
                  a talk station carries "kind":"talk"; a song may carry "m": [[start second, title, artist], ...], the
-                 parts of a long DJ mix
+                 parts of a long DJ mix; "ads": [{"k","t","s"}] are the station's adverts (played only when switched on)
 "sig" is a fingerprint of the content: it tells whether an existing file is still up to date.
 
 A pack contains game audio: for personal use only, do not share it.
@@ -131,7 +131,7 @@ def estimate_bytes(stations):
     total = 0
     for st in stations.values():
         total += 150_000
-        for tr in st["songs"] + st["jingles"]:
+        for tr in st["songs"] + st["jingles"] + st.get("ads", []):
             total += tr["sec"] * BYTES_PER_SEC + 200
     return int(total)
 
@@ -156,6 +156,8 @@ def station_entry(name, st, has_logo):
              "songs": [dict({"k": track_key(s), "t": s["title"], "a": s["artist"], "s": s["sec"]}, **({"m": s["m"]} if s.get("m") else {}))
                        for s in st["songs"]],
              "jingles": [{"k": track_key(j), "s": j["sec"]} for j in st["jingles"]]}
+    if st.get("ads"):
+        entry["ads"] = [{"k": track_key(a), "t": a["title"], "s": a["sec"]} for a in st["ads"]]
     if any(s.get("parts") and not s.get("set") for s in st["songs"]):      # talk radio, not a club's DJ set
         entry["kind"] = "talk"
     return entry
@@ -165,7 +167,7 @@ def signature(name, st, index):
     """Fingerprint of everything that goes into the pack of a station: programme, titles, source streams and logo."""
     logo = _logo(name)
     sources = [[(index["items"].get(str(base)) or {}).get("length"), base, i]
-               for tr in st["songs"] + st["jingles"] for base, i in tr.get("parts") or [(tr["base"], tr["idx"])]]
+               for tr in st["songs"] + st["jingles"] + st.get("ads", []) for base, i in tr.get("parts") or [(tr["base"], tr["idx"])]]
     h = hashlib.sha1(json.dumps([VERSION, station_entry(name, st, bool(logo)), sources], sort_keys=True,
                                 ensure_ascii=False).encode("utf-8"))
     h.update(logo)
@@ -183,8 +185,13 @@ def read_signature(path):
             if off < HEADER or not 0 < length <= 64 << 20 or off + length != os.fstat(f.fileno()).st_size:
                 return ""
             f.seek(off)
-            return str(json.loads(f.read(length).decode("utf-8")).get("sig", ""))
-    except (OSError, ValueError, struct.error, AttributeError):
+            meta = json.loads(f.read(length).decode("utf-8"))
+            for st in meta.get("stations", []):                     # every item of the programme must be in the file
+                for item in st.get("songs", []) + st.get("jingles", []) + st.get("ads", []):
+                    if "t/" + item["k"] not in meta["files"]:
+                        return ""
+            return str(meta.get("sig", ""))
+    except (OSError, ValueError, struct.error, AttributeError, KeyError, TypeError):
         return ""
 
 
@@ -324,7 +331,7 @@ def export_packs(stations, index, rpf, folder, progress=None, cancel=None, cache
     need = sum(sizes) * 1.05 + max(sizes)                        # an old pack stays until the new one is complete
     if shutil.disk_usage(folder).free < need + 50_000_000:
         raise ExportError(t("err_space", s=human(need)))
-    jobs = {n: {track_key(tr): tr for tr in stations[n]["songs"] + stations[n]["jingles"]} for n in write}
+    jobs = {n: {track_key(tr): tr for tr in stations[n]["songs"] + stations[n]["jingles"] + stations[n].get("ads", [])} for n in write}
     total, done = sum(len(j) for j in jobs.values()), [0]
     work = os.path.join(folder, ".awc_pack_work")
     shutil.rmtree(work, ignore_errors=True)

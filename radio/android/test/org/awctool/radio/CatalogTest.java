@@ -131,13 +131,15 @@ public final class CatalogTest {
             check(s.logo.isEmpty() || s.pack.read(s.logo)[1] == 'P', "logo of " + s.name);      // not every station has one
             List<Schedule.Track> all = new ArrayList<>(s.songs);
             all.addAll(s.jingles);
+            all.addAll(s.ads);
+            check(s.programme(false) == s.schedule && (s.programme(true) == s.schedule) == s.ads.isEmpty(), "programmes of " + s.name);
             for (Schedule.Track t : all) {
                 Pack.Entry e = s.pack.entry("t/" + t.key);
                 check(e != null && e.length > 1000, s.name + ": file of " + t.key);
                 items++;
             }
             check(s.schedule.itemsFrom(System.currentTimeMillis() / 1000.0, 5).size() == 5, "programme of " + s.name);
-            System.out.println("  " + s.name + (s.talk ? " [talk]" : "") + (s.logo.isEmpty() ? " [no logo]" : "") + ": " + s.songs.size() + " + " + s.jingles.size());
+            System.out.println("  " + s.name + (s.talk ? " [talk]" : "") + (s.logo.isEmpty() ? " [no logo]" : "") + ": " + s.songs.size() + " + " + s.jingles.size() + " + " + s.ads.size() + " adverts");
         }
         System.out.println(c.stations.size() + " stations in " + c.packCount() + " packs, " + items + " recordings");
     }

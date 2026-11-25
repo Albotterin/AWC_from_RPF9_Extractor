@@ -49,6 +49,8 @@ Dieses Tool geht einen anderen Weg:
    ihrer Lage im Archiv** – Dateien eines Ordners liegen hintereinander, eine Gruppe ist also typischerweise ein
    Radiosender bzw. ein Ordner. Die **Gruppen kannst du selbst benennen** (Rechtsklick); der Name wird zum Ordnernamen
    beim Export.
+6. Es kann ein Archiv auch **nach Radiosendern** zeigen: Die Sender werden aus der Audio-Konfiguration des Spiels
+   gelesen, jeder mit Logo und mit seinen Songs, **DJ-Intros und -Outros**, **Werbespots**, Jingles und Wortbeiträgen.
 
 Du kannst eine einzelne `.awc`, eine `.rpf` oder einen **ganzen Ordner** angeben – dann werden alle Unterordner nach
 `.rpf`- und `.awc`-Dateien durchsucht und alle gefundenen Musik-Streams aufgelistet.
@@ -74,6 +76,7 @@ Du kannst eine einzelne `.awc`, eine `.rpf` oder einen **ganzen Ordner** angeben
 * 📂 **Ordner-Modus**: alle Unterordner nach `*.rpf` und `*.awc` durchsuchen.
 * 🌳 **Baumansicht** Container → Gruppe → AWC → Stream mit Stream-ID, Codec, Stereo/Mono, Dauer und Größe.
 * 🗂 **Gruppen**: AWCs werden nach ihrer Lage im Archiv gebündelt (≈ ein Ordner / Radiosender). Rechtsklick auf eine Gruppe → **Gruppe umbenennen…**; der Name wird für den Export-Ordner genutzt.
+* 📻 **Ansicht nach Radiosendern**: Sender → Kategorie → Stream, mit Senderlogo: Songs, DJ-Sets, DJ-Intros/-Outros und Überleitungen, Werbung, Jingles, DJ-Ansagen, Musikbetten, Talk-Sendungen. Beim Extrahieren ein Ordner je Sender und Kategorie.
 * ▶️ **Player** direkt aus dem Archiv (Play/Pause/Stop, Positionsleiste, Lautstärke) über `ffplay`.
 * 💾 **Extraktion** als Opus (verlustfrei), FLAC, WAV (16 Bit) oder MP3 (320 kbit/s) – für Streams, ganze AWCs oder Container.
 * ⏱ **Dauer-Filter** („Nur Streams ab N Sekunden“) blendet die vielen Kurz-Schnipsel aus.
@@ -84,6 +87,11 @@ Du kannst eine einzelne `.awc`, eine `.rpf` oder einen **ganzen Ordner** angeben
 * ❌ Scans und Extraktionen sind **abbrechbar**; angefangene Dateien werden entfernt.
 
 ## Screenshots
+
+**Nach Radiosendern** – die Sender des Spiels mit ihren Logos; hier die DJ-Intros eines Senders, benannt nach dem Song,
+den sie ankündigen.
+
+![Ansicht nach Radiosendern](docs/screenshots/10-stations-de.png)
 
 **Musik-Container eines Archivs durchsuchen** – Mehrstream-AWCs (hier 3 Stereo-Streams) lassen sich aufklappen:
 
@@ -147,6 +155,24 @@ Unter Windows geht auch ein Doppelklick auf `Start AWC-Tool.bat` in diesem Ordne
    und **Zielordner** wählen und **Markierte extrahieren** klicken. **Alle Streams extrahieren** verarbeitet die ganze
    Liste. *Markierte → FLAC* / *→ WAV* sind Ein-Klick-Abkürzungen.
 5. Mit **Nur Streams ab (Sek.)** lassen sich kurze Schnipsel überspringen (z. B. `60` = nur Streams ab einer Minute).
+### Ansicht nach Radiosendern
+
+**Nach Radiosendern gruppieren** ist von Haus aus angehakt. Nach dem Scan liest das Tool die Sender aus der
+Audio-Konfiguration am Anfang des Archivs und sucht die DJ-Ansagen zwischen den Musik-Banken (dauert einige Sekunden
+länger). Ohne Haken erscheint wieder die Ansicht nach Lage im Archiv.
+
+* Jeder Sender hat Ordner für **Songs**, **DJ-Set**, **DJ-Intros, -Outros und Überleitungen**, **Werbung**,
+  **Senderkennungen und Jingles**, **DJ-Ansagen**, **Sendungs-An- und -Abmoderationen**, **Musikbetten**,
+  **Wortbeiträge und Nachrichten** und **Sonstiges** (nur die, die er hat).
+* Die **DJ-Intros und -Outros** sind Sprachaufnahmen in Mono; sie erscheinen nur in dieser Ansicht. Eine Zeile bekommt den
+  Namen ihres Songs, wo die Stream-ID zum Namensschema des Spiels passt; die übrigen sind nummeriert.
+* **Werbespots** teilen sich die Sender; sie sind einmal für das ganze Archiv nummeriert (`Werbung 001`, …). Die
+  Konfiguration enthält keine Produktnamen. Rechtsklick → **Titel / Interpret setzen…** benennt einen Spot, oder man
+  trägt Namen in `%APPDATA%\AWC-Tool\advert_names.json` ein: `{"<Stream-ID, hex>": "<Name>"}`.
+* Was die Konfiguration keinem Sender zuordnet, steht nach Lage unter **Keinem Sender zugeordnet**.
+
+### Namen, Logos und Mixe
+
 6. **Gruppen benennen** (optional): Rechtsklick auf eine Zeile *Gruppe NN* → **Gruppe umbenennen…** (z. B. nach dem
    Reinhören). Die Namen liegen in `%APPDATA%\AWC-Tool\group_names.json` und werden Teil des Export-Ordnernamens.
 7. **Namen** (optional) – die AWC-Dateien enthalten nur 32-Bit-Hash-IDs, keine Namen:
@@ -173,7 +199,7 @@ Unter Windows geht auch ein Doppelklick auf `Start AWC-Tool.bat` in diesem Ordne
    UI-Textur-Pool des Spiels (`data\ttdb\ui\ttdb_ui.ttpf`, neben der `audio.rpf`) nach `%APPDATA%\AWC-Tool\icons\`
    geschnitten. Der kleine Leser `awc_logos.py` kann genau diese Texturen (BC1 / BC7 in zlib-Blöcken, nichts wird
    entschlüsselt), es muss also nichts heruntergeladen werden. Das passiert nach einem Scan; der Knopf **Sender-Logos…**
-   wiederholt den Schritt. Die Logos werden in voller Spielgröße (256 × 256) gespeichert. Bekannt sind 23 Sender; den
+   wiederholt den Schritt. Die Logos werden in voller Spielgröße (256 × 256) gespeichert. Bekannt sind 27 Sender-Logos; den
    Sender liefert die Credits-Liste (siehe Punkt 7). Gruppen-Zeilen bekommen ein kleines Logo, und FLAC/MP3-Exporte
    tragen das Logo als Cover-Bild. Vom Spiel wird nichts mitgeliefert.
 9. **Sender-Mixe** (optional): ein paar sehr lange Streams (40-120 Min.) sind komplette Radio-Mixe. Das Spiel legt
@@ -202,6 +228,10 @@ Dateiname: `<Zielordner>/<Container>/<Gruppenordner>/<awc-name>_stream<N>_<STREA
 `group_04_Mein Sender/…`) – `group_04` ist die Gruppe (siehe [Gruppierung](#gruppierung-was-gehört-zusammen)), `956` die laufende Nummer des AWC-Headers,
 `000000015034A000` der Byte-Offset im Archiv, `1D7CA6CC` die 32-Bit-Stream-ID (ein Hash; echte Namen stehen nicht in der AWC).
 
+In der **Ansicht nach Radiosendern** heißen die Ordner `<Zielordner>/<Container>/<Sender>/<Kategorie>/`, die Dateien wie
+in der Ansicht (`Interpret - Titel`, `DJ-Intro - Song (1)`, `Werbung 001`). Ein Spot, den mehrere ausgewählte Sender
+spielen, wird in jeden ihrer Ordner geschrieben.
+
 ## So funktioniert es
 
 ```
@@ -215,6 +245,8 @@ audio.rpf (28 GB)
 ```
 
 Die Byte-genaue Beschreibung steht in **[docs/FORMAT.md](docs/FORMAT.md)** (englisch).
+Die DJ-Ansagen liegen in AWCs mit anderem Aufbau (viele kurze Zeilen je Datei); `awc_speech.py` liest sie für die
+Ansicht nach Sendern ([FORMAT.md, Abschnitt 8](docs/FORMAT.md#8-speech-containers-dj-lines)).
 
 ## Gruppierung: was gehört zusammen?
 
@@ -234,6 +266,9 @@ aber das ist ein Schluss, keine Tatsache. Ein paar Titel anhören, dann die Grup
 Praktisch: `Nur Streams ab (Sek.)` mit `90` behält nur die echten Titel.
 
 Im Code: `awc_core.add_groups(items)` setzt `item["g"]` (ab 1) auf den Einträgen des Scanners.
+
+Wo die Radio-Konfiguration des Spiels lesbar ist, kommt die [Ansicht nach Radiosendern](#ansicht-nach-radiosendern)
+ohne Raten aus.
 
 ## Als Bibliothek nutzen
 
@@ -265,8 +300,11 @@ Englisch zurück). Pull Requests mit Übersetzungen sind willkommen.
 
 ## Einschränkungen
 
-* **Nur Musik-Container mit Opus-Codec (`0x0B`)**. Andere AWC-Arten (Effekte, Sprache, Vorbis/ADPCM/XMA …) werden
-  als „kein Musik-Container“ erkannt und übersprungen.
+* **Nur Opus (`0x0B`)**: die Musik-Container und in der Ansicht nach Sendern die DJ-Sprachcontainer des Radios. Andere
+  AWC-Arten (Effekte, sonstige Sprache, Vorbis/ADPCM/XMA …) werden übersprungen.
+* **Werbespots haben keine Produktnamen** und manche DJ-Zeilen keinen erkannten Namen: Weder die AWCs noch die
+  Radio-Konfiguration enthalten sie.
+* Die Ansicht nach Sendern hängt an der Radio-Konfiguration des Spiels; entwickelt wurde sie mit einem Archiv.
 * Das **RPF9-Inhaltsverzeichnis wird nicht gelesen** (es wirkt verschlüsselt/verschleiert) – deshalb gibt es **keine
   echten Dateinamen**, nur Offsets und Stream-IDs.
 * **Gruppen sind eine Layout-Heuristik** (siehe oben), keine echten Ordner; Namen musst du selbst vergeben.
@@ -298,6 +336,8 @@ extractor/
   awc_credits.py      Liest die öffentliche Credits-Seite und ordnet ihre Songs Stream-IDs zu
   awc_icons.py        Optional: schneidet die Sender-Logos aus dem Spiel
   awc_logos.py        Kleiner Leser für die Logo-Texturen im UI-Textur-Pool des Spiels
+  awc_gamedata.py     Liest die Radiosender, ihre Playlists und Kategorien aus der Audio-Konfiguration des Spiels
+  awc_speech.py       Liest die DJ-Sprachcontainer (Ansicht nach Radiosendern)
   logos/              Selbst gezeichnete Bilder für Sender, die die Programme selbst bilden (make_station_logos.py)
   Start AWC-Tool.bat  Starter
   build_exe.bat       Baut dist\AWC-Tool.exe mit PyInstaller

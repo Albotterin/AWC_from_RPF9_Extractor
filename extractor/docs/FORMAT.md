@@ -177,9 +177,40 @@ The `value` of a marker in a mix equals the `value` of the standalone track with
 of that standalone track, so a segment is the part of the track that the mix plays, or the marker is not the start.
 The tool shows the markers as chapters under a mix and can split the exported mix at them (`ffmpeg -c copy`).
 
-## 8. Not covered
+## 8. Speech containers (DJ lines)
 
-* Non-music AWCs (chunk `0xFA` "sfx header", Vorbis `0x76`/`0x7F`, MIDI `0x68`, …).
+The DJ lines of the radio stations lie between the music banks in AWCs of another layout: one file holds many short
+lines, each on its own. The music scan skips them (no `0x48` chunk); `awc_speech.py` reads them for the view by radio
+station.
+
+```
+0x00  char[4]  "ADAT"
+0x04  u16      version                  (1)
+0x06  u16      flags                    (low byte 0x02)
+0x08  u32      number of lines
+0x0C  u32      end of the headers
+0x10  u32[lines]                        bits 29-31: number of chunks of the line, bits 0-28: stream ID
+...   u64[sum of the chunk numbers]     chunk entries as in section 2: those of line 0, then of line 1, ...
+```
+
+Chunks used per line:
+
+| Tag | Meaning |
+|---|---|
+| `0x76` | format: `u32` samples at +0, `u16` sample rate at +8, `u8` codec at +28 (`0x0B` = Opus) |
+| `0x55` | audio: units of 0x800 bytes with `[u16 length, Opus packet]*` as in section 4; mono |
+
+Other chunks of a line (`0x36`, the seek table `0xA3`) are not needed. Only containers with exactly this layout and the
+Opus codec are read. In the sample archive the radio stations have 3,417 such lines.
+
+**Names.** The stream ID is the `joaat` hash of the line's name cut to 29 bits. Names found this way:
+`dj_intro_<song>_NN`, `dj_outro_<song>_NN` (`<song>` as the audio config writes the title), `dj_intro_NN`,
+`dj_outro_NN`, `dj_to_ads_NN`, `dj_to_news_NN`. A container belongs to the station whose songs its lines announce, else
+to the station around it in the archive.
+
+## 9. Not covered
+
+* Sound-effect AWCs and other non-music kinds (chunk `0xFA` "sfx header", Vorbis, MIDI `0x68`, …).
 * Codecs other than `0x0B`: PCM, IMA/MS-ADPCM, XMA2, MPEG, Vorbis, ATRAC9, DSP, other Opus variants.
 * The RPF9 table of contents (names, directory structure).
 * Writing/repacking archives.

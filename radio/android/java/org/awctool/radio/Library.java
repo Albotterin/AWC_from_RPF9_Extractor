@@ -15,7 +15,16 @@ final class Library {
         Pack pack;                         // the file the station comes from
         final List<Schedule.Track> songs = new ArrayList<>();
         final List<Schedule.Track> jingles = new ArrayList<>();
-        Schedule schedule;
+        final List<Schedule.Track> ads = new ArrayList<>();
+        Schedule schedule;                 // the programme without adverts
+        private Schedule withAds;
+
+        /** The station's programme: with advert breaks if wanted and the station has adverts. */
+        Schedule programme(boolean adverts) {
+            if (!adverts || ads.isEmpty()) return schedule;
+            if (withAds == null) withAds = new Schedule(name, songs, jingles, ads);
+            return withAds;
+        }
 
         Station(String name, String logo, boolean talk) {
             this.name = name;
@@ -51,6 +60,13 @@ final class Library {
                 for (int j = 0; j < jingles.length(); j++) {
                     JSONObject s = jingles.getJSONObject(j);
                     st.jingles.add(new Schedule.Track(s.getString("k"), "", "", s.getDouble("s")));
+                }
+            }
+            JSONArray ads = o.optJSONArray("ads");
+            if (ads != null) {
+                for (int j = 0; j < ads.length(); j++) {
+                    JSONObject s = ads.getJSONObject(j);
+                    st.ads.add(new Schedule.Track(s.getString("k"), s.optString("t", ""), "", s.getDouble("s")));
                 }
             }
             st.schedule = new Schedule(st.name, st.songs, st.jingles);
