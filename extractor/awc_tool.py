@@ -21,6 +21,7 @@ import threading
 import time
 import tkinter as tk
 import json
+from concurrent.futures import ThreadPoolExecutor
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -31,7 +32,9 @@ import awc_credits as credits  # noqa: E402
 import awc_gamedata as gamedata  # noqa: E402
 import awc_icons as icons  # noqa: E402
 import awc_names as names  # noqa: E402
+import awc_score as score  # noqa: E402
 import awc_speech as speech  # noqa: E402
+import awc_texts as texts  # noqa: E402
 from awc_core import AwcError, AwcFile, AwcRef  # noqa: E402
 from awc_i18n import LANGUAGES, tr  # noqa: E402
 
@@ -99,6 +102,32 @@ def save_group_names(d):
         pass
 
 
+class ScoreRef:
+    """A piece of the score in the view by station. It behaves like an AWC with one stream, so that playing and extracting
+    work as for everything else; its audio is mixed from the recordings of its layers when it is needed (awc_score)."""
+    score = True
+
+    def __init__(self, path, piece, ffmpeg):
+        self.path, self.piece, self.ffmpeg = path, piece, ffmpeg
+        self.key = "score:%s:%s" % (path, piece["id"])
+        self.name = piece["sub"]
+        self.base, self.group, self.tid, self.cues, self.in_rpf = 0, 0, None, [], True
+        self.size = max(1, int(piece["sec"] * 16000))                # about its size as Opus, for the progress bar
+        self.container = os.path.splitext(os.path.basename(path))[0]
+        stream = core.AwcStream(0, 0, 48000, 0x0B)                 # Opus
+        stream.opus_channels, stream.est_seconds = 2, piece["sec"]
+        self.streams = [stream]
+
+    def extract(self, jobs, progress=None, cancel=None, tags=None):
+        made = {}
+        for index, target in jobs.items():
+            own = dict((tags or {}).get(index) or {"TITLE": self.piece["title"]}, COMMENT=self.piece["name"])
+            made[index] = score.render(self.path, self.piece, target, self.ffmpeg, cancel=cancel, tags=own)
+        if progress:
+            progress(1.0)
+        return made
+
+
 def safe_name(s):
     return "".join(c if c not in '<>:"/\\|?*' else "_" for c in s)
 
@@ -124,6 +153,11 @@ class App(tk.Tk):
         self._icon_img = None
         self._small_icons = {}     # logo path -> small PhotoImage for the tree
         self.cue_info = {}         # ref.key -> [(standalone AWC name, stream id) or None] per cue of a mix
+        self.game_titles = {}      # track number -> (title, artist) of the game's own table (awc_texts)
+        self.sid_titles = {}       # stream id -> (title, artist) of the same table
+        self.score_data = {}       # container path -> pieces of its score; None while they are read, [] if there are none
+        self.score_refs = {}       # ScoreRef.key -> ScoreRef
+        self.score_rows = {}       # container path -> the row that says the score is being read
         self.cache = {}            # (ref.key, stream_idx) -> (opus_path, seconds)  (playback/extract cache)
         self.loaded = []           # the scanned containers, in the order they were added
         self.station_data = {}     # container path -> what _stations_read() found, or None
@@ -219,12 +253,23 @@ class App(tk.Tk):
     def _place(self, iid):
         """(name, station, output sub folder) of a row of the view by station."""
         category, number, entry, station = self.node_info[iid]
-        folder = (os.path.join(tr("grp_podcasts"), safe_name(station)) if category == "podcast"
-                  else os.path.join(safe_name(station), safe_name(tr("cat_" + category))))
+        if category == "score":
+            folder = os.path.join(station, safe_name(tr("score_" + entry[4][0])), safe_name(entry[4][1]))
+        elif category == "podcast":
+            folder = os.path.join(tr("grp_podcasts"), safe_name(station))
+        else:
+            folder = os.path.join(safe_name(station), safe_name(tr("cat_" + category)))
         return self._station_label(category, number, entry), station, folder
 
+    def _game_label(self, found):
+        """"Artist - Title" of an entry of the game's table, or ""."""
+        if not found:
+            return ""
+        title, artist = texts.pretty(found[0]), texts.pretty(found[1])
+        return "%s – %s" % (artist, title) if artist else title
+
     def _stream_text(self, s):
-        label = names.track_label(self.names.get(s.id))
+        label = names.track_label(self.names.get(s.id)) or self._game_label(self.sid_titles.get(s.id))
         return "%s   [%s]" % (label, s.label) if label else s.label
 
     def _station(self, ref, s):
@@ -246,6 +291,7 @@ class App(tk.Tk):
         val = ref.cues[k][1]
         link = (self.cue_info.get(ref.key) or [None] * (k + 1))[k]
         title = names.track_label(self.names.get(link[1])) if link else ""
+        title = title or self._game_label(self.game_titles.get(val))
         return title or tr("cue_track", v=val)
 
     def _cue_text(self, ref, k):
@@ -639,7 +685,24 @@ class App(tk.Tk):
             for s in it["streams"]:
                 kind, song, number = lines.get(s["id"], ("", "", 0))
                 out.setdefault(station, {}).setdefault("speech", []).append((key, s["i"], kind, song, [number], s["id"]))
-        return {"stations": out, "speech": found}
+        wanted = texts.numbers(items)
+        runs = {}                                               # podcast -> [(episode, item, stream)]
+        for station, kind, track, item, s in placed:
+            if kind == "podcast":
+                runs.setdefault(station, []).append((int(track.artists[0]), item, s))
+        numbered = {}
+        for station, episodes in runs.items():
+            episodes.sort(key=lambda x: x[0])
+            numbered[station] = texts.fill_gaps([item.get("tid") for _n, item, _s in episodes])
+            wanted |= {n for n in numbered[station] if n is not None}
+        titles = texts.read_titles(path, wanted)
+        named = {s["id"]: titles[it["tid"]] for it in items
+                 if not it.get("cues") and it.get("tid") in titles for s in it["streams"]}
+        for station, episodes in runs.items():
+            for (_n, _item, s), number in zip(episodes, numbered[station]):
+                if number in titles:
+                    named[s["id"]] = titles[number]
+        return {"stations": out, "speech": found, "titles": titles, "named": named}
 
     def _stations_done(self, path, data):
         if path not in self.containers:
@@ -651,6 +714,9 @@ class App(tk.Tk):
         for it in data["speech"]:
             ref = AwcRef(it)
             self.refs.setdefault(ref.key, ref)
+        self.game_titles.update(data.get("titles", {}))
+        self.sid_titles.update(data.get("named", {}))
+        self._score_start(path)
         if self.by_station.get():
             self._rebuild_tree()
         adverts = {(e[0], e[1]) for v in data["stations"].values() for e in v.get("advert", ())}
@@ -659,6 +725,86 @@ class App(tk.Tk):
                         d=sum(len(v.get("speech", ())) for v in data["stations"].values()))
         if icons.missing_stations() and self._icons_pools():
             self._icons_start(quiet=True)
+
+    # ------------------------------------------------------------------ the score in the view by station
+    def _score_start(self, path):
+        if path in self.score_data:
+            return
+        self.score_data[path] = None
+        threading.Thread(target=self._score_worker, args=(path,), daemon=True).start()
+
+    def _score_worker(self, path):
+        last = [-1]
+
+        def progress(fraction):
+            percent = int(fraction * 100)
+            if percent != last[0]:
+                last[0] = percent
+                self.q.put(("scoreprog", path, percent))
+        try:
+            pieces = score.load(path, progress=progress, cancel=lambda: path not in self.containers)
+        except InterruptedError:
+            return
+        except Exception:  # noqa: BLE001  (an archive without a score simply gets no such folder)
+            pieces = []
+        self.q.put(("score", path, pieces))
+
+    def _score_progress(self, path, percent):
+        row = self.score_rows.get(path)
+        if row and self.tree.exists(row):
+            self.tree.item(row, text=" " + tr("score_node_reading", p=percent))
+
+    def _score_done(self, path, pieces):
+        if path not in self.containers:
+            return                                              # cleared meanwhile
+        self.score_data[path] = pieces
+        row = self.score_rows.pop(path, None)
+        if row and self.tree.exists(row):                       # in its place: the rows the user has opened stay open
+            parent, at = self.tree.parent(row), self.tree.index(row)
+            self.tree.delete(row)
+            self.nodes.pop(row, None)
+            self._insert_score(parent, path, at)
+        if pieces and not self.busy and not self.playing:
+            self.set_status("st_score_done", n=len(pieces))
+
+    def _insert_score(self, parent, path, at="end"):
+        """The folder "Score" of an archive: the four groups, their sub groups and the pieces."""
+        if path not in self.score_data:
+            return
+        pieces = self.score_data[path]
+        if pieces is None:
+            row = self.tree.insert(parent, at, text=" " + tr("score_node_reading", p=0), values=("", "", "", "", ""))
+            self.nodes[row] = ("folder", None)
+            self.score_rows[path] = row
+            return
+        if not pieces:
+            return
+
+        def folder(where, index, text, inside):
+            node = self.tree.insert(where, index, text=text, open=False, values=(
+                "", "", tr("score_n", n=len(inside)), fmt_time(sum(p["sec"] for p in inside)), ""))
+            self.nodes[node] = ("folder", None)
+            return node
+        top = folder(parent, at, " " + tr("grp_score"), pieces)
+        for group in score.GROUPS:
+            of_group = [p for p in pieces if p["group"] == group]
+            if not of_group:
+                continue
+            gnode = folder(top, "end", tr("score_" + group), of_group)
+            subs = {}
+            for p in of_group:
+                subs.setdefault(p["sub"], []).append(p)
+            for sub, inside in subs.items():
+                snode = folder(gnode, "end", sub, inside)
+                for number, p in enumerate(inside, 1):
+                    ref = ScoreRef(path, p, self.ffmpeg)
+                    ref = self.score_refs.setdefault(ref.key, ref)
+                    s = ref.streams[0]
+                    node = self.tree.insert(snode, "end", text=p["title"], values=(
+                        "", s.codec_name, tr("stereo"), "~" + fmt_time(p["sec"]), ""))
+                    self.nodes[node] = ("stream", (ref, s))
+                    self.node_info[node] = ("score", number, (ref.key, 0, "score", p["title"], [group, sub], 0), "Score")
+                    self.stream_nodes[(ref.key, 0)] = [node]
 
     def _rebuild_tree(self):
         if self.busy:                       # an extraction reads the folders of the current view: rebuild afterwards
@@ -682,16 +828,23 @@ class App(tk.Tk):
 
     def _station_label(self, category, number, entry):
         _key, _idx, kind, title, extra, sid = entry
+        if category == "score":
+            return title
         named = names.track_label(self.names.get(sid))          # a name the user gave or imported comes first
         if category == "advert":
             name = named or gamedata.advert_name(sid)
             return tr("lbl_advert_named", name=name) if name else tr("lbl_advert", n="%03d" % number)
         if named:
             return named
+        game = self.sid_titles.get(sid)
         if kind == "podcast":
+            if game:
+                return tr("lbl_episode_named", show=title, n=extra[0], name=game[0])
             return tr("lbl_episode", show=title, n=extra[0])
         if kind == "part":
             return tr("lbl_part", show=title, e=extra[0], p=extra[1])
+        if category in ("music", "set") and game:
+            return self._game_label(game)
         if category in ("music", "set") and title:
             artists = ", ".join(gamecfg.pretty(a) for a in extra if a != "SPECIAL")
             return ("%s – %s" % (artists, gamecfg.pretty(title))) if artists else gamecfg.pretty(title)
@@ -765,6 +918,7 @@ class App(tk.Tk):
                             mark = self.tree.insert(node, "end", text="", values=("", "", "", fmt_time(t), ""))
                             self.nodes[mark] = ("cue", (ref, s, m))
                             self.tree.item(mark, text=self._cue_text(ref, m))
+        self._insert_score(cid, c["path"])
         rest = {AwcRef(it).key for it in c["items"]} - used
         self._insert_container(c, only=rest, parent_node=cid)
 
@@ -792,6 +946,11 @@ class App(tk.Tk):
         self.stream_nodes.clear()
         self.cur_node = None
         self.cue_info.clear()
+        self.game_titles.clear()
+        self.sid_titles.clear()
+        self.score_data.clear()
+        self.score_refs.clear()
+        self.score_rows.clear()
         self.cache.clear()
         self._update_count()
         for f in os.listdir(self.cache_dir):
@@ -831,12 +990,13 @@ class App(tk.Tk):
         return out
 
     def _all_streams(self):
-        return list({(v[1][0].key, v[1][1].index): v[1] for v in self.nodes.values() if v[0] == "stream"}.values())
+        return list({(v[1][0].key, v[1][1].index): v[1] for v in self.nodes.values()
+                     if v[0] == "stream" and not getattr(v[1][0], "score", False)}.values())
 
     def _context_menu(self, e):
         iid = self.tree.identify_row(e.y)
         kind = self.nodes.get(iid, (None,))[0] if iid else None
-        if kind == "stream":
+        if kind == "stream" and not getattr(self.nodes[iid][1][0], "score", False):
             self.tree.selection_set(iid)
             s = self.nodes[iid][1][1]
             m = tk.Menu(self, tearoff=0)
@@ -1151,9 +1311,17 @@ class App(tk.Tk):
             return
         self._set_busy(True)
         self.set_status("st_reading_names")
-        threading.Thread(target=self._gamenames_worker, args=(by_path,), daemon=True).start()
+        marked = {}                                       # path -> (numbers, {number: stream ids})
+        for ref in self.refs.values():
+            if ref.in_rpf:
+                wanted, single = marked.setdefault(ref.path, (set(), {}))
+                if ref.tid is not None and not ref.cues:
+                    wanted.add(ref.tid)
+                    single.setdefault(ref.tid, []).extend(s.id for s in ref.streams)
+                wanted.update(v for _t, v in ref.cues)
+        threading.Thread(target=self._gamenames_worker, args=(by_path, marked), daemon=True).start()
 
-    def _gamenames_worker(self, by_path):
+    def _gamenames_worker(self, by_path, marked):
         found, stations, failed = {}, set(), []
         for path, ids in by_path.items():
             try:
@@ -1162,15 +1330,27 @@ class App(tk.Tk):
                 stations.update(st)
             except (OSError, ValueError) as e:
                 failed.append("%s (%s)" % (path, e))
-        self.q.put(("gamenames", found, sorted(stations), failed))
+        titles, named = {}, {}
+        for path, (wanted, single) in marked.items():
+            got = texts.read_titles(path, wanted)
+            titles.update(got)
+            for number, ids in single.items():
+                if number in got:
+                    named.update((sid, got[number]) for sid in ids)
+        self.q.put(("gamenames", found, sorted(stations), failed, titles, named))
 
-    def _apply_game_names(self, found, stations, failed):
+    def _apply_game_names(self, found, stations, failed, titles=(), named=()):
+        self.game_titles.update(titles)
+        self.sid_titles.update(named)
+        new = {sid: (title, "") for sid, title in found.items()}
+        new.update({sid: (texts.pretty(t), texts.pretty(a)) for sid, (t, a) in dict(named).items()})
         k = kept = 0
-        for sid, title in found.items():
-            if self.names.get(sid):
+        for sid, (title, artist) in new.items():
+            cur = self.names.get(sid)
+            if cur and (cur.get("artist") or not artist):      # an internal name gives way to title and artist
                 kept += 1
             else:
-                self.names.set(sid, title)
+                self.names.set(sid, title, artist, (cur or {}).get("station", ""))
                 k += 1
         self.names.save()
         if stations:
@@ -1180,7 +1360,7 @@ class App(tk.Tk):
         self.set_status("st_names_read", k=k)
         streams = self._all_streams()
         total = len(streams)
-        missing = sum(1 for _r, st in streams if st.id not in found)
+        missing = sum(1 for _r, st in streams if st.id not in new)
         if failed:
             messagebox.showwarning(tr("dlg_names_title"), tr("dlg_gamenames_error", paths="\n".join(failed)))
         messagebox.showinfo(tr("dlg_names_title"), tr("dlg_gamenames_result", k=k, kept=kept, st=len(stations),
@@ -1306,7 +1486,7 @@ class App(tk.Tk):
         fmt_id = self._fmt_id()
         ext, ff_args, bps = FORMATS[fmt_id]
         split = self.split_mixes.get()
-        if (ff_args or split) and not self.ffmpeg:
+        if (ff_args or split or any(getattr(a, "score", False) for a, _s in items)) and not self.ffmpeg:
             messagebox.showerror(tr("dlg_ffmpeg_title"), tr("dlg_need_ffmpeg"))
             return
         try:
@@ -1367,6 +1547,7 @@ class App(tk.Tk):
             done = 0.0
             made = 0
             used, lists = set(), {}        # file names handed out per folder / playlist entries per folder
+            later = []                     # pieces of the score: mixed at the end, several at once
             for gi, k in enumerate(order):
                 ref, streams = groups[k]
                 w = max(1, ref.size) / float(total)
@@ -1403,6 +1584,9 @@ class App(tk.Tk):
                             tags[s.index] = names.make_tags(rec, station or self._station(ref, s), len(entries))
                     jobs[s.index] = final[s.index] if ext == "opus" else os.path.join(
                         self.cache_dir, "x_%d_%d_%d.opus" % (os.getpid(), gi, s.index))
+                if ext == "opus" and getattr(ref, "score", False):
+                    later.append((ref, final[0], tags.get(0)))
+                    continue
                 self.q.put(("statuskey", "st_group", {"i": gi + 1, "n": len(order), "name": ref.name,
                                                       "k": len(streams)}))
                 share = w if ext == "opus" else w * 0.5
@@ -1440,6 +1624,8 @@ class App(tk.Tk):
                 made += len(streams)
                 done += w
                 self.q.put(("progress", done))
+            if later:
+                made += self._mix_pieces(later, done)
             if playlist:
                 for folder, entries in lists.items():
                     names.write_m3u8(folder, entries)
@@ -1448,6 +1634,27 @@ class App(tk.Tk):
             self.q.put(("done", "st_cancelled", {}))
         except Exception as e:  # noqa: BLE001
             self.q.put(("error", str(e)))
+
+    def _mix_pieces(self, pieces, done):
+        """Mix [(ScoreRef, file, tags)] on several processors; `done` is the share of the progress bar already filled."""
+        def one(job):
+            ref, target, tags = job
+            if self.cancel_flag:
+                raise InterruptedError()
+            ref.extract({0: target}, cancel=lambda: self.cancel_flag, tags={0: tags} if tags else None)
+        self.q.put(("statuskey", "score_saving", {"i": 0, "n": len(pieces)}))
+        with ThreadPoolExecutor(max_workers=max(1, min(4, (os.cpu_count() or 2) - 1))) as pool:
+            futures = [pool.submit(one, job) for job in pieces]
+            try:
+                for n, future in enumerate(futures, 1):
+                    future.result()
+                    self.q.put(("statuskey", "score_saving", {"i": n, "n": len(pieces)}))
+                    self.q.put(("progress", done + (1.0 - done) * n / len(pieces)))
+            except BaseException:
+                for future in futures:
+                    future.cancel()
+                raise
+        return len(pieces)
 
     def _split_mix(self, path, ref, s):
         """Cut an exported station mix at its track markers (stream copy, no re-encode)."""
@@ -1506,6 +1713,9 @@ class App(tk.Tk):
             return
         if not self.ffplay:
             messagebox.showerror(tr("dlg_ffplay_title"), tr("dlg_ffplay"))
+            return
+        if getattr(ref, "score", False) and not self.ffmpeg:
+            messagebox.showerror(tr("dlg_ffmpeg_title"), tr("dlg_need_ffmpeg"))
             return
         self._kill()
         self.playing = False
@@ -1653,7 +1863,7 @@ class App(tk.Tk):
                     self._add_containers(msg[1], msg[2])
                 elif kind == "gamenames":
                     self._set_busy(False)
-                    self._apply_game_names(msg[1], msg[2], msg[3])
+                    self._apply_game_names(*msg[1:])
                 elif kind == "credits":
                     self._set_busy(False)
                     self._apply_credits(msg[1], msg[2])
@@ -1661,6 +1871,10 @@ class App(tk.Tk):
                     self._credits_failed(msg[1], msg[2], msg[3])
                 elif kind == "stations":
                     self._stations_done(msg[1], msg[2])
+                elif kind == "scoreprog":
+                    self._score_progress(msg[1], msg[2])
+                elif kind == "score":
+                    self._score_done(msg[1], msg[2])
                 elif kind == "icons":
                     self._icons_done(*msg[1:])
                 elif kind == "done":

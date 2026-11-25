@@ -84,7 +84,7 @@ public class SettingsTest {
         Harness.settle();
         View root = a.getWindow().getDecorView();
         for (String text : new String[]{"Wiedergabe", "Überblenden", "Dauer", "3 s", "Werbung", "Pack-Ordner", "AWC-Radio",
-                "Sender neu laden", "Akku-Einstellungen", "AWC Radio 1.11"}) {
+                "Sender neu laden", "Akku-Einstellungen", "AWC Radio 1.12"}) {
             Assert.assertTrue(text, shows(root, text));
         }
         ScreenshotTest.shot(a, "50_settings", null);

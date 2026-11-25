@@ -24,7 +24,7 @@
 ## Start
 
 `awc_radio.py` (or `Start AWC-Radio.bat` / `AWC-Radio.exe`) is a small web-radio style player on top of the
-[extractor](../extractor/README.md)'s code. On the first start you pick the game's `audio.rpf` and its texture file (`data\ttdb\ui\ttdb_ui.ttpf`). The app
+[extractor](../extractor/README.md)'s code. On the first start you pick the game's `audio.rpf` and its texture file (`data\ttdb\ui\ttdb_ui.ttpf`); `data.rpf` in the folder of the `audio.rpf` gives the titles. The app
 reads the archive once (the same scan cache as the extractor; several minutes the first time) and then lists every
 station with its logo.
 
@@ -81,15 +81,16 @@ The audio config lists five podcasts with their episodes in a fixed order: **Dru
 20 episodes are in `audio.rpf`, whatever the progress in the game. They play on demand instead of by the clock, **in the
 Android app** and in the radio on the PC, listed below the stations: pick an episode, pause, seek,
 jump 15 seconds back or 30 forward, and the place in every episode is remembered.
+The titles of the episodes come from the game's own table in `data.rpf`; without that file they are numbered.
 [All episodes with their length](docs/RADIO-PROGRESS.md#podcasts).
 
 ![Podcasts in the app](docs/screenshots/08-app-podcasts.png)
 
 ## Stations and progress
 
-792 of 809 songs the credits list for the music stations (97.9 %) are found, and all 15 talk show episodes;
+793 of 809 songs the credits list for the music stations (98.0 %) are found, and all 15 talk show episodes;
 see [station progress](docs/RADIO-PROGRESS.md) for every station.
-Long DJ mixes are played as stations too: **The Vault Radio**, extra "(Mix)" stations for Radio On-U, Worldwide FM and The Sniper Of La Perle, and **Clubmixes** (the one club mix that cannot be assigned to a place). While a mix plays, the title of the current part is shown (from the markers in the mix; the part is only named where the marker points to a known song).
+Long DJ mixes are played as stations too: **The Vault Radio**, extra "(Mix)" stations for Radio On-U, Worldwide FM and The Sniper Of La Perle, and **Clubmixes** (the one club mix that cannot be assigned to a place). While a mix plays, the title of the current part is shown (from the markers in the mix, named by the game's title table in `data.rpf`; without that file only the parts that also exist as single songs).
 
 All numbers per station: [station progress](docs/RADIO-PROGRESS.md).
 
@@ -101,7 +102,7 @@ The phone app plays the same live programme as the PC: same UTC clock, same orde
 setting). It consists of the app
 and the station packs:
 
-* **`AWC-Radio.apk`** - the app (version 1.11), the same file for everybody, no game data inside. Android 7.0 or newer,
+* **`AWC-Radio.apk`** - the app (version 1.12), the same file for everybody, no game data inside. Android 7.0 or newer,
   English and German. Station grid, mini player and a large player in the colour of the station's logo; background playback
   with a media notification, lock-screen and headset buttons; sleep timer; **adverts** switch (off by default); **Android Auto** (switch on *Unknown sources* in
   its developer settings first, because the app does not come from the Play Store).

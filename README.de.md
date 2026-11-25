@@ -33,7 +33,8 @@ Start aus dem Quellcode müssen deshalb beide Ordner nebeneinander liegen.
 1. `AWC-Tool-…-win64.zip` aus dem [neuesten Release](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/latest) laden und entpacken. Darin liegen beide Windows-Programme.
 2. `ffmpeg.exe` und `ffplay.exe` ([ffmpeg.org](https://ffmpeg.org/download.html)) daneben oder in den `PATH` legen.
 3. **`AWC-Tool.exe`** zum Extrahieren oder **`AWC-Radio.exe`** zum Hören starten und die `audio.rpf` deines eigenen Spiels
-   wählen. Das Radio fragt zusätzlich nach der Textur-Datei `data\ttdb\ui\ttdb_ui.ttpf` (Sender-Logos).
+   wählen. Das Radio fragt zusätzlich nach der Textur-Datei `data\ttdb\ui\ttdb_ui.ttpf` (Sender-Logos). Liegt die `data.rpf` des
+   Spiels im selben Ordner, bekommen auch die Podcast-Folgen und die Teile der Mixe ihre Titel.
 4. **Aufs Handy:** die Android-App installieren, in AWC Radio mit **Android-Packs…** die Sender- und Podcast-Packs schreiben, sie in
    einen Ordner auf dem Handy kopieren und diesen Ordner in der App wählen.
 
@@ -51,7 +52,7 @@ python radio/awc_radio.py        # das Radio
 * Durchsucht `.rpf`-Archive jeder Größe nach Audio-Containern – ohne Inhaltsverzeichnis.
 * Schreibt die originalen Opus-Pakete 1:1 in `.opus`-Dateien (keine Neukodierung); optional FLAC, WAV oder MP3.
 * Spielt jeden Stream direkt aus dem Archiv.
-* Zeigt das Archiv **nach Radiosendern**: Songs, DJ-Intros und -Outros, Werbespots, Jingles und Talk, mit Senderlogo – und die **Podcasts** in einer eigenen Gruppe.
+* Zeigt das Archiv **nach Radiosendern**: Songs, DJ-Intros und -Outros, Werbespots, Jingles und Talk, mit Senderlogo – dazu die **Podcasts** und der **Score** in eigenen Gruppen.
 * Liest den **Score** des Spiels (die interaktive Musik): Stücke aus seinen Instrumentenspuren gemischt, gruppiert in offene
   Welt, Missionen, Stützpunkte und Aktivitäten – zum Hören, Speichern und fürs Handy (braucht FFmpeg).
 * Benennt Streams aus der Spiel-Konfiguration, von der öffentlichen Credits-Seite oder aus eigenen Listen; Sender-Logos optional.
@@ -68,14 +69,14 @@ python radio/awc_radio.py        # das Radio
 * **Der DJ**, wenn man ihn einschaltet: Ansagen über den Anfang und das Ende der Songs, in den Fenstern, die die Songdateien
   dafür markieren (von Haus aus aus).
 * **Werbung wahlweise**: jeder Sender mit oder ohne Werbeblöcke (Standard: ohne).
-* **Podcasts**: die 5 Podcasts des Spiels mit ihren 20 Folgen, abspielbar in der Android-App und am PC.
+* **Podcasts**: die 5 Podcasts des Spiels mit ihren 20 Folgen und deren Titeln, abspielbar in der Android-App und am PC.
 * Eine [**Android-App**](#-die-awc-radio-app-für-android) spielt dasselbe Programm auf dem Handy und im Auto – und weckt dich damit.
 
 ➡️ [**Radio-Anleitung**](radio/README.de.md)
 
 ## 📱 Die AWC-Radio-App für Android
 
-Das Radio für die Hosentasche, fürs Auto und für den Nachttisch. **`AWC-Radio.apk`** (Version 1.11; auf einem echten Android-Handy getestet) spielt dasselbe
+Das Radio für die Hosentasche, fürs Auto und für den Nachttisch. **`AWC-Radio.apk`** (Version 1.12; Version 1.11 ist auf einem echten Android-Handy getestet) spielt dasselbe
 Live-Programm wie der PC: gleiche UTC-Uhr, gleiche Reihenfolge, gleiche Überblendungen – mit Sender-Packs derselben Version
 spielen Handy und PC zur selben Zeit denselben Song.
 
@@ -111,22 +112,23 @@ spielen Handy und PC zur selben Zeit denselben Song.
 
 ## Fortschritt
 
-Stand **2026-11-25** (v2.8.0), gemessen an einer 28,5 GB großen `audio.rpf`.
+Stand **2026-11-26** (v2.9.0), gemessen an einer 28,5 GB großen `audio.rpf`.
 
 | Bereich | Stand | |
 |---|---|---|
 | Vom Scan gefundene Musik-Container | 3.008 mit 3.116 Streams (rund 101 Stunden), alle Opus und extrahierbar | ✅ |
-| Songs, die die Credits für die Musiksender nennen | **792 von 809** gefunden (97,9 %) | 🟢 |
+| Songs, die die Credits für die Musiksender nennen | **793 von 809** gefunden (98,0 %) | 🟢 |
 | Talk-Radio | alle 5 in den Credits genannten Sendungen, **15 Folgen** | ✅ |
 | Sender in AWC Radio | 34 (darunter 3 „(Mix)“-Sender, 4 Orte aus dem Spiel und „Clubmixes“) | ✅ |
 | Orte aus dem Spiel | Jack of Hearts (100 Min. DJ-Set), VYB (45 Min.), The Vault (Club, 84 Min.), Thrillbilly Mud Club (20 Songs) | ✅ |
 | Werbung | 239 Spots, wahlweise im Programm von 18 Sendern | ✅ |
 | DJ-Ansagen über den Songs | 714 Songs mit Intro, 687 mit Outro, 2.221 Ansagen auf 18 Sendern | ✅ |
 | Extractor nach Sendern | 28 Sender und 5 Podcasts mit Logo, 3.417 DJ-Zeilen | ✅ |
-| Podcasts | alle 5, die die Credits nennen, mit 20 Folgen (3 Std. 36 Min.), in der App und am PC | ✅ |
-| Score | 2.543 Stücke (rund 33 Std.); 974 ab 30 Sekunden (26,5 Std.) kommen in die App-Packs | ✅ |
-| Android-App | Version 1.11: Radio, Podcasts, Score, DJ, Werbung, Radiowecker, Android Auto; läuft auf einem echten Android-Handy | ✅ |
-| The Vault Radio | läuft als ein langer Mix; seine 24 gelisteten Songs sind keine Einzeldateien | 🎚 |
+| Podcasts | alle 5, die die Credits nennen, mit 20 Folgen samt Titeln (3 Std. 36 Min.), in der App und am PC | ✅ |
+| Score | 2.543 Stücke (rund 33 Std.), im Extractor in einem eigenen Ordner; 974 ab 30 Sekunden (26,5 Std.) kommen in die App-Packs | ✅ |
+| Titel aus `data.rpf` | 839 der 865 Titel-Nummern, die die Aufnahmen tragen, haben in der Tabelle des Spiels Titel und Interpret | ✅ |
+| Android-App | Version 1.12: Radio, Podcasts, Score, DJ, Werbung, Radiowecker, Android Auto; Version 1.11 läuft auf einem echten Android-Handy | ✅ |
+| The Vault Radio | läuft als ein langer Mix; 23 seiner 24 gelisteten Songs sind als Teile darin benannt | 🎚 |
 
 ![AWC Radio – Fortschritt der Sender](radio/docs/radio-progress.svg)
 
@@ -134,11 +136,13 @@ Details zu jedem Sender: [Fortschritt des Radios](radio/docs/RADIO-PROGRESS.de.m
 
 ### Noch offen
 
-- [ ] 17 gelistete Songs ohne Datei: die Club-DJ-Sets (Bodega The DJ, DJ Stevie J), zwei von Worldwide FM, einer von Radio On-U.
-      Kein Stream des Archivs trägt ihre Namen (Musik, Sprache und Sound-Banken durchsucht)
+- [ ] 16 gelistete Songs ohne eigene Datei bei ihrem Sender (die Club-DJ-Sets, je einer von Worldwide FM und Radio On-U):
+      6 laufen auf Vice City Rap Radio und Dirty South Classics, 1 steckt im Radio-On-U-Mix, 9 wurden nirgends gefunden
+      (weder ein Stream des Archivs noch die Titeltabelle des Spiels trägt ihre Namen)
 - [ ] Die 8 eigens geschriebenen Songs von „Honey FM – Liquid City“ (ebenfalls nicht gefunden)
-- [ ] Die Titel der Podcast-Folgen sind nicht bekannt (sie sind nummeriert)
-- [ ] Ein 61 Minuten langer Club-Mix bleibt in „Clubmixes“: Keine Titelliste und kein Ort der Konfiguration spielt ihn
+- [x] Die Podcast-Folgen heißen wie im Spiel
+- [ ] Ein 61 Minuten langer Club-Mix bleibt in „Clubmixes“: Keine Titelliste und kein Ort der Konfiguration spielt ihn,
+      und er hat keine Titelmarken
 - [x] AWC Radio am PC spielt die Podcasts
 - [x] Das Radio spricht die DJ-Intros und -Outros über die Songs (PC und App)
 - [x] Die Android-App läuft auf einem echten Handy
@@ -164,6 +168,7 @@ Details zu jedem Sender: [Fortschritt des Radios](radio/docs/RADIO-PROGRESS.de.m
 | [v2.6.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.6.0) | 2026-11-25 | 📻 Werbung wahlweise (App 1.6) · 🎛 Ansicht nach Radiosendern mit DJ-Intros, Outros und Werbung |
 | [v2.7.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.7.0) | 2026-11-25 | 🎙 Podcasts in App (1.8, eigener Bereich, `.podpak`) und Extractor |
 | [v2.8.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.8.0) | 2026-11-25 | 🎼 Der Score des Spiels (AWC-Tool und App 1.11, `.scorepak`) · 📻 DJ-Ansagen, Podcasts am PC, Überblend-Einstellung · 🎛 40 weitere Musik-Container |
+| [v2.9.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.9.0) | 2026-11-26 | 🏷 Titel aus der Tabelle des Spiels: alle 20 Podcast-Folgen, die Teile der Mixe, 5 korrigierte und 2 ergänzte Songnamen · 🎼 der Score als Gruppen im AWC-Tool · App 1.12 |
 
 ## Aufbau des Repositorys
 

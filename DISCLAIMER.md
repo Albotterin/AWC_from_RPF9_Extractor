@@ -44,7 +44,7 @@ Two things belong in the open here:
 ## 3. No decryption, no circumvention
 
 * The programs read only data that is stored **without encryption**: audio containers found by scanning, and
-  configuration and texture data stored with ordinary, openly documented compression (zlib).
+  configuration, text and texture data stored with ordinary, openly documented compression (zlib).
 * Parts of the archive that appear to be encrypted or obfuscated, such as its table of contents, are **not read**.
 * The repository contains **no keys** and no code to obtain, derive or apply them.
 * The programs do not bypass copy protection, digital rights management or any security feature of a console or of a

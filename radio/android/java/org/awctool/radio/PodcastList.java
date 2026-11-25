@@ -177,7 +177,7 @@ final class PodcastList extends ScrollView {
         LinearLayout col = new LinearLayout(activity);
         col.setOrientation(LinearLayout.VERTICAL);
         col.setPadding(dp(14), 0, 0, 0);
-        r.title = Ui.oneLine(Ui.strong(activity, activity.getString(R.string.episode_n, i + 1), 16, Ui.TEXT));
+        r.title = Ui.oneLine(Ui.strong(activity, Ui.episodeName(activity, p, i), 16, Ui.TEXT));
         col.addView(r.title);
         r.info = Ui.oneLine(Ui.text(activity, "", 13, Ui.MUTED));
         r.info.setPadding(0, dp(2), 0, 0);
@@ -226,8 +226,10 @@ final class PodcastList extends ScrollView {
             double at = current ? radio.position() : heard.position(t.key);
             boolean done = heard.done(t.key) && at <= 0;
             String length = Ui.fmt(t.sec);
-            set(r.info, at >= 1 ? activity.getString(R.string.episode_left, Ui.fmt(t.sec - at), length)
-                    : done ? activity.getString(R.string.episode_heard, length) : length);
+            String info = at >= 1 ? activity.getString(R.string.episode_left, Ui.fmt(t.sec - at), length)
+                    : done ? activity.getString(R.string.episode_heard, length) : length;
+            // below a title stands the number of the episode
+            set(r.info, t.title.isEmpty() ? info : activity.getString(R.string.episode_n, i + 1) + " \u00b7 " + info);
             r.bar.setVisibility(at >= 1 ? VISIBLE : GONE);
             r.bar.setProgress((int) Math.min(1000, 1000 * at / Math.max(1, t.sec)));
             r.title.setTextColor(current ? Logos.color(open).light : done ? Ui.MUTED : Ui.TEXT);

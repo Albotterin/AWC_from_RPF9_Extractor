@@ -51,7 +51,8 @@ This tool takes a different route:
    position in the archive** – files of one folder are stored back to back, so a group is typically one radio station
    or one folder. You can **name the groups yourself** (right-click), and the names become export folder names.
 6. It can also show an archive **by radio station**: the stations are read from the game's audio config, each with its
-   logo and with its songs, **DJ intros and outros**, **adverts**, jingles and talk.
+   logo and with its songs, **DJ intros and outros**, **adverts**, jingles and talk; the **podcasts** and the **score** follow in
+   folders of their own.
 7. And it reads the game's **score** – the interactive music that is not stored as finished tracks – and mixes it into
    pieces you can listen to and save (see [The score](#the-score)).
 
@@ -182,11 +183,19 @@ by position back.
   `%APPDATA%\AWC-Tool\advert_names.json` as `{"<stream ID, hex>": "<name>"}`.
 * The **podcasts** stand in a group of their own, **Podcasts**, each with its cover and episodes; extraction writes
   the folders `Podcasts/<name>/`.
+* The **score** has a folder of its own, **Score**, built by itself: **Open world**, **Missions**, **Compounds** and
+  **Activities**, their sub groups and the pieces (see [The score](#the-score)). The first time it takes a few minutes
+  after the stations are there. Double-click listens, **Extract selected** writes
+  `Score/<group>/<sub group>/<title>` – for a piece, a sub group or a whole group. A piece is mixed when you play or
+  extract it (needs FFmpeg); **Extract all streams** leaves the score out.
 * Whatever the config assigns to no station is listed by position under **Not assigned to a station**.
+
+![The score in the view by station](docs/screenshots/11-score-folder.png)
 
 ### The score
 
-The button **Score…** opens a window of its own for the game's score. The game does not store it as finished songs: its
+Besides the folder in the view by station, the button **Score…** opens a window of its own for the game's score, with a
+search and the app packs. The game does not store it as finished songs: its
 audio config describes **sections** (tempo, instrument layers, which recording each layer plays, looping or once) and how
 they follow each other; the recordings lie in sound banks. The tool reads that, finds the banks (a pass over the archive,
 a few minutes the first time) and offers **pieces**: a section the game starts by an event, together with those that
@@ -208,8 +217,10 @@ follow it by themselves, mixed from their layers with FFmpeg. In the sample arch
 7. **Names** (optional) – the AWC files only contain 32-bit hash IDs, no names:
    * **Read names from game files** hashes the internal names in the game's own audio config (the zlib part at the
      start of `audio.rpf`) and fills in titles for the streams it recognises (roughly a third of the music streams
-     in the sample archive; internal titles only, no artists). It also remembers the station names found there and
-     offers them in **Rename group…**.
+     in the sample archive; internal titles only for these, no artists). It also remembers the station names found there and
+     offers them in **Rename group…**. With the game's `data.rpf` next to the archive, songs, podcast episodes and the
+     parts of the mixes get **title and artist** from the game's own title table (the view by station and the markers show
+     them without this button, too).
    * **Songs from the credits page** downloads the soundtrack list of the publisher's public credits page
      (`rockstargames.com/VI/credits`: every station with its songs and artists), hashes the titles the same way the
      game does and sets **title, artist and station** for every stream it recognises (about 660 of the music streams

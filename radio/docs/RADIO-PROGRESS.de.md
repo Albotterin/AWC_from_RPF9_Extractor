@@ -4,7 +4,7 @@
 
 Wie viele der Songs, die die öffentliche Credits-Seite für jeden Sender aufführt, als Dateien in der `audio.rpf` des Spiels gefunden wurden.
 
-**Stand: 2026-11-25** · 792 / 809 (97.9 %)
+**Stand: 2026-11-26** · 793 / 809 (98.0 %)
 
 Seit v2.4.0 kommen die Playlists direkt aus der Audio-Konfiguration des Spiels. Viele Sender spielen deshalb auch Songs, die die Credits nicht nennen (Spalte *Im Radio*).
 
@@ -37,11 +37,11 @@ Seit v2.4.0 kommen die Playlists direkt aus der Audio-Konfiguration des Spiels. 
 | 🟢 V-Rock | 70 / 70 | 100.0 % | 70 |
 | 🟢 Vice City FM | 71 / 71 | 100.0 % | 72 |
 | 🟢 Vice City Rap Radio | 25 / 25 | 100.0 % | 82 |
-| 🟢 Worldwide FM | 39 / 41 | 95.1 % | 40 |
+| 🟢 Worldwide FM | 40 / 41 | 97.6 % | 40 |
 | 🟢 Radio On-U | 15 / 16 | 93.8 % | 16 |
 | 🟡 Bodega The DJ | 36 / 45 | 80.0 % | 36 |
 | 🟡 DJ Stevie J | 19 / 24 | 79.2 % | 19 |
-| **Gesamt** | **792 / 809** | **97.9 %** | **857** |
+| **Gesamt** | **793 / 809** | **98.0 %** | **857** |
 
 </details>
 
@@ -63,7 +63,7 @@ Ein durchgehender DJ-Mix; seine Songs liegen nicht als einzelne Dateien vor und 
 
 | Sender | Gefunden | Gelistete Songs darin |
 |---|---|---:|
-| 🎚 The Vault Radio | 1 Mix (84 Min.), läuft als Sender | 24 |
+| 🎚 The Vault Radio | 1 Mix (84 Min.), läuft als Sender | 24 (23 benannt) |
 
 ## Orte im Spiel
 
@@ -90,11 +90,11 @@ Die fünf Podcasts der Credits-Liste, alle gefunden: 20 Folgen, zusammen 3 Std. 
 
 ## Die Lücken
 
-- **Bodega The DJ** und **DJ Stevie J** sind DJ-Sets in Clubs. Die fehlenden Titel haben dort keine zugeordnete Einzeldatei; manche laufen auf anderen Sendern.
-- **Worldwide FM**: zwei gelistete Titel sind nicht zugeordnet, eine Aufnahme der Playlist läuft als „Unknown track“. **Radio On-U**: ein Titel fehlt, sehr wahrscheinlich ist er der „Unknown track“ des Senders.
+- **Bodega The DJ** und **DJ Stevie J** sind DJ-Sets in Clubs. Die fehlenden Titel haben dort keine zugeordnete Einzeldatei: 6 davon laufen auf Vice City Rap Radio und Dirty South Classics, 8 wurden nirgends gefunden.
+- **Worldwide FM**: ein gelisteter Titel (ein Jingle) wurde nirgends gefunden. **Radio On-U**: ein Titel hat keine benannte Datei; er steckt im Radio-On-U-Mix (ab 6:28), und der „Unknown track“ des Senders ist sehr wahrscheinlich derselbe.
 - **Honey FM - Liquid City** (8 eigens geschriebene Songs, nicht oben mitgezählt) steht in keiner der Senderlisten.
-- Lange DJ-Mixe laufen zusätzlich als „(Mix)“-Sender: Radio On-U (10 von 24), The Sniper Of La Perle (20 von 22), Worldwide FM (31 von 41). Die Zahlen nennen die Abschnitte mit Titel. Ein weiterer langer Club-Mix, dem sich kein Ort zuordnen lässt, läuft als „Clubmixes“.
-- Die Podcast-Folgen sind nummeriert; ihre Titel aus dem Spiel sind nicht bekannt.
+- Lange DJ-Mixe laufen zusätzlich als „(Mix)“-Sender: Radio On-U (16 von 24), The Sniper Of La Perle (22 von 22), Worldwide FM (40 von 41), The Vault (25 von 25). Die Zahlen nennen die Abschnitte mit Titel. Ein weiterer langer Club-Mix, dem sich kein Ort zuordnen lässt, läuft als „Clubmixes“.
+- Die Titel der Podcast-Folgen und der Mix-Abschnitte stehen in der Tabelle des Spiels (`data.rpf`); ohne diese Datei sind die Folgen nummeriert.
 
 ## Alle Sender
 

@@ -31,12 +31,13 @@ import awc_dj  # noqa: E402
 import awc_gamedata as gamedata  # noqa: E402
 import awc_i18n  # noqa: E402
 import awc_icons as icons  # noqa: E402
+import awc_texts as texts  # noqa: E402
 
 NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 SONG_MIN, SONG_MAX = 60.0, 1500.0          # seconds: shorter is not a song, longer is a mix
 JINGLE_MIN, JINGLE_MAX = 2.0, 25.0         # unnamed short streams of a station are used as jingles
 MIN_SONGS = 5                              # a station needs at least this many songs to be listed
-INDEX_VERSION = 9
+INDEX_VERSION = 10
 
 BG, PANEL, CARD, CARD_SEL, FG, DIM, ACCENT = "#14161c", "#1c1f27", "#232733", "#2f3550", "#eceef4", "#8b91a3", "#ff5a36"
 
@@ -48,7 +49,7 @@ STR = {
         "lbl_rpf": "audio.rpf", "lbl_pool": "Texture file (ttdb_ui.ttpf)", "btn_browse": "Browse…", "btn_start": "Start radio",
         "btn_settings": "Files…", "btn_rescan": "Re-read", "btn_android": "Android packs…", "st_scan": "Reading the archive … (the first time takes several minutes)",
         "st_credits": "Loading the song list …", "st_names": "Reading names from the game config …",
-        "st_build": "Building the stations …", "st_icons": "Reading the station logos …", "st_ready": "{n} stations",
+        "st_build": "Building the stations …", "st_titles": "Reading the titles from data.rpf …", "st_icons": "Reading the station logos …", "st_ready": "{n} stations",
         "err_rpf": "Please choose an existing audio.rpf.", "err_scan": "No music streams found in that file.",
         "err_ffplay": "ffplay was not found. Put ffplay.exe next to the program or into your PATH.",
         "err_credits": "The credits page could not be downloaded:\n{e}\n\nPick the page saved from your browser instead?",
@@ -70,7 +71,7 @@ STR = {
         "lbl_rpf": "audio.rpf", "lbl_pool": "Textur-Datei (ttdb_ui.ttpf)", "btn_browse": "Durchsuchen…", "btn_start": "Radio starten",
         "btn_settings": "Dateien…", "btn_rescan": "Neu einlesen", "btn_android": "Android-Packs…", "st_scan": "Lese das Archiv … (beim ersten Mal dauert das mehrere Minuten)",
         "st_credits": "Lade die Songliste …", "st_names": "Lese Namen aus der Spiel-Konfiguration …",
-        "st_build": "Baue die Sender …", "st_icons": "Lese die Sender-Logos …", "st_ready": "{n} Sender",
+        "st_build": "Baue die Sender …", "st_titles": "Lese die Titel aus data.rpf …", "st_icons": "Lese die Sender-Logos …", "st_ready": "{n} Sender",
         "err_rpf": "Bitte eine vorhandene audio.rpf wählen.", "err_scan": "In dieser Datei wurden keine Musik-Streams gefunden.",
         "err_ffplay": "ffplay wurde nicht gefunden. ffplay.exe neben das Programm legen oder in den PATH aufnehmen.",
         "err_credits": "Die Credits-Seite konnte nicht geladen werden:\n{e}\n\nStattdessen die im Browser gespeicherte Seite wählen?",
@@ -440,6 +441,12 @@ def make_index(rpf, pool, get_songs, status=None, progress=None):
         podcasts = gamedata.build_podcasts(items, gamedata.read_podcasts(rpf))     # for the app: played on demand
     except (OSError, ValueError):
         podcasts = {}
+    if status:
+        status(t("st_titles"), 0.93)
+    numbered = {it["base"]: it.get("tid") for it in items}
+    runs = [[numbered.get(e["base"]) for e in st["songs"]] for st in podcasts.values()]
+    wanted = texts.numbers(items) | {n for run in runs for n in texts.fill_gaps(run) if n is not None}
+    apply_titles(stations, podcasts, items, texts.read_titles(rpf, wanted), songs)
     used = {}
     for st in list(stations.values()) + list(podcasts.values()):
         for tr_ in st["songs"] + st["jingles"] + st.get("ads", []):
@@ -455,6 +462,38 @@ def make_index(rpf, pool, get_songs, status=None, progress=None):
     with open(index_path(), "w", encoding="utf-8") as f:
         json.dump(idx, f)
     return idx
+
+
+def apply_titles(stations, podcasts, items, titles, songs):
+    """Names from the game's own table (awc_texts), by the track number every recording carries: songs that had no or
+    another name, the parts of the long mixes and the titles of the podcast episodes. `titles` is empty when there is no
+    data.rpf next to the archive: then everything stays as it is."""
+    if not titles:
+        return
+    by_base = {it["base"]: it for it in items}
+    for name, st in stations.items():
+        station = name[:-6] if name.endswith(" (Mix)") else name
+        for tr_ in st["songs"]:
+            it = by_base.get(tr_["base"])
+            if tr_.get("parts") or not it:
+                continue
+            if it.get("cues"):                                    # a long mix: every marker starts a part
+                old, parts = tr_.get("m") or [], []
+                for k, (at, number) in enumerate(it["cues"]):
+                    if number in titles:
+                        title, artist = texts.spell(*titles[number], songs, station)
+                    else:
+                        title, artist = old[k][1:3] if k < len(old) else ("", "")
+                    parts.append([round(at, 1), title, artist])
+                if any(p[1] for p in parts):
+                    tr_["m"] = parts
+            elif it.get("tid") in titles and not texts.agrees(tr_["title"], tr_["artist"], titles[it["tid"]]):
+                tr_["title"], tr_["artist"] = texts.spell(*titles[it["tid"]], songs, station)
+    for st in podcasts.values():
+        run = texts.fill_gaps([(by_base.get(e["base"]) or {}).get("tid") for e in st["songs"]])
+        for episode, number in zip(st["songs"], run):
+            if number in titles:
+                episode["name"] = titles[number][0]
 
 
 def add_venues(stations, items, rpf, songs, found, cfg_names):

@@ -246,6 +246,10 @@ class PodcastPanel(tk.Frame):
             self.listener.open(name, episodes, keys, max(0, go), play=False)
         self._refresh(full=True)
 
+    def _label(self, i, episode):
+        """"3. Fatal Incursion", or "Episode 3" when the game's titles could not be read."""
+        return "%d.  %s" % (i + 1, episode["name"]) if episode.get("name") else self.radio.t("pod_episode", n=i + 1)
+
     def _line(self, i, episode, key):
         t, fmt = self.radio.t, self.radio.fmt_time
         listener = self.listener
@@ -253,7 +257,7 @@ class PodcastPanel(tk.Frame):
         at = listener.position() if current else listener.place(key)
         note = t("pod_resume", t=fmt(at)) if at >= 1 else t("pod_heard") if listener.done(key) else ""
         mark = "▶ " if current and listener.wanted else "    "
-        return "%s%s      %s%s" % (mark, t("pod_episode", n=i + 1), fmt(episode["sec"]), "      " + note if note else "")
+        return "%s%s      %s%s" % (mark, self._label(i, episode), fmt(episode["sec"]), "      " + note if note else "")
 
     def _refresh(self, full=False):
         if not self.name:
@@ -272,7 +276,7 @@ class PodcastPanel(tk.Frame):
         if listener.index >= 0:
             state = self.radio.t("pod_error") if listener.failed else self.radio.t("st_loading") \
                 if listener.wanted and listener.proc is None else ""
-            now = "%s – %s" % (listener.show, self.radio.t("pod_episode", n=listener.index + 1))
+            now = "%s – %s" % (listener.show, self._label(listener.index, listener.episodes[listener.index]))
             self.lbl_now.config(text="%s   %s" % (now, state) if state else now)
             self.lbl_pos.config(text=self.radio.fmt_time(listener.position()))
             self.lbl_len.config(text=self.radio.fmt_time(listener.duration))

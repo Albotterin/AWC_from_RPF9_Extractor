@@ -102,6 +102,12 @@ public class PodcastTest {
         return list.get(Catalog.indexOf(list, SHOW));
     }
 
+    /** What the app calls an episode of a podcast: its title. */
+    private String name(String podcast, int i) {
+        List<Library.Station> list = PackStore.get(Harness.app()).podcasts;
+        return Ui.episodeName(Harness.app(), list.get(Catalog.indexOf(list, podcast)), i);
+    }
+
     @Test
     public void listPlayAndRemember() throws Exception {
         open();
@@ -115,14 +121,16 @@ public class PodcastTest {
         ScreenshotTest.shot(a, "40_podcasts", null);
 
         Assert.assertTrue(tap(SHOW));
-        Assert.assertTrue(visible("Folge 6"));
+        Assert.assertEquals("the pack knows the titles", "Fatal Incursion", name(SHOW, 2));
+        Assert.assertTrue(visible("Fatal Incursion"));
+        Assert.assertTrue("the number below the title", visible("Folge 6 \u00b7 "));
         Assert.assertTrue(visible("Alle Podcasts"));
 
-        Assert.assertTrue(tap("Folge 1"));
+        Assert.assertTrue(tap(name(SHOW, 0)));
         Assert.assertTrue(radio.isPodcast());
         Assert.assertEquals(RadioService.PLAYING, radio.state);
         Assert.assertEquals(SHOW, radio.stationName);
-        Assert.assertEquals("Folge 1", radio.title);
+        Assert.assertEquals(name(SHOW, 0), radio.title);
         Assert.assertEquals(show().songs.get(0).sec, radio.duration(), 0.01);
         seconds(20);
         double at = radio.position();
@@ -154,6 +162,7 @@ public class PodcastTest {
         Assert.assertEquals(View.GONE, ((View) ReflectionHelpers.getField(a, "player")).getVisibility());
         screen.setTranslationY(0);
         Assert.assertTrue(visible("Folge 1 von 6"));
+        Assert.assertTrue("the title in the large player", visible(name(SHOW, 0)));
         ScreenshotTest.shot(a, "42_episode_player", null);
         SeekBar bar = null;
         for (View v : ScreenshotTest.all(screen)) if (v instanceof SeekBar) bar = (SeekBar) v;
@@ -166,7 +175,7 @@ public class PodcastTest {
 
         Assert.assertTrue(tap("Nächste Folge"));
         Assert.assertEquals(1, radio.episodeIndex());
-        Assert.assertEquals("Folge 2", radio.title);
+        Assert.assertEquals(name(SHOW, 1), radio.title);
         double left = new Heard(a).position(show().songs.get(0).key);
         Assert.assertEquals("the place in episode 1 is kept", 318, left, 8);
 
@@ -181,7 +190,7 @@ public class PodcastTest {
 
         ReflectionHelpers.callInstanceMethod(a, "openPlayer", ReflectionHelpers.ClassParameter.from(boolean.class, false));
         Harness.pass(600);
-        Assert.assertTrue(tap("Folge 1"));
+        Assert.assertTrue(tap(name(SHOW, 0)));
         seconds(2);
         Assert.assertTrue(radio.isPodcast());
         Assert.assertEquals("and goes on there", left + 2, radio.position(), 2.5);
@@ -227,7 +236,7 @@ public class PodcastTest {
 
         tap("Podcasts");
         tap("Final Act");
-        tap("Folge 2");
+        Assert.assertTrue(tap(name("Final Act", 1)));
         seconds(20);
         command(RadioService.ACTION_STOP, null, 0);
         Assert.assertEquals(RadioService.STOPPED, radio.state);
@@ -245,7 +254,7 @@ public class PodcastTest {
         seconds(2);
         Assert.assertTrue("goes on at the place", radio.position() > 18);
         tap("Radio");
-        Assert.assertTrue("what is playing stays within reach", visible("Folge 2"));
+        Assert.assertTrue("what is playing stays within reach", visible(name("Final Act", 1)));
     }
 
     private boolean dialogShows(String text) {
@@ -290,7 +299,8 @@ public class PodcastTest {
         Assert.assertEquals("pod:Drunk Kings", shows.get(0));
         List<MediaBrowser.MediaItem> eps = radio.children("pod:" + SHOW);
         Assert.assertEquals(6, eps.size());
-        Assert.assertEquals("Folge 3", eps.get(2).getDescription().getTitle().toString());
+        Assert.assertEquals("Fatal Incursion", eps.get(2).getDescription().getTitle().toString());
+        Assert.assertTrue(eps.get(2).getDescription().getSubtitle().toString().startsWith("Folge 3 "));
         Assert.assertTrue(eps.get(2).isPlayable());
         radio.playEpisodeId(eps.get(2).getMediaId());
         Harness.pass(800);
@@ -312,7 +322,7 @@ public class PodcastTest {
         tap("Podcasts");
         ScreenshotTest.shot(a, "45_small_podcasts", null);
         tap("The Safe Trap");
-        tap("Folge 2");
+        Assert.assertTrue(tap(name("The Safe Trap", 1)));
         seconds(70);
         ReflectionHelpers.callInstanceMethod(a, "openPlayer", ReflectionHelpers.ClassParameter.from(boolean.class, true));
         Harness.pass(600);

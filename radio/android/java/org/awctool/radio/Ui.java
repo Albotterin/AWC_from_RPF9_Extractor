@@ -379,6 +379,12 @@ final class Ui {
     }
 
     /** The name of a station or podcast; a group of the score has a translated one. */
+    /** The title of an episode; "Episode 3" for a pack that does not know it. */
+    static String episodeName(android.content.Context c, Library.Station podcast, int i) {
+        String title = podcast.songs.get(i).title;
+        return title.isEmpty() ? c.getString(R.string.episode_n, i + 1) : title;
+    }
+
     static String nameOf(Context c, Library.Station st) {
         if (st == null) return "";
         if (st.score == null) return st.name;

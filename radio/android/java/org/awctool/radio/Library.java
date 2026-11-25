@@ -58,7 +58,7 @@ final class Library {
         }
     }
 
-    /** The podcasts of a pack: [{"name", "logo", "episodes": [{"k", "s"}]}], the episodes in their order. */
+    /** The podcasts of a pack: [{"name", "logo", "episodes": [{"k", "s", "t"?}]}], in their order; "t": the title. */
     static void parsePodcasts(JSONArray arr, List<Station> out) throws Exception {
         for (int i = 0; i < arr.length(); i++) {
             JSONObject o = arr.getJSONObject(i);
@@ -66,7 +66,7 @@ final class Library {
             JSONArray episodes = o.getJSONArray("episodes");
             for (int j = 0; j < episodes.length(); j++) {
                 JSONObject e = episodes.getJSONObject(j);
-                p.songs.add(new Schedule.Track(e.getString("k"), "", p.name, e.getDouble("s")));
+                p.songs.add(new Schedule.Track(e.getString("k"), e.optString("t", ""), p.name, e.getDouble("s")));
             }
             if (!p.songs.isEmpty()) out.add(p);
         }

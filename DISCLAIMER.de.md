@@ -44,7 +44,7 @@ Zwei Dinge werden hier offen benannt:
 ## 3. Keine Entschlüsselung, keine Umgehung
 
 * Die Programme lesen nur Daten, die **unverschlüsselt** gespeichert sind: Audio-Container, die durch Durchsuchen
-  gefunden werden, sowie Konfigurations- und Texturdaten in gewöhnlicher, offen dokumentierter Kompression (zlib).
+  gefunden werden, sowie Konfigurations-, Text- und Texturdaten in gewöhnlicher, offen dokumentierter Kompression (zlib).
 * Teile des Archivs, die verschlüsselt oder verschleiert erscheinen, etwa sein Inhaltsverzeichnis, werden **nicht
   gelesen**.
 * Das Repository enthält **keine Schlüssel** und keinen Code, um sie zu beschaffen, abzuleiten oder anzuwenden.

@@ -239,7 +239,24 @@ A piece starts at a section without the `FA_` prefix and follows the actions unt
 event is needed. The mix lets a one-shot ring until a later section gives its layer something new, and cuts silence at
 the end.
 
-## 10. Not covered
+## 10. Titles (text tables in `data.rpf`)
+
+The texts of the game lie in `data.rpf`, next to the audio archive, as ordinary zlib streams (nothing is decrypted; the
+table of contents of the archive is not read, the streams are found by scanning). A text table is a "resource" cut into
+pages, one stream each, 16 byte aligned; pointers inside it are `0x50000000` + offset.
+
+| Where | What |
+|---|---|
+| page 1, offset 0 / 8 / 16 | `u64` 0, `u64` pointer to the root, `u32` `0x50524430` |
+| records near the root | `u32` flags, `u32` size, `u64` pointer: flags `0x101` the slots of a hash table, `0x10` the block of null terminated strings |
+| slot (16 bytes) | `u32` key, `u32` 0, `u8` 1 (used), `u16` 0, `u32` number of the string (at byte 11), `u8` 0 |
+
+The radio's table has the keys `joaat("<n>s")` (title) and `joaat("<n>a")` (artist), where `<n>` is the number of the
+`trackid` marker (section 7) a song, a podcast episode or a part of a mix carries. There is one table per language; the
+first one in the file is the English one. Two podcast episodes carry no marker; their numbers follow from the episodes
+around them. Read by `awc_texts.py`.
+
+## 11. Not covered
 
 * Sound-effect AWCs and other non-music kinds (chunk `0xFA` "sfx header", Vorbis, MIDI `0x68`, …).
 * Codecs other than `0x0B`: PCM, IMA/MS-ADPCM, XMA2, MPEG, Vorbis, ATRAC9, DSP, other Opus variants.

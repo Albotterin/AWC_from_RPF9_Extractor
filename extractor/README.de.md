@@ -171,11 +171,19 @@ länger). Ohne Haken erscheint wieder die Ansicht nach Lage im Archiv.
   trägt Namen in `%APPDATA%\AWC-Tool\advert_names.json` ein: `{"<Stream-ID, hex>": "<Name>"}`.
 * Die **Podcasts** stehen in einer eigenen Gruppe **Podcasts**, je Podcast mit Cover und seinen Folgen; beim Extrahieren
   entstehen die Ordner `Podcasts/<Name>/`.
+* Der **Score** hat einen eigenen Ordner, **Score**, der von selbst entsteht: **Offene Welt**, **Missionen**,
+  **Stützpunkte** und **Aktivitäten**, darunter die Untergruppen und die Stücke (siehe [Der Score](#der-score)). Beim
+  ersten Mal dauert das nach den Sendern noch einige Minuten. Doppelklick spielt ab, **Markierte extrahieren** schreibt
+  `Score/<Gruppe>/<Untergruppe>/<Titel>` – für ein Stück, eine Untergruppe oder eine ganze Gruppe. Ein Stück wird beim
+  Abspielen oder Extrahieren gemischt (braucht FFmpeg); **Alle Streams extrahieren** lässt den Score aus.
 * Was die Konfiguration keinem Sender zuordnet, steht nach Lage unter **Keinem Sender zugeordnet**.
+
+![Der Score in der Ansicht nach Radiosendern](docs/screenshots/11-score-folder-de.png)
 
 ### Der Score
 
-Der Knopf **Score …** öffnet ein eigenes Fenster für den Score des Spiels. Er liegt nicht als fertige Titel vor: Die
+Neben dem Ordner in der Senderansicht öffnet der Knopf **Score …** ein eigenes Fenster für den Score des Spiels, mit
+Suche und App-Packs. Er liegt nicht als fertige Titel vor: Die
 Audio-Konfiguration beschreibt **Abschnitte** (Tempo, Instrumentenspuren, welche Aufnahme jede Spur spielt, als Schleife
 oder einmal) und ihre Abfolge; die Aufnahmen liegen in Sound-Banken. Das Tool liest das, sucht die Banken (ein Durchlauf
 durch das Archiv, beim ersten Mal einige Minuten) und bietet **Stücke** an: einen Abschnitt, den das Spiel durch ein
@@ -198,8 +206,10 @@ Ereignis startet, samt denen, die von selbst folgen, mit FFmpeg aus ihren Spuren
 7. **Namen** (optional) – die AWC-Dateien enthalten nur 32-Bit-Hash-IDs, keine Namen:
    * **Namen aus Spieldateien lesen** hasht die internen Namen aus der Audio-Konfiguration des Spiels (der
      zlib-Teil am Anfang der `audio.rpf`) und trägt Titel für die erkannten Streams ein (im Beispielarchiv etwa ein
-     Drittel der Musik-Streams; nur interne Titel, keine Interpreten). Die dort gefundenen Stationsnamen werden
-     bei **Gruppe umbenennen…** vorgeschlagen.
+     Drittel der Musik-Streams; dabei nur interne Titel, keine Interpreten). Die dort gefundenen Stationsnamen werden
+     bei **Gruppe umbenennen…** vorgeschlagen. Liegt die `data.rpf` des Spiels neben dem Archiv, bekommen Songs,
+     Podcast-Folgen und die Teile der Mixe **Titel und Interpret** aus der Titeltabelle des Spiels (die Ansicht nach
+     Sendern und die Marken zeigen sie auch ohne diesen Knopf).
    * **Songs von der Credits-Seite** lädt die Soundtrack-Liste der öffentlichen Credits-Seite des Herausgebers
      (`rockstargames.com/VI/credits`: jeder Sender mit seinen Songs und Interpreten), hasht die Titel wie das Spiel
      und setzt für jeden erkannten Stream **Titel, Interpret und Sender** (im Beispielarchiv etwa 660 der

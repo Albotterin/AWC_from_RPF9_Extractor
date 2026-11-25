@@ -262,8 +262,12 @@ final class EpisodeScreen extends LinearLayout {
         toggle.setContentDescription(getContext().getString(playing ? R.string.act_pause : R.string.act_resume));
         int i = radio.episodeIndex();
         boolean failed = radio.title.equals(getContext().getString(score ? R.string.piece_error : R.string.episode_error));
+        // an episode with a title: the title below the podcast's name, "Episode 2 of 3" at the top
+        boolean named = !score && i >= 0 && !podcast.songs.get(i).title.isEmpty();
+        String place = score ? "" : getContext().getString(R.string.episode_of, i + 1, podcast.songs.size());
+        if (!score) set(kind, named ? place : getContext().getString(R.string.podcast));
         set(title, score ? radio.artist + " • " + Ui.nameOf(getContext(), podcast)
-                : failed ? radio.title : getContext().getString(R.string.episode_of, i + 1, podcast.songs.size()));
+                : failed || named ? radio.title : place);
         length = radio.duration();
         if (!dragging) {
             double at = radio.position();

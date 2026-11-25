@@ -335,7 +335,9 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
                 Library.Station p = at < 0 ? null : catalog.podcasts.get(at);
                 for (int i = 0; p != null && i < p.songs.size(); i++) {
                     out.add(new MediaBrowser.MediaItem(new MediaDescription.Builder().setMediaId(EPISODE_ID + p.name + "#" + i)
-                            .setTitle(getString(R.string.episode_n, i + 1)).setSubtitle(Ui.fmt(p.songs.get(i).sec))
+                            .setTitle(Ui.episodeName(ctx, p, i))
+                            .setSubtitle(p.songs.get(i).title.isEmpty() ? Ui.fmt(p.songs.get(i).sec)
+                                    : getString(R.string.episode_n, i + 1) + " \u00b7 " + Ui.fmt(p.songs.get(i).sec))
                             .setIconBitmap(Logos.get(p, 192)).build(), MediaBrowser.MediaItem.FLAG_PLAYABLE));
                 }
             } else if (SCORE.equals(parentId)) {
@@ -469,7 +471,7 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
             for (int i = 0; i < episodes.count(); i++) {
                 if (score && !station.songs.get(i).artist.equals(sub)) continue;
                 q.add(new MediaSession.QueueItem(new MediaDescription.Builder().setMediaId(EPISODE_ID + stationName + "#" + i)
-                        .setTitle(score ? station.songs.get(i).title : getString(R.string.episode_n, i + 1)).build(), i));
+                        .setTitle(score ? station.songs.get(i).title : Ui.episodeName(this, station, i)).build(), i));
             }
             session.setQueue(q);
             session.setQueueTitle(score ? sub : stationName);
@@ -739,9 +741,10 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
             nextText = !more ? "" : station.songs.get(episodes.index() + 1).title;
             if (!t.artist.equals(queueSub)) publishQueue();
         } else {
-            title = getString(R.string.episode_n, episodes.index() + 1);
-            artist = "";
-            nextText = more ? getString(R.string.episode_n, episodes.index() + 2) : "";
+            int at = episodes.index();
+            title = Ui.episodeName(this, station, at);
+            artist = station.songs.get(at).title.isEmpty() ? "" : getString(R.string.episode_n, at + 1);
+            nextText = more ? Ui.episodeName(this, station, at + 1) : "";
             new Heard(this).setLast(stationName, episodes.index());
         }
         episodeLoading = episodes.isLoading();
@@ -1044,7 +1047,8 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
                 .putString(MediaMetadata.METADATA_KEY_ARTIST, score ? artist : stationName)
                 .putString(MediaMetadata.METADATA_KEY_ALBUM, label())
                 .putString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE, title)
-                .putString(MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE, score ? artist + " • " + label() : stationName)
+                .putString(MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE, score ? artist + " • " + label()
+                        : artist.isEmpty() ? stationName : stationName + " • " + artist)
                 .putString(MediaMetadata.METADATA_KEY_MEDIA_ID, EPISODE_ID + stationName + "#" + episodes.index())
                 .putLong(MediaMetadata.METADATA_KEY_DURATION, (long) (episodes.duration() * 1000));
         Bitmap logo = logo();

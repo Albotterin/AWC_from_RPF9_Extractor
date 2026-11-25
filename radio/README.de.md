@@ -24,7 +24,8 @@
 ## Start
 
 `awc_radio.py` (oder `Start AWC-Radio.bat` / `AWC-Radio.exe`) ist ein kleiner Webradio-Player auf Basis des
-[Extractor](../extractor/README.de.md)-Codes. Beim ersten Start wählst du die `audio.rpf` des Spiels und die Textur-Datei (`data\ttdb\ui\ttdb_ui.ttpf`).
+[Extractor](../extractor/README.de.md)-Codes. Beim ersten Start wählst du die `audio.rpf` des Spiels und die Textur-Datei (`data\ttdb\ui\ttdb_ui.ttpf`);
+die `data.rpf` im Ordner der `audio.rpf` liefert die Titel.
 Die App liest das Archiv einmal ein (derselbe Scan-Cache wie beim Extractor; beim ersten Mal mehrere Minuten) und
 zeigt dann jeden Sender mit seinem Logo.
 
@@ -81,15 +82,16 @@ für ihn nennt. Das Programm ohne Werbung ist dasselbe wie bisher.
 Die Audio-Konfiguration führt fünf Podcasts mit ihren Folgen in fester Reihenfolge: **Drunk Kings** (5), **Final Act** (4),
 **Fuck Marry Murder** (6), **The Safe Trap** (3) und **Vice City True Stories** (2) – dieselben fünf, die die Credits
 nennen. Alle 20 Folgen liegen in der `audio.rpf`, unabhängig vom Spielfortschritt. Sie laufen auf Abruf statt nach der Uhr, **in der Android-App** und im PC-Radio unter den Sendern: Folge wählen, pausieren, spulen, 15 Sekunden zurück oder 30 vor; die Stelle
-in jeder Folge wird gemerkt. [Alle Folgen mit Länge](docs/RADIO-PROGRESS.de.md#podcasts).
+in jeder Folge wird gemerkt. Die Titel der Folgen stammen aus der Tabelle des Spiels in `data.rpf`; ohne diese Datei sind sie nummeriert.
+[Alle Folgen mit Länge](docs/RADIO-PROGRESS.de.md#podcasts).
 
 ![Podcasts in der App](docs/screenshots/08-app-podcasts.png)
 
 ## Sender und Fortschritt
 
-792 von 809 Songs, die die Credits für die Musiksender nennen (97,9 %), sind gefunden, dazu alle 15 Folgen
+793 von 809 Songs, die die Credits für die Musiksender nennen (98,0 %), sind gefunden, dazu alle 15 Folgen
 der Talk-Sendungen; alle Sender in [Fortschritt der Sender](docs/RADIO-PROGRESS.de.md).
-Lange DJ-Mixe laufen auch als Sender: **The Vault Radio**, zusätzliche „(Mix)“-Sender für Radio On-U, Worldwide FM und The Sniper Of La Perle sowie **Clubmixes** (der eine Club-Mix, der keinem Ort zugeordnet werden kann). Während ein Mix läuft, wird der Titel des aktuellen Abschnitts angezeigt (aus den Markern im Mix; ein Abschnitt hat nur dann einen Namen, wenn der Marker auf einen bekannten Song zeigt).
+Lange DJ-Mixe laufen auch als Sender: **The Vault Radio**, zusätzliche „(Mix)“-Sender für Radio On-U, Worldwide FM und The Sniper Of La Perle sowie **Clubmixes** (der eine Club-Mix, der keinem Ort zugeordnet werden kann). Während ein Mix läuft, wird der Titel des aktuellen Abschnitts angezeigt (aus den Markern im Mix, benannt über die Titeltabelle des Spiels in `data.rpf`; ohne diese Datei nur die Abschnitte, die es auch als einzelnen Song gibt).
 
 Alle Zahlen je Sender: [Fortschritt der Sender](docs/RADIO-PROGRESS.de.md).
 
@@ -100,7 +102,7 @@ Die aktuelle Liste aller Sender mit Inhalt und Länge: [alle Sender](docs/RADIO-
 Die Handy-App spielt dasselbe Live-Programm wie der PC: gleiche UTC-Uhr, gleiche Reihenfolge, gleiche Überblendungen.
 Dazu hat sie einen eigenen Bereich für die [Podcasts](#podcasts). Zur App gehören die Packs:
 
-* **`AWC-Radio.apk`** - die App (Version 1.11), für alle dieselbe Datei, ohne Spieldaten. Android 7.0 oder neuer, Deutsch und
+* **`AWC-Radio.apk`** - die App (Version 1.12), für alle dieselbe Datei, ohne Spieldaten. Android 7.0 oder neuer, Deutsch und
   Englisch. Senderraster, kleiner Player und großer Player in der Farbe des Senderlogos; Wiedergabe im Hintergrund mit
   Medien-Benachrichtigung, Sperrbildschirm- und Kopfhörertasten; Einschlaftimer; Schalter für **Werbung** (von Haus aus aus); **Android Auto** (vorher in dessen
   Entwicklereinstellungen „Unbekannte Quellen“ aktivieren, weil die App nicht aus dem Play Store kommt).

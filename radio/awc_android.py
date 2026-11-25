@@ -23,7 +23,7 @@ Pack layout (little endian), read by android/java/org/awctool/radio/Pack.java:
                  [line keys]]} (over its intro, its outro), the station "voices": [{"k","s"}] (the lines) and
                  "toads": [line keys] (said over a song before an advert break)
                  a podcast pack (.podpak, same layout) has "stations": [] and
-                 "podcasts": [{"name","logo","episodes":[{"k","s"}]}] (the episodes in their order)
+                 "podcasts": [{"name","logo","episodes":[{"k","s","t"?}]}] (in their order; "t": the title)
                  a score pack (.scorepak, same layout) has "stations": [] and
                  "scores": [{"name","group","pieces":[{"k","g": sub group,"t": title,"s"}]}] (in their order)
 "sig" is a fingerprint of the content: it tells whether an existing file is still up to date.
@@ -200,7 +200,8 @@ def station_entry(name, st, has_logo):
                 "pieces": [{"k": "s_" + x["id"], "g": x["sub"], "t": x["title"], "s": x["sec"]} for x in st["pieces"]]}
     logo = "logos/%s.png" % icons.slug(name) if has_logo else ""
     if st.get("podcast"):
-        return {"name": name, "logo": logo, "episodes": [{"k": track_key(e), "s": e["sec"]} for e in st["songs"]]}
+        return {"name": name, "logo": logo, "episodes": [
+            dict({"k": track_key(e), "s": e["sec"]}, **({"t": e["name"]} if e.get("name") else {})) for e in st["songs"]]}
     entry = {"name": name, "logo": logo,
              "songs": [dict({"k": track_key(s), "t": s["title"], "a": s["artist"], "s": s["sec"]}, **({"m": s["m"]} if s.get("m") else {}))
                        for s in st["songs"]],

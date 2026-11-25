@@ -4,7 +4,7 @@
 
 How many of the songs that the public credits page lists for each station could be found as files in the game's `audio.rpf`.
 
-**Status: 2026-11-25** · 792 / 809 (97.9 %)
+**Status: 2026-11-26** · 793 / 809 (98.0 %)
 
 Since v2.4.0 the playlists come straight from the game's audio config. Many stations therefore also play songs the credits do not list (column *In the radio*).
 
@@ -37,11 +37,11 @@ Since v2.4.0 the playlists come straight from the game's audio config. Many stat
 | 🟢 V-Rock | 70 / 70 | 100.0 % | 70 |
 | 🟢 Vice City FM | 71 / 71 | 100.0 % | 72 |
 | 🟢 Vice City Rap Radio | 25 / 25 | 100.0 % | 82 |
-| 🟢 Worldwide FM | 39 / 41 | 95.1 % | 40 |
+| 🟢 Worldwide FM | 40 / 41 | 97.6 % | 40 |
 | 🟢 Radio On-U | 15 / 16 | 93.8 % | 16 |
 | 🟡 Bodega The DJ | 36 / 45 | 80.0 % | 36 |
 | 🟡 DJ Stevie J | 19 / 24 | 79.2 % | 19 |
-| **Total** | **792 / 809** | **97.9 %** | **857** |
+| **Total** | **793 / 809** | **98.0 %** | **857** |
 
 </details>
 
@@ -63,7 +63,7 @@ One continuous DJ mix; its songs are not stored as separate files, so they are n
 
 | Station | Found | Listed songs inside |
 |---|---|---:|
-| 🎚 The Vault Radio | 1 mix (84 min), plays as the station | 24 |
+| 🎚 The Vault Radio | 1 mix (84 min), plays as the station | 24 (23 named) |
 
 ## Places of the game
 
@@ -90,11 +90,11 @@ The five podcasts of the credits list, all found: 20 episodes, 3 h 36 min togeth
 
 ## Reading the gaps
 
-- **Bodega The DJ** and **DJ Stevie J** are DJ sets in clubs. The missing titles have no single file assigned to them there; some of them play on other stations.
-- **Worldwide FM**: two listed titles are not assigned, one recording of the playlist plays as "Unknown track". **Radio On-U**: one title is missing, very probably it is the station's "Unknown track".
+- **Bodega The DJ** and **DJ Stevie J** are DJ sets in clubs. The missing titles have no single file assigned to them there: 6 of them play on Vice City Rap Radio and Dirty South Classics, 8 were found nowhere.
+- **Worldwide FM**: one listed title (a jingle) was found nowhere. **Radio On-U**: one title has no named file; it is part of the Radio On-U mix (from 6:28), and the station's "Unknown track" is very probably the same one.
 - **Honey FM - Liquid City** (8 original songs, not counted above) is in none of the station lists.
-- Long DJ mixes are also played as "(Mix)" stations: Radio On-U (10 of 24), The Sniper Of La Perle (20 of 22), Worldwide FM (31 of 41). The numbers are the parts that have a title. One further long club mix, which no place can be assigned to, plays as "Clubmixes".
-- The podcast episodes are numbered; their titles in the game are not known.
+- Long DJ mixes are also played as "(Mix)" stations: Radio On-U (16 of 24), The Sniper Of La Perle (22 of 22), Worldwide FM (40 of 41), The Vault (25 of 25). The numbers are the parts that have a title. One further long club mix, which no place can be assigned to, plays as "Clubmixes".
+- The titles of the podcast episodes and of the mix parts are in the game's own table (`data.rpf`); without that file the episodes are numbered.
 
 ## All stations
 
