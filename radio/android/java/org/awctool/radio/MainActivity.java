@@ -2,9 +2,6 @@ package org.awctool.radio;
 
 import android.Manifest;
 import android.app.Activity;
-import android.app.AlertDialog;
-import android.content.ClipData;
-import android.content.ClipboardManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -12,16 +9,13 @@ import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Color;
-import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
-import android.provider.Settings;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -37,12 +31,8 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
-import java.util.Locale;
-import java.util.TimeZone;
 
 /**
  * The three tabs of the app (the stations, the podcasts and the alarms), the small player at the bottom and the large
@@ -595,7 +585,8 @@ public class MainActivity extends Activity implements PackStore.Listener {
         super.onStart();
         bound = bindService(new Intent(this, RadioService.class), conn, Context.BIND_AUTO_CREATE);
         PackStore.addListener(this);
-        if (stations != PackStore.get(this).stations) buildScreen();      // changed while we were away
+        Catalog now = PackStore.get(this);
+        if (stations != now.stations || podcasts != now.podcasts) buildScreen();      // changed while we were away
         else if (alarms != null) alarms.refresh();                         // back from the editor or the settings
         PackStore.refresh(this, null);                                     // new files in the folder?
         handler.post(refresh);
@@ -697,7 +688,6 @@ public class MainActivity extends Activity implements PackStore.Listener {
     /** The advert switch: remembered for all stations; a playing station goes on with its other programme. */
     private void setAdverts(boolean on) {
         getSharedPreferences(RadioService.PREFS, MODE_PRIVATE).edit().putBoolean(RadioService.PREF_ADS, on).apply();
-        command(RadioService.ACTION_ADS);
         Toast.makeText(this, on ? R.string.adverts_on : R.string.adverts_off, Toast.LENGTH_SHORT).show();
     }
 
@@ -705,14 +695,7 @@ public class MainActivity extends Activity implements PackStore.Listener {
     private void showMenu() {
         List<Ui.Choice> m = new ArrayList<>();
         m.add(new Ui.Choice(getString(R.string.menu_sleep), null, false, this::showSleepSheet));
-        boolean ads = RadioService.adverts(this);
-        if (tab == TAB_RADIO) {
-            m.add(new Ui.Choice(getString(ads ? R.string.menu_adverts_off : R.string.menu_adverts_on), null, false, () -> setAdverts(!ads)));
-        }
-        m.add(new Ui.Choice(getString(R.string.menu_reload), null, false, this::reload));
-        m.add(new Ui.Choice(getString(R.string.menu_folder), null, false, this::pickFolder));
-        m.add(new Ui.Choice(getString(R.string.menu_battery), null, false, this::openBatterySettings));
-        m.add(new Ui.Choice(getString(R.string.menu_info), null, false, this::showInfo));
+        m.add(new Ui.Choice(getString(R.string.settings), null, false, () -> startActivity(new Intent(this, SettingsActivity.class))));
         Ui.sheet(this, getString(R.string.app_name), m);
     }
 
@@ -726,53 +709,10 @@ public class MainActivity extends Activity implements PackStore.Listener {
         Ui.sheet(this, getString(R.string.sleep_title), out);
     }
 
-    /** Opens Android's battery optimisation list so that the user can set this app to "not optimised". */
-    private void openBatterySettings() {
-        try {
-            startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
-        } catch (RuntimeException e) {
-            Toast.makeText(this, R.string.battery_failed, Toast.LENGTH_LONG).show();
-        }
-    }
-
-    private void showInfo() {
-        String version = "?";
-        try {
-            version = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
-        } catch (Exception ignored) {
-        }
-        SimpleDateFormat f = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US);
-        f.setTimeZone(TimeZone.getTimeZone("UTC"));
-        int songs = 0;
-        for (Library.Station s : stations) songs += s.songs.size();
-        Catalog c = PackStore.get(this);
-        StringBuilder info = new StringBuilder(getString(R.string.info_body, version, PackStore.folderName(this), c.packCount(),
-                stations.size(), songs, f.format(new Date())));
-        if (!podcasts.isEmpty()) info.append('\n').append(getString(R.string.info_podcasts, podcasts.size()));
-        for (String p : c.problems) info.append('\n').append(getString(R.string.info_skipped, p));
-        final String body = info.toString();
-        final String log = AppLog.text();
-        TextView tv = Ui.text(this, body + "\n\n" + log, 11, Ui.TEXT);
-        tv.setTypeface(Typeface.MONOSPACE);
-        tv.setTextIsSelectable(true);
-        tv.setPadding(dp(16), dp(12), dp(16), dp(12));
-        ScrollView sv = new ScrollView(this);
-        sv.addView(tv);
-        new AlertDialog.Builder(this, R.style.AppDialog).setTitle(R.string.info_title).setView(sv)
-                .setPositiveButton(R.string.info_close, null)
-                .setNeutralButton(R.string.info_copy, (d, w) -> {
-                    ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-                    cm.setPrimaryClip(ClipData.newPlainText("AWC Radio log", body + "\n\n" + log));
-                    Toast.makeText(this, R.string.info_copied, Toast.LENGTH_SHORT).show();
-                }).show();
-    }
-
-    /** Let the user pick the folder with the station packs (Android's folder picker; the permission is kept). */
+    /** Let the user pick the folder with the station packs. */
     private void pickFolder() {
-        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
-        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
         try {
-            startActivityForResult(i, REQ_PICK);
+            startActivityForResult(SettingsActivity.folderPicker(), REQ_PICK);
         } catch (RuntimeException e) {
             AppLog.e("folder picker", e);
             Toast.makeText(this, getString(R.string.folder_error, e.getMessage()), Toast.LENGTH_LONG).show();
@@ -789,15 +729,7 @@ public class MainActivity extends Activity implements PackStore.Listener {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode != REQ_PICK || resultCode != RESULT_OK || data == null || data.getData() == null) return;
-        Uri uri = data.getData();
-        try {
-            getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        } catch (SecurityException ignored) {
-            // some providers do not offer a persistable permission; it then works until the next restart
-        }
-        AppLog.d("folder chosen: " + uri);
-        PackStore.setFolder(this, uri);
+        if (requestCode == REQ_PICK && resultCode == RESULT_OK) SettingsActivity.useFolder(this, data);
     }
 
     // ------------------------------------------------------------------------------------------ refresh

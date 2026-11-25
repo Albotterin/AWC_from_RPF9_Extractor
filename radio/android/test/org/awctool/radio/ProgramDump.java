@@ -22,9 +22,12 @@ public final class ProgramDump {
                     for (int a = 2; a < args.length; a++) {
                         double now = Double.parseDouble(args[a]);
                         for (boolean adverts : new boolean[]{false, true}) {
-                            for (Schedule.Item it : s.programme(adverts).itemsFrom(now, 40)) {
-                                out.printf(java.util.Locale.ROOT, "%s|%d|%s|%s|%s|%.6f|%.6f|%.6f|%.6f%n", s.name, a - 2, adverts ? "ads" : "no",
-                                        it.ad ? "ad" : it.jingle ? "jingle" : "song", it.track.key, it.start, it.end, it.fadeIn, it.fadeOut);
+                            for (int fade : new int[]{0, 3, 8}) {
+                                for (Schedule.Item it : s.programme(adverts, fade).itemsFrom(now, 40)) {
+                                    out.printf(java.util.Locale.ROOT, "%s|%d|%s%d|%s|%s|%.6f|%.6f|%.6f|%.6f%n", s.name, a - 2,
+                                            adverts ? "ads" : "no", fade, it.ad ? "ad" : it.jingle ? "jingle" : "song", it.track.key,
+                                            it.start, it.end, it.fadeIn, it.fadeOut);
+                                }
                             }
                         }
                     }

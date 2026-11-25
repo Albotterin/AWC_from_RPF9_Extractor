@@ -78,7 +78,8 @@ spielen Handy und PC zur selben Zeit denselben Song.
 | ⏰ **Radiowecker** | Mehrere Wecker mit Wochentagen, Sender, Lautstärke, sanftem Start und Schlummern; ein Sonnenaufgang-Bildschirm über dem Sperrbildschirm. Ist das Radio nicht zu hören, klingelt der Weckton des Handys; Wecker bleiben nach einem Neustart erhalten |
 | 🚗 **Android Auto** | Die Sender als Raster mit ihren Logos, Song und Sender auf dem Player-Bildschirm, Sprachbefehle wie *„Spiele Radio On-U auf AWC Radio“* |
 | 😴 **Einschlaftimer** | Stoppt das Radio nach der gewählten Zeit |
-| 📢 **Werbung** | Schalter im Player und im Menü, von Haus aus aus; bei 18 Sendern |
+| 📢 **Werbung** | Schalter im Player und im Menü (App 1.9: auf der Einstellungsseite), von Haus aus aus; bei 18 Sendern |
+| ⚙️ **Einstellungen** *(App 1.9, im Quellcode, noch ohne Release)* | Eine Einstellungsseite: Überblenden ein/aus und 1–12 s (nur zwischen zwei Songs), Werbung, Pack-Ordner, Akku-Einstellungen, Info und Protokoll |
 | 📦 **Packs** | Eine Datei je Sender (`.radiopak`) und je Podcast (`.podpak`), alle in einem Ordner auf dem Handy: einzeln hinzufügen oder aktualisieren, ohne alles neu zu kopieren |
 | 🔒 **Offline** | Die App hat keine Internet-Berechtigung: Alles kommt aus den Packs auf dem Handy |
 | 🌍 **Sprachen** | Deutsch und Englisch |
@@ -118,6 +119,10 @@ Stand **2026-11-25** (v2.7.0), gemessen an einer 28,5 GB großen `audio.rpf`.
 ![AWC Radio – Fortschritt der Sender](radio/docs/radio-progress.svg)
 
 Details zu jedem Sender: [Fortschritt des Radios](radio/docs/RADIO-PROGRESS.de.md).
+
+### Im Quellcode, noch ohne Release
+
+* App 1.9 und das PC-Radio: Überblenden nur zwischen zwei Songs, abschaltbar und einstellbar; Einstellungsseite in der App.
 
 ### Noch offen
 

@@ -50,7 +50,9 @@ STR = {
         "err_ffplay": "ffplay was not found. Put ffplay.exe next to the program or into your PATH.",
         "err_credits": "The credits page could not be downloaded:\n{e}\n\nPick the page saved from your browser instead?",
         "err_html": "HTML page", "err_generic": "Something went wrong:\n{e}", "err_nostations": "No station with songs was found.",
-        "kind_song": "SONG", "kind_jingle": "JINGLE", "kind_ad": "ADVERT", "advert": "Advert", "chk_ads": "Adverts", "btn_play": "▶ Play (live)", "btn_pause": "⏸ Pause",
+        "kind_song": "SONG", "kind_jingle": "JINGLE", "kind_ad": "ADVERT", "advert": "Advert", "chk_ads": "Adverts",
+        "lbl_fade": "Crossfade", "fade_off": "Off", "fade_s": "{n} s",
+        "st_fade_note": "The programme now differs from devices with another crossfade setting (standard: 3 s).", "btn_play": "▶ Play (live)", "btn_pause": "⏸ Pause",
         "sync_hint": "Live: the stations run by the UTC clock, everyone with the same time hears the same song.", "lbl_volume": "Volume", "n_songs": "{n} songs", "n_shows": "{n} shows", "kind_show": "SHOW", "st_loading": "Loading …",
         "lbl_next": "Up next:", "tune": "Tune in to a station on the left", "no_logo_hint": "",
     },
@@ -66,7 +68,9 @@ STR = {
         "err_ffplay": "ffplay wurde nicht gefunden. ffplay.exe neben das Programm legen oder in den PATH aufnehmen.",
         "err_credits": "Die Credits-Seite konnte nicht geladen werden:\n{e}\n\nStattdessen die im Browser gespeicherte Seite wählen?",
         "err_html": "HTML-Seite", "err_generic": "Es ist ein Fehler aufgetreten:\n{e}", "err_nostations": "Es wurde kein Sender mit Songs gefunden.",
-        "kind_song": "SONG", "kind_jingle": "JINGLE", "kind_ad": "WERBUNG", "advert": "Werbung", "chk_ads": "Werbung", "btn_play": "▶ Abspielen (live)", "btn_pause": "⏸ Pause",
+        "kind_song": "SONG", "kind_jingle": "JINGLE", "kind_ad": "WERBUNG", "advert": "Werbung", "chk_ads": "Werbung",
+        "lbl_fade": "Überblenden", "fade_off": "Aus", "fade_s": "{n} s",
+        "st_fade_note": "Das Programm weicht jetzt von Geräten mit anderer Überblendung ab (Standard: 3 s).", "btn_play": "▶ Abspielen (live)", "btn_pause": "⏸ Pause",
         "sync_hint": "Live: Die Sender laufen nach der UTC-Uhrzeit, alle mit derselben Zeit hören denselben Song.", "lbl_volume": "Lautstärke", "n_songs": "{n} Songs", "n_shows": "{n} Sendungen", "kind_show": "SENDUNG", "st_loading": "Lade …",
         "lbl_next": "Als Nächstes:", "tune": "Links einen Sender wählen", "no_logo_hint": "",
     },
@@ -457,9 +461,10 @@ def add_venues(stations, items, rpf, songs, found, cfg_names):
 
 
 DAY = 86400.0
-FADE = 3.0                                 # seconds of crossfade between two items (shorter around short jingles)
+FADE = 3.0                                 # standard seconds of crossfade between two songs
+FADE_MAX = 12
 LEAD = 0.4                                 # ffplay needs about this long to start; its start position is moved on by it
-AD_FADE = 0.5                              # adverts are talk: only a short overlap around them
+TAIL = 0.3                                 # an item that is not faded out may play this much longer than scheduled
 AD_AFTER = (540, 361)                      # with adverts: a break after 9 to 15 minutes of programme (540 + 0..360 s)
 
 
@@ -496,15 +501,18 @@ class Schedule:
     so everybody with the same game files and the same clock hears the same song at the same second. The one song that
     would cross midnight UTC is cut there.
 
-    Neighbouring items overlap by a few seconds (a crossfade like on a real radio): the next one starts while the
-    previous one fades out. The overlap only depends on the two tracks, so it is the same for everybody as well.
+    Two songs that follow each other overlap by `fade` seconds (a crossfade like on a real radio): the next one starts
+    while the previous one fades out. Jingles, adverts and talk shows are never faded: they follow back to back. The
+    overlap is part of the timetable, so listeners hear the same only with the same crossfade (standard: FADE).
 
     Every station has a second programme with adverts (ads=True, for stations that have an advert list): after 9 to 15
     minutes of songs comes a break of two or three adverts, then a jingle. Without adverts the programme is the same as
     for a station that has none."""
 
-    def __init__(self, name, station, ads=False):
+    def __init__(self, name, station, ads=False, fade=FADE):
         self.name = name
+        self.fade = min(float(FADE_MAX), max(0.0, float(fade)))
+        self.talk = any(_is_show(s) for s in station["songs"])        # talk radio: its items are shows, not songs
         self.songs = sorted(station["songs"], key=_tkey)
         self.jingles = sorted(station["jingles"], key=_tkey)
         self.ads = sorted(station.get("ads", []), key=_tkey) if ads else []
@@ -556,9 +564,9 @@ class Schedule:
                 played += max(1.0, tr_["sec"])
             sec = max(1.0, tr_["sec"])
             if entries:
-                ov = min(FADE, 0.25 * prev_sec, 0.25 * sec)       # crossfade with the previous item
-                if kind == "ad" or prev_kind == "ad":
-                    ov = min(ov, AD_FADE)
+                ov = 0.0                                          # crossfade only from one song into the next
+                if kind == "song" and prev_kind == "song" and not self.talk:
+                    ov = min(self.fade, 0.25 * prev_sec, 0.25 * sec)
                 start = prev_start + prev_sec - ov
                 if start >= DAY:
                     break
@@ -659,6 +667,12 @@ class RadioApp(tk.Tk):
         s.configure("Accent.TButton", background=ACCENT, foreground="white", padding=(18, 8), font=("Segoe UI", 11, "bold"))
         s.map("Accent.TButton", background=[("active", "#ff7a58")])
         s.configure("TEntry", fieldbackground=PANEL, foreground=FG, insertcolor=FG)
+        s.configure("TCombobox", fieldbackground=CARD, background=CARD, foreground=FG, arrowcolor=FG, bordercolor=CARD,
+                    lightcolor=CARD, darkcolor=CARD, padding=(6, 2))
+        s.map("TCombobox", fieldbackground=[("readonly", CARD)], foreground=[("readonly", FG)],
+              selectbackground=[("readonly", CARD)], selectforeground=[("readonly", FG)], background=[("active", CARD_SEL)])
+        for option, colour in (("background", PANEL), ("foreground", FG), ("selectBackground", CARD_SEL), ("selectForeground", FG)):
+            self.option_add("*TCombobox*Listbox.%s" % option, colour)          # the list that drops down
         s.configure("Horizontal.TProgressbar", background=ACCENT, troughcolor=PANEL)
         s.configure("Horizontal.TScale", background=BG, troughcolor=PANEL)
         s.configure("Vertical.TScrollbar", background=CARD, troughcolor=BG, arrowcolor=DIM, bordercolor=BG, lightcolor=CARD, darkcolor=CARD)
@@ -700,6 +714,12 @@ class RadioApp(tk.Tk):
         ttk.Button(top, text=t("btn_android"), command=self._android).pack(side="right", padx=8)
         self.var_ads = tk.BooleanVar(value=bool(self.cfg.get("ads", False)))         # off unless the listener wants them
         ttk.Checkbutton(top, text=t("chk_ads"), variable=self.var_ads, command=self._toggle_ads).pack(side="right", padx=8)
+        self.box_fade = ttk.Combobox(top, state="readonly", width=5,                  # between two songs: off or 1-12 s
+                                     values=[t("fade_off")] + [t("fade_s", n=n) for n in range(1, FADE_MAX + 1)])
+        self.box_fade.current(self._fade())
+        self.box_fade.pack(side="right")
+        self.box_fade.bind("<<ComboboxSelected>>", self._fade_chosen)
+        tk.Label(top, text=t("lbl_fade"), bg=PANEL, fg=FG).pack(side="right", padx=(8, 4))
         body = tk.Frame(self.radio, bg=BG)
         body.pack(fill="both", expand=True)
         left = tk.Frame(body, bg=BG, width=390)
@@ -880,7 +900,7 @@ class RadioApp(tk.Tk):
         self.stations = idx["stations"]
         self._fill_stations()
         self._show_radio()
-        self.status.config(text=t("st_ready", n=len(self.stations)))
+        self.status.config(text=self._ready_text())
         if background_icons and pool and os.path.isfile(pool) and icons.missing_stations():
             def work():
                 self._make_icons(pool)
@@ -992,7 +1012,7 @@ class RadioApp(tk.Tk):
             self.want.queue.clear()
         self.upcoming = []
         self.fail_count = 0
-        self.sched = Schedule(name, self.stations[name], self.var_ads.get())
+        self.sched = self._programme(name)
         self.cur = None
         self._mark_selected()
         self._see_card(name)
@@ -1000,14 +1020,39 @@ class RadioApp(tk.Tk):
         self.lbl_station.config(text=name)
         self._sync()
 
+    def _fade(self):
+        """The chosen seconds of crossfade between two songs; 0 = off."""
+        try:
+            return min(FADE_MAX, max(0, int(self.cfg.get("crossfade", int(FADE)))))
+        except (TypeError, ValueError):
+            return int(FADE)
+
+    def _ready_text(self):
+        """The status line; with another crossfade than the standard one it says what that means."""
+        return t("st_fade_note") if self._fade() != int(FADE) else t("st_ready", n=len(self.stations))
+
+    def _programme(self, name):
+        return Schedule(name, self.stations[name], self.var_ads.get(), self._fade())
+
     def _toggle_ads(self):
         """The other programme of the station: with or without advert breaks."""
         self.cfg["ads"] = bool(self.var_ads.get())
         save_settings(self.cfg)
+        self._retune()
+
+    def _fade_chosen(self, _e=None):
+        self.cfg["crossfade"] = self.box_fade.current()
+        save_settings(self.cfg)
+        self.box_fade.selection_clear()
+        self._retune()
+        self.status.config(text=self._ready_text())
+
+    def _retune(self):
+        """A setting that shapes the programme changed."""
         if self.station and self.state in ("playing", "loading"):
             self._tune(self.station)
         elif self.station:
-            self.sched = Schedule(self.station, self.stations[self.station], self.var_ads.get())
+            self.sched = self._programme(self.station)
 
     def _track_key(self, tr_):
         return _tkey(tr_)
@@ -1103,7 +1148,7 @@ class RadioApp(tk.Tk):
         self.started = time.time()
         self.state = "playing"
         self.btn_play.config(text=t("btn_pause"))
-        self.status.config(text=t("st_ready", n=len(self.stations)))
+        self.status.config(text=self._ready_text())
         return True
 
     def _kill(self):
@@ -1197,7 +1242,8 @@ class RadioApp(tk.Tk):
                         proc = self._spawn(nxt)
                         if proc is not None:
                             if self.proc is not None:
-                                self.old.append((self.proc, self.cur_end))
+                                faded = self.cur_item[5] > 0            # (still the item that is ending)
+                                self.old.append((self.proc, self.cur_end + (0.0 if faded else TAIL)))
                             self.proc, self.started, self.fail_count = proc, now, 0
                             self._set_cur(nxt)
                             self.upcoming = self.sched.items_from(nxt[0] + 0.001, 4)[1:3]

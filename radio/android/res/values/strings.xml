@@ -17,7 +17,6 @@
 
     <string name="menu_sleep">Sleep timer</string>
     <string name="menu_reload">Reload stations</string>
-    <string name="menu_folder">Change folder …</string>
     <string name="menu_battery">Battery settings</string>
     <string name="menu_info">Info &amp; log</string>
 
@@ -120,8 +119,6 @@
     <string name="adverts_none">This station has no adverts</string>
     <string name="adverts_on">Adverts on: breaks between the songs</string>
     <string name="adverts_off">Adverts off</string>
-    <string name="menu_adverts_on">Turn adverts on</string>
-    <string name="menu_adverts_off">Turn adverts off</string>
     <string name="tab_podcasts">Podcasts</string>
     <string name="podcast">Podcast</string>
     <string name="episode_n">Episode %1$d</string>
@@ -145,4 +142,17 @@
     <string name="act_next_episode">Next episode</string>
     <string name="act_seek">Position in the episode</string>
     <string name="info_podcasts">Podcasts: %1$d</string>
+    <string name="settings">Settings</string>
+    <string name="settings_playback">Playback</string>
+    <string name="crossfade">Crossfade</string>
+    <string name="crossfade_what">Only from one song into the next</string>
+    <string name="crossfade_length">Length</string>
+    <string name="seconds_short">%1$d s</string>
+    <string name="crossfade_sync">Phone and PC play the same song at the same moment only with the same crossfade (standard: %1$d s).</string>
+    <string name="adverts_what">Breaks on the stations that have adverts</string>
+    <string name="settings_packs">Packs</string>
+    <string name="settings_folder">Pack folder</string>
+    <string name="settings_no_folder">not chosen</string>
+    <string name="settings_more">Phone and app</string>
+    <string name="settings_version">AWC Radio %1$s</string>
 </resources>

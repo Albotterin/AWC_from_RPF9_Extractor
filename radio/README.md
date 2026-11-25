@@ -50,12 +50,17 @@ parts) and **The Vault (Club)** get the DJ sets of these clubs, and the **Thrill
 Click a station to tune in: its songs play one after the other, and after every 2-4 songs a short jingle is played. On
 talk radio an "item" is a whole show episode (its parts joined, 10-23 minutes). The programme is calculated from the
 **UTC clock** (a new order every UTC day, jingles included), so every station keeps "running" in the background: switch
-to another station and back and you land where the first one is by now. Everybody with the same game files and the same
-clock hears the same song at the same second (accurate to about a second; the one song that would cross midnight UTC is
-cut). Neighbouring songs and jingles are **crossfaded** for 3 seconds (shorter around short jingles), at the same moment
-for everybody. There is no skip button - like on a real radio; after a pause, play resumes live. Later starts are
+to another station and back and you land where the first one is by now. Everybody with the same game files, the same clock and the same crossfade setting
+hears the same song at the same second (accurate to about a second; the one song that would cross midnight UTC is cut).
+There is no skip button - like on a real radio; after a pause, play resumes live. Later starts are
 instant. **Jingles** are the short recordings (idents and DJ talk) that only this station uses; for the club DJ sets they
 are an educated guess. Needs `ffplay` like the extractor.
+
+**Crossfade.** Only one **song into the next** is crossfaded (standard: 3 seconds). Jingles, adverts, talk shows and
+podcasts are never faded: they follow back to back. You can switch the crossfade off or set it to 1-12 seconds - on the
+PC with **Crossfade** at the top of the window, in the app on the settings page. The overlap is part of the timetable, so
+PC and phone stay in step only with the same setting. *New in the source (app 1.9); the latest release, v2.7.0 with app
+1.8, still crossfades around jingles and adverts and has no setting.*
 
 **Adverts.** Every station has two programmes after the same clock: without adverts (the default) and with them. Tick
 **Adverts** on the PC, or switch **Adverts** on in the app. After about 9 to 15 minutes of songs a break of two or three
@@ -85,13 +90,16 @@ The current list of all stations with their content and length: [all stations](d
 
 ## AWC Radio for Android
 
-The phone app plays the same live programme as the PC: same UTC clock, same order, same crossfades. It consists of the app
+The phone app plays the same live programme as the PC: same UTC clock, same order, same crossfades (with the same
+setting). It consists of the app
 and the station packs:
 
 * **`AWC-Radio.apk`** - the app (version 1.8), the same file for everybody, no game data inside. Android 7.0 or newer,
   English and German. Station grid, mini player and a large player in the colour of the station's logo; background playback
   with a media notification, lock-screen and headset buttons; sleep timer; **adverts** switch (off by default); **Android Auto** (switch on *Unknown sources* in
   its developer settings first, because the app does not come from the Play Store).
+* **Settings page** (app 1.9, not in a release yet) - crossfade on/off and length, adverts, pack folder and reload,
+  battery settings, info and log; open it from the three-dot menu.
 * **Radio alarm** - several alarms with weekdays, station, volume, gentle start, snooze and vibration. It rings on the phone's
   alarm volume with a screen over the lock screen. If nothing can be heard from the radio within 10 seconds (pack missing,
   player error, phone not yet unlocked after a restart), the phone's own alarm tone rings. It stops by itself after 30 minutes.

@@ -17,14 +17,18 @@ final class Library {
         final List<Schedule.Track> songs = new ArrayList<>();
         final List<Schedule.Track> jingles = new ArrayList<>();
         final List<Schedule.Track> ads = new ArrayList<>();
-        Schedule schedule;                 // the programme without adverts
-        private Schedule withAds;
+        private final java.util.Map<String, Schedule> programmes = new java.util.HashMap<>();
 
-        /** The station's programme: with advert breaks if wanted and the station has adverts. */
-        Schedule programme(boolean adverts) {
-            if (!adverts || ads.isEmpty()) return schedule;
-            if (withAds == null) withAds = new Schedule(name, songs, jingles, ads);
-            return withAds;
+        /** The station's programme: with advert breaks if wanted and the station has adverts, and with this crossfade. */
+        synchronized Schedule programme(boolean adverts, double fade) {
+            boolean with = adverts && !ads.isEmpty();
+            String key = with + " " + fade;
+            Schedule s = programmes.get(key);
+            if (s == null) {
+                s = new Schedule(name, songs, jingles, with ? ads : java.util.Collections.<Schedule.Track>emptyList(), fade, talk);
+                programmes.put(key, s);
+            }
+            return s;
         }
 
         Station(String name, String logo, boolean talk) {
@@ -89,7 +93,6 @@ final class Library {
                     st.ads.add(new Schedule.Track(s.getString("k"), s.optString("t", ""), "", s.getDouble("s")));
                 }
             }
-            st.schedule = new Schedule(st.name, st.songs, st.jingles);
             out.add(st);
         }
     }

@@ -71,7 +71,7 @@ public class AdvertTest {
         radio.play(Catalog.indexOf(list, "Flash FM"));
         ReflectionHelpers.setField(a, "service", radio);
         Harness.pass(500);
-        Assert.assertSame("plays without adverts", flash.schedule, playingSchedule());
+        Assert.assertSame("plays without adverts", flash.programme(false, 3), playingSchedule());
         ReflectionHelpers.callInstanceMethod(a, "openPlayer", ReflectionHelpers.ClassParameter.from(boolean.class, true));
         Harness.pass(600);
         PlayerScreen player = ReflectionHelpers.getField(a, "player");
@@ -83,25 +83,25 @@ public class AdvertTest {
         toggle.performClick();
         deliver();
         Assert.assertTrue("remembered", RadioService.adverts(a));
-        Assert.assertSame("now the programme with adverts", flash.programme(true), playingSchedule());
-        Assert.assertNotSame(flash.schedule, playingSchedule());
+        Assert.assertSame("now the programme with adverts", flash.programme(true, 3), playingSchedule());
+        Assert.assertNotSame(flash.programme(false, 3), playingSchedule());
         Assert.assertEquals(RadioService.PLAYING, radio.state);
         Assert.assertEquals("Flash FM", radio.stationName);
         Assert.assertTrue(switches(player).get(0).isChecked());
 
         radio.play(Catalog.indexOf(list, "Jack of Hearts"));                // a club has no adverts
         Harness.pass(600);
-        Assert.assertSame(club.schedule, playingSchedule());
+        Assert.assertSame(club.programme(false, 3), playingSchedule());
         Assert.assertFalse(switches(player).get(0).isEnabled());
         Assert.assertTrue("the wish stays for the other stations", RadioService.adverts(a));
 
         radio.play(Catalog.indexOf(list, "Flash FM"));
         Harness.pass(600);
-        Assert.assertSame(flash.programme(true), playingSchedule());
+        Assert.assertSame(flash.programme(true, 3), playingSchedule());
         Shadows.shadowOf(Harness.application()).clearStartedServices();
         switches(player).get(0).performClick();
         deliver();
         Assert.assertFalse(RadioService.adverts(a));
-        Assert.assertSame(flash.schedule, playingSchedule());
+        Assert.assertSame(flash.programme(false, 3), playingSchedule());
     }
 }

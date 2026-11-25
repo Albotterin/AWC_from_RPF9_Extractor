@@ -10,7 +10,7 @@ import java.util.List;
  *
  * Every tick it looks at the programme (Schedule) for "now": items that are about to start are opened ahead of time
  * (PRELOAD), started when their time comes at the position the station has reached by then, and faded in and out with an
- * equal-power crossfade. A player that fails is opened again a few times; a clock jump or a dropped audio focus is
+ * equal-power crossfade where the programme overlaps two songs (else one follows the other). A player that fails is opened again a few times; a clock jump or a dropped audio focus is
  * handled with resync().
  */
 final class Engine {
@@ -40,6 +40,7 @@ final class Engine {
     static final double PRELOAD = 25.0;           // open items this many seconds before they start
     static final double START_COMPENSATION = 0.08;  // start() needs a moment, start that much early
     static final int MAX_TRIES = 3;
+    static final double TAIL = 0.25;              // an item that is not faded out may end this much after its time
 
     private static final class Slot {
         final Schedule.Item item;
@@ -70,6 +71,11 @@ final class Engine {
 
     void setDuck(float d) {
         duck = d;
+    }
+
+    /** The programme this engine plays. */
+    Schedule schedule() {
+        return schedule;
     }
 
     /** The item that is on air now (the one that started last), or null while nothing has started yet. */
@@ -184,7 +190,10 @@ final class Engine {
         while (iter.hasNext()) {
             Slot s = iter.next();
             Schedule.Item it = s.item;
-            if (now >= it.end + (it.fadeOut > 0 ? 0.1 : 0.0)) {     // a hard cut (midnight UTC) ends exactly on time
+            // a faded item is silent at its end; one that is not faded gets a moment for its last words (a player starts
+            // a little late), unless midnight UTC cuts it: then it ends exactly on time
+            double grace = it.fadeOut > 0 ? 0.1 : it.end - it.start > it.track.sec - 0.01 ? TAIL : 0.0;
+            if (now >= it.end + grace) {
                 kill(s);
                 iter.remove();
                 continue;
@@ -219,9 +228,9 @@ final class Engine {
             }
             if (!s.started) {
                 if (now + 2.0 >= it.start) busy = true;
-                double comp = it.fadeIn > 0 ? START_COMPENSATION : 0.0;      // no early start where nothing fades (no overlap)
-                if (p.isPrepared() && now + comp >= it.start) {
-                    p.startAt(Math.max(0.0, now + comp - it.start), volume(it, now, duck));
+                // start() needs a moment: a little early, so that one item follows the other without a gap
+                if (p.isPrepared() && now + START_COMPENSATION >= it.start) {
+                    p.startAt(Math.max(0.0, now + START_COMPENSATION - it.start), volume(it, now, duck));
                     s.started = true;
                 }
             } else {

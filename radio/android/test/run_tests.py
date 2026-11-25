@@ -127,6 +127,7 @@ def compare_programmes(cp, folder):
         tr = {"base": int(base), "idx": int(idx), "sec": entry["s"], "title": entry.get("t", "")}
         if parts:
             tr["parts"] = [0] * int(parts)
+            tr["set"] = not talk                       # made of parts: a talk show, or a club's DJ set
         return tr
 
     want = []
@@ -138,9 +139,11 @@ def compare_programmes(cp, folder):
         if not stations:
             continue                                   # a podcast pack has no programme
         st = stations[0]
+        talk = st.get("kind") == "talk"
         station = {"songs": [track(x) for x in st["songs"]], "jingles": [track(x) for x in st["jingles"]],
                    "ads": [track(x) for x in st.get("ads", [])]}
-        programmes = [("no", radio.Schedule(st["name"], station)), ("ads", radio.Schedule(st["name"], station, True))]
+        programmes = [("%s%d" % (tag, fade), radio.Schedule(st["name"], station, tag == "ads", fade))
+                      for tag in ("no", "ads") for fade in (0, 3, 8)]
         for i, now in enumerate(moments):
             for tag, schedule in programmes:
                 for start, end, kind, tr, fin, fout in schedule.items_from(now, 40):

@@ -216,13 +216,13 @@ public class PodcastTest {
         Assert.assertFalse("nothing to go on with yet: no small player under Podcasts", visible("Zum Einschalten"));
         ReflectionHelpers.callInstanceMethod(a, "showMenu");
         Harness.pass(300);
-        Assert.assertFalse("adverts belong to the radio", dialogShows("Werbung einschalten"));
+        Assert.assertTrue("the settings are in the menu", dialogShows("Einstellungen"));
         ShadowDialog.getLatestDialog().dismiss();
         tap("Radio");
         Assert.assertTrue("the radio offers its station", visible("Zum Einschalten"));
         ReflectionHelpers.callInstanceMethod(a, "showMenu");
         Harness.pass(300);
-        Assert.assertTrue(dialogShows("Werbung einschalten"));
+        Assert.assertTrue(dialogShows("Einschlaftimer"));
         ShadowDialog.getLatestDialog().dismiss();
 
         tap("Podcasts");
@@ -260,7 +260,9 @@ public class PodcastTest {
         open();
         radio.playEpisode("Drunk Kings", 0);
         seconds(3);
-        command(RadioService.ACTION_ADS, null, 0);                    // the advert switch does not disturb a podcast
+        Harness.app().getSharedPreferences(RadioService.PREFS, 0).edit()      // radio settings do not disturb a podcast
+                .putBoolean(RadioService.PREF_ADS, true).putInt(RadioService.PREF_FADE_SEC, 9).commit();
+        Harness.pass(300);
         Assert.assertTrue(radio.isPodcast());
         command(RadioService.ACTION_SLEEP, RadioService.EXTRA_MINUTES, 1);
         radio.sleepAt = System.currentTimeMillis() - 1;

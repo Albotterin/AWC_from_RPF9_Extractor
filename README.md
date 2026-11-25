@@ -78,7 +78,8 @@ song at the same time.
 | ⏰ **Radio alarm** | Several alarms with weekdays, station, volume, gentle start and snooze; a sunrise screen over the lock screen. If the radio cannot be heard, the phone's own alarm tone rings; alarms survive a restart |
 | 🚗 **Android Auto** | The stations as a grid with their logos, song and station on the player screen, voice commands such as *"play Radio On-U on AWC Radio"* |
 | 😴 **Sleep timer** | Stops the radio after the time you choose |
-| 📢 **Adverts** | A switch in the player and the menu, off by default; on 18 stations |
+| 📢 **Adverts** | A switch in the player and the menu (app 1.9: the settings page), off by default; on 18 stations |
+| ⚙️ **Settings** *(app 1.9, in the source, no release yet)* | A settings page: crossfade on/off and 1-12 s (only between two songs), adverts, pack folder, battery settings, info and log |
 | 📦 **Packs** | One file per station (`.radiopak`) and per podcast (`.podpak`), all in one folder on the phone: add or update single ones without copying everything again |
 | 🔒 **Offline** | The app has no internet permission: everything comes from the packs on the phone |
 | 🌍 **Languages** | English and German |
@@ -118,6 +119,10 @@ Status **2026-11-25** (v2.7.0), measured with a 28.5 GB `audio.rpf`.
 ![AWC Radio – station progress](radio/docs/radio-progress.svg)
 
 Details for every station: [radio progress](radio/docs/RADIO-PROGRESS.md).
+
+### In the source, not yet released
+
+* App 1.9 and the PC radio: crossfade only between two songs, switchable and adjustable; settings page in the app.
 
 ### Still open
 

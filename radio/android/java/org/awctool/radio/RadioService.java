@@ -48,7 +48,6 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
     static final String ACTION_NEXT = "org.awctool.radio.NEXT";
     static final String ACTION_PREV = "org.awctool.radio.PREV";
     static final String ACTION_SLEEP = "org.awctool.radio.SLEEP";
-    static final String ACTION_ADS = "org.awctool.radio.ADS";            // the advert switch changed
     static final String ACTION_EPISODE = "org.awctool.radio.EPISODE";    // play an episode of a podcast
     static final String ACTION_SEEK = "org.awctool.radio.SEEK";          // podcast: go to EXTRA_SECONDS
     static final String ACTION_JUMP = "org.awctool.radio.JUMP";          // podcast: EXTRA_SECONDS back or forth
@@ -65,6 +64,8 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
     private static final long PAUSE_TIMEOUT_MS = 30L * 60 * 1000;     // a pause that is forgotten ends the service
     private static final long SLEEP_FADE_MS = 8000;
     static final String PREFS = "radio", PREF_LAST = "lastName", PREF_ADS = "ads";
+    static final String PREF_FADE_ON = "xfade", PREF_FADE_SEC = "xfadeSec";      // crossfade between two songs
+    static final int FADE_MAX = Schedule.FADE_MAX;
     private static final long WAKE_LOCK_MS = 30L * 60 * 1000;
 
     public final class LocalBinder extends Binder {
@@ -94,6 +95,11 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
     private float focusDuck = 1f;
     private Episodes episodes;                    // set while a podcast is on; `station` then is the podcast
     private boolean episodeLoading;
+
+    /** A setting that shapes the programme changed (the switches in the player and on the settings page). */
+    private final SharedPreferences.OnSharedPreferenceChangeListener settingsListener = (p, key) -> {
+        if (PREF_ADS.equals(key) || PREF_FADE_ON.equals(key) || PREF_FADE_SEC.equals(key)) applyProgramme();
+    };
 
     private final Runnable tickRun = new Runnable() {
         @Override
@@ -273,6 +279,7 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
         session.setSessionActivity(PendingIntent.getActivity(this, 0, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
         setSessionToken(session.getSessionToken());                 // lets browsers (Android Auto) connect to the session
         PackStore.addListener(this);
+        getSharedPreferences(PREFS, MODE_PRIVATE).registerOnSharedPreferenceChangeListener(settingsListener);
         AppLog.d("service created");
     }
 
@@ -461,8 +468,6 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
                 skip(+1);
             } else if (ACTION_PREV.equals(action)) {
                 skip(-1);
-            } else if (ACTION_ADS.equals(action)) {
-                applyAdverts();
             } else if (ACTION_SLEEP.equals(action)) {
                 setSleepTimer(intent.getIntExtra(EXTRA_MINUTES, 0));
             } else if (ACTION_STOP.equals(action)) {
@@ -489,6 +494,7 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
     public void onDestroy() {
         AppLog.d("service destroyed");
         PackStore.removeListener(this);
+        getSharedPreferences(PREFS, MODE_PRIVATE).unregisterOnSharedPreferenceChangeListener(settingsListener);
         handler.removeCallbacksAndMessages(null);
         if (engine != null) engine.stop();
         closePodcast();
@@ -554,7 +560,7 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
 
     private Engine newEngine(Library.Station st) {
         final Pack p = st.pack;
-        return new Engine(st.programme(adverts(this)), clock, track -> new PackPlayer(p, "t/" + track.key, AudioAttributes.USAGE_MEDIA));
+        return new Engine(st.programme(adverts(this), crossfade(this)), clock, track -> new PackPlayer(p, "t/" + track.key, AudioAttributes.USAGE_MEDIA));
     }
 
     /** Whether the listener wants advert breaks (off unless switched on). */
@@ -562,14 +568,26 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
         return c.getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(PREF_ADS, false);
     }
 
-    /** The switch changed: the station goes on with its other programme. */
-    private void applyAdverts() {
-        if (station == null || state == STOPPED || episodes != null) return;
-        AppLog.d("adverts " + (adverts(this) ? "on" : "off"));
+    /** The chosen length of the crossfade in seconds (kept while the crossfade is switched off). */
+    static int fadeSeconds(Context c) {
+        int s = c.getSharedPreferences(PREFS, MODE_PRIVATE).getInt(PREF_FADE_SEC, (int) Schedule.FADE);
+        return Math.max(1, Math.min(FADE_MAX, s));
+    }
+
+    /** The crossfade between two songs in seconds, 0 when switched off. */
+    static double crossfade(Context c) {
+        return c.getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(PREF_FADE_ON, true) ? fadeSeconds(c) : 0;
+    }
+
+    /** A setting changed: the station goes on with its other programme (nothing happens if it is the same one). */
+    private void applyProgramme() {
+        if (station == null || engine == null || state == STOPPED || episodes != null) return;
+        if (engine.schedule() == station.programme(adverts(this), crossfade(this))) return;
+        AppLog.d("programme: adverts " + (adverts(this) ? "on" : "off") + ", crossfade " + crossfade(this) + " s");
         if (state == PLAYING) {
             play(stationIndex);
         } else {
-            if (engine != null) engine.stop();
+            engine.stop();
             engine = newEngine(station);
             lastItemShown = null;
         }

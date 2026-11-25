@@ -74,11 +74,32 @@ public class EngineTest {
     }
 
     static Schedule station(String name, int songs, int jingles, long seed) {
+        return station(name, songs, jingles, seed, Schedule.FADE, false);
+    }
+
+    static Schedule station(String name, int songs, int jingles, long seed, double fade, boolean talk) {
         Random r = new Random(seed);
         List<Schedule.Track> s = new ArrayList<>(), j = new ArrayList<>();
         for (int i = 0; i < songs; i++) s.add(new Schedule.Track((1000 + i) + "_0", "s" + i, "a", 120 + r.nextInt(200) + r.nextDouble()));
         for (int i = 0; i < jingles; i++) j.add(new Schedule.Track((9000 + i) + "_0", "", "", 2 + r.nextInt(20) + r.nextDouble()));
-        return new Schedule(name, s, j);
+        return new Schedule(name, s, j, new ArrayList<>(), fade, talk);
+    }
+
+    /** Crossfades only from song to song, as long as asked for; everything else follows back to back. */
+    static void rules(Schedule sch, double fade, boolean talk) {
+        List<Schedule.Item> items = sch.itemsFrom(Math.floor(1_700_000_000.0 / 86400) * 86400 + 1, 400);
+        int faded = 0, plain = 0;
+        for (int i = 1; i < items.size(); i++) {
+            Schedule.Item a = items.get(i - 1), b = items.get(i);
+            if (b.start % 86400 == 0) continue;                              // the new day
+            boolean songs = !a.jingle && !a.ad && !b.jingle && !b.ad && !talk;
+            double want = songs ? Math.min(fade, Math.min(a.track.sec, b.track.sec) / 4) : 0;
+            check(Math.abs(b.fadeIn - want) < 1e-6 && Math.abs(a.fadeOut - want) < 1e-6, "fade " + b.fadeIn + " instead of " + want);
+            check(Math.abs(b.start - (a.start + a.track.sec - want)) < 1e-6, "start of the next item");
+            if (want > 0) faded++;
+            else plain++;
+        }
+        check(plain > 0 && (faded > 0) == (fade > 0 && !talk), "faded " + faded + ", back to back " + plain);
     }
 
     interface Hook {
@@ -110,11 +131,12 @@ public class EngineTest {
             List<Schedule.Item> items = sch.itemsFrom(now, 4);
             double energy = 0;
             int audible = 0;
+            Schedule.Item older = null;
             for (Fake f : all) {
                 if (!f.started || f.released) continue;
                 Schedule.Item match = null;
                 for (Schedule.Item it : sch.itemsFrom(now - 500, 60)) {
-                    if (it.track.key.equals(f.track.key) && it.start <= now + Engine.START_COMPENSATION + 1e-9 && now < it.end + 0.11) match = it;
+                    if (it.track.key.equals(f.track.key) && it.start <= now + Engine.START_COMPENSATION + 1e-9 && now < it.end + Engine.TAIL + 0.01) match = it;
                 }
                 if (match == null) {
                     StringBuilder dbg = new StringBuilder();
@@ -130,13 +152,16 @@ public class EngineTest {
                 if (now < match.end) {
                     energy += (double) f.vol * f.vol;
                     audible++;
+                    if (older == null || match.start < older.start) older = match;
                 }
             }
             if (audible > 0) lastAudible = now;
             if (strictAudible && now - start > 2.0) {
                 check(audible >= 1, label + ": silence at " + now);
                 // equal-power crossfade: the summed energy stays close to 1 (within the sampling of the 50 ms tick)
-                if (audible == 2) check(energy > 0.85 && energy < 1.15, label + ": crossfade energy " + energy + " at " + now);
+                if (audible == 2 && older.fadeOut > 0) check(energy > 0.85 && energy < 1.15, label + ": crossfade energy " + energy + " at " + now);
+                // without a crossfade two items only touch: the next one starts a moment early
+                if (audible == 2 && older.fadeOut == 0) check(older.end - now <= Engine.START_COMPENSATION + 1e-6, label + ": overlap without a fade at " + now);
             }
             check(eng.openPlayers() <= 4, label + ": too many players " + eng.openPlayers());
             clock.t += delay / 1000.0;
@@ -162,6 +187,16 @@ public class EngineTest {
         run("normal run, start 0", sch, 1_700_000_000.0, 3 * 3600, null, true);
         for (int i = 0; i < 12; i++) run("normal run, random start #" + i, sch, 1_700_000_000.0 + rnd.nextInt(86400 * 30) + rnd.nextDouble(), 1800, null, true);
         run("across midnight UTC", sch, Math.floor(1_700_000_000.0 / 86400) * 86400 + 86400 - 400, 900, null, false);
+
+        // 1b) every crossfade setting, and talk radio: the rules of the programme, and no gap and no overlap when playing
+        for (double fade : new double[]{0, 1, 3, 8, 12}) {
+            Schedule s = station("Fade FM", 14, 5, 23, fade, false);
+            rules(s, fade, false);
+            run("crossfade " + (int) fade + " s", s, 1_700_000_000.0, 3600, null, true);
+        }
+        Schedule talk = station("Talk FM", 6, 4, 31, 8, true);
+        rules(talk, 8, true);
+        run("talk radio, never faded", talk, 1_700_000_000.0, 3600, null, true);
 
         // 2) joining in the middle of a crossfade: the very next item's overlap start
         Schedule.Item it = sch.itemsFrom(1_700_000_000.0, 3).get(1);

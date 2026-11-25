@@ -62,7 +62,7 @@ public final class CatalogTest {
         check(first.problems.size() == 1 && first.problems.get(0).startsWith("broken.radiopak: "), "problems " + first.problems);
         check(first.packCount() == 5, "packs " + first.packCount());
         for (Library.Station s : first.stations) {
-            check(s.pack != null && s.schedule != null, "pack and programme of " + s.name);
+            check(s.pack != null && s.programme(false, Schedule.FADE) != null, "pack and programme of " + s.name);
             check(s.pack.read(s.logo)[1] == 'P', "logo of " + s.name);
             for (Schedule.Track t : s.songs) check(s.pack.read("t/" + t.key).length > 0, "song file " + t.key);
         }
@@ -127,7 +127,7 @@ public final class CatalogTest {
         check(c.problems.isEmpty(), "problems " + c.problems);
         check(!c.stations.isEmpty(), "no station");
         for (Library.Station p : c.podcasts) {
-            check(p.podcast && p.schedule == null && !p.songs.isEmpty(), "podcast " + p.name);
+            check(p.podcast && !p.songs.isEmpty(), "podcast " + p.name);
             check(Catalog.indexOf(c.stations, p.name) < 0, "a podcast is no station: " + p.name);
             check(p.logo.isEmpty() || p.pack.read(p.logo)[1] == 'P', "cover of " + p.name);
             for (Schedule.Track t : p.songs) {
@@ -142,13 +142,15 @@ public final class CatalogTest {
             List<Schedule.Track> all = new ArrayList<>(s.songs);
             all.addAll(s.jingles);
             all.addAll(s.ads);
-            check(s.programme(false) == s.schedule && (s.programme(true) == s.schedule) == s.ads.isEmpty(), "programmes of " + s.name);
+            Schedule plain = s.programme(false, Schedule.FADE);
+            check(plain == s.programme(false, Schedule.FADE) && (s.programme(true, Schedule.FADE) == plain) == s.ads.isEmpty()
+                    && s.programme(false, 0) != plain, "programmes of " + s.name);
             for (Schedule.Track t : all) {
                 Pack.Entry e = s.pack.entry("t/" + t.key);
                 check(e != null && e.length > 1000, s.name + ": file of " + t.key);
                 items++;
             }
-            check(s.schedule.itemsFrom(System.currentTimeMillis() / 1000.0, 5).size() == 5, "programme of " + s.name);
+            check(plain.itemsFrom(System.currentTimeMillis() / 1000.0, 5).size() == 5, "programme of " + s.name);
             System.out.println("  " + s.name + (s.talk ? " [talk]" : "") + (s.logo.isEmpty() ? " [no logo]" : "") + ": " + s.songs.size() + " + " + s.jingles.size() + " + " + s.ads.size() + " adverts");
         }
         System.out.println(c.stations.size() + " stations in " + c.packCount() + " packs, " + items + " recordings");

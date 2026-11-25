@@ -17,7 +17,6 @@
 
     <string name="menu_sleep">Einschlaftimer</string>
     <string name="menu_reload">Sender neu laden</string>
-    <string name="menu_folder">Ordner ändern …</string>
     <string name="menu_battery">Akku-Einstellungen</string>
     <string name="menu_info">Info &amp; Protokoll</string>
 
@@ -120,8 +119,6 @@
     <string name="adverts_none">Dieser Sender hat keine Werbung</string>
     <string name="adverts_on">Werbung an: Pausen zwischen den Songs</string>
     <string name="adverts_off">Werbung aus</string>
-    <string name="menu_adverts_on">Werbung einschalten</string>
-    <string name="menu_adverts_off">Werbung ausschalten</string>
     <string name="tab_podcasts">Podcasts</string>
     <string name="podcast">Podcast</string>
     <string name="episode_n">Folge %1$d</string>
@@ -145,4 +142,17 @@
     <string name="act_next_episode">Nächste Folge</string>
     <string name="act_seek">Stelle in der Folge</string>
     <string name="info_podcasts">Podcasts: %1$d</string>
+    <string name="settings">Einstellungen</string>
+    <string name="settings_playback">Wiedergabe</string>
+    <string name="crossfade">Überblenden</string>
+    <string name="crossfade_what">Nur von einem Song in den nächsten</string>
+    <string name="crossfade_length">Dauer</string>
+    <string name="seconds_short">%1$d s</string>
+    <string name="crossfade_sync">Handy und PC spielen nur mit derselben Überblendung zur selben Zeit denselben Song (Standard: %1$d s).</string>
+    <string name="adverts_what">Werbeblöcke bei den Sendern, die Werbung haben</string>
+    <string name="settings_packs">Packs</string>
+    <string name="settings_folder">Pack-Ordner</string>
+    <string name="settings_no_folder">nicht gewählt</string>
+    <string name="settings_more">Handy und App</string>
+    <string name="settings_version">AWC Radio %1$s</string>
 </resources>

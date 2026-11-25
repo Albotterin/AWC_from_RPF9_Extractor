@@ -14,13 +14,14 @@ import java.util.zip.CRC32;
  *
  * This is a line-by-line port of class Schedule in awc_radio.py and must give exactly the same result (same order,
  * same times, same crossfades), so that the phone and the PC play the same song at the same second. A station with
- * adverts has a second programme with advert breaks (built when a list of adverts is given).
+ * adverts has a second programme with advert breaks (built when a list of adverts is given). Only two songs that follow
+ * each other are crossfaded; the seconds of that overlap are part of the timetable.
  * Times are UNIX seconds (double), like time.time() in Python.
  */
 public final class Schedule {
     public static final double DAY = 86400.0;
-    public static final double FADE = 3.0;
-    public static final double AD_FADE = 0.5;
+    public static final double FADE = 3.0;               // standard seconds of crossfade between two songs
+    public static final int FADE_MAX = 12;
     private static final int AD_AFTER = 540, AD_AFTER_SPAN = 361;   // an advert break after 9 to 15 minutes of songs
 
     public static final class Track {
@@ -102,6 +103,8 @@ public final class Schedule {
     private final List<Track> jingles;
     private final List<Track> ads;
     private final Map<Integer, Day> days = new HashMap<>();
+    private final double fade;
+    private final boolean talk;                          // talk radio: its items are shows, never crossfaded
 
     public Schedule(String name, List<Track> songs, List<Track> jingles) {
         this(name, songs, jingles, Collections.<Track>emptyList());
@@ -109,6 +112,13 @@ public final class Schedule {
 
     /** With a non-empty list of adverts: the programme with advert breaks. */
     public Schedule(String name, List<Track> songs, List<Track> jingles, List<Track> ads) {
+        this(name, songs, jingles, ads, FADE, false);
+    }
+
+    /** `fade`: seconds of crossfade between two songs (0 = none); `talk`: the items are talk shows. */
+    public Schedule(String name, List<Track> songs, List<Track> jingles, List<Track> ads, double fade, boolean talk) {
+        this.fade = Math.min(FADE_MAX, Math.max(0.0, fade));
+        this.talk = talk;
         this.name = name;
         Comparator<Track> byKey = (a, b) -> a.key.compareTo(b.key);
         this.songs = new ArrayList<>(songs);
@@ -168,7 +178,7 @@ public final class Schedule {
         int target = 2 + (int) (h(name, d, "target", 0) % 3);
         double played = 0.0;                                  // seconds of songs since the last advert break
         int bn = 0, apass = 0;
-        boolean afterBreak = false, prevAd = false;
+        boolean afterBreak = false, prevSong = false;
         List<Track> block = new ArrayList<>(), adDeck = new ArrayList<>();
         Track lastAd = null;
         long threshold = AD_AFTER + h(name, d, "adt", 0) % AD_AFTER_SPAN;
@@ -221,8 +231,8 @@ public final class Schedule {
             double sec = Math.max(1.0, tr.sec);
             double ov, start;
             if (!starts.isEmpty()) {
-                ov = Math.min(FADE, Math.min(0.25 * prevSec, 0.25 * sec));     // crossfade with the previous item
-                if (isAd || prevAd) ov = Math.min(ov, AD_FADE);
+                ov = !isJingle && !isAd && prevSong && !talk                  // crossfade only from song to song
+                        ? Math.min(fade, Math.min(0.25 * prevSec, 0.25 * sec)) : 0.0;
                 start = prevStart + prevSec - ov;
                 if (start >= DAY) break;
                 fout.set(fout.size() - 1, ov);
@@ -233,7 +243,7 @@ public final class Schedule {
             starts.add(start);
             kinds.add(isJingle);
             adverts.add(isAd);
-            prevAd = isAd;
+            prevSong = !isJingle && !isAd;
             tracks.add(tr);
             fin.add(ov);
             fout.add(0.0);

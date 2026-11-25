@@ -52,12 +52,18 @@ Ein Klick auf einen Sender schaltet ihn ein: seine Songs laufen nacheinander, na
 Jingle. Beim Talk-Radio ist ein „Titel“ eine ganze Sendungsfolge (ihre Teile am Stück, 10-23 Minuten). Das Programm wird
 aus der **UTC-Uhrzeit** berechnet (jeden UTC-Tag eine neue Reihenfolge, Jingles inklusive), jeder Sender „läuft“ also im
 Hintergrund weiter: Wer zu einem anderen Sender und zurück wechselt, landet dort, wo der erste Sender inzwischen ist.
-Alle mit denselben Spieldateien und derselben Uhrzeit hören denselben Song zur selben Sekunde (auf etwa eine Sekunde
-genau; der Song, der über Mitternacht UTC laufen würde, wird abgeschnitten). Aufeinanderfolgende Songs und Jingles werden
-3 Sekunden lang **überblendet** (um kurze Jingles herum kürzer), für alle im selben Moment. Es gibt keinen
+Alle mit denselben Spieldateien, derselben Uhrzeit und derselben Überblend-Einstellung hören denselben Song zur selben
+Sekunde (auf etwa eine Sekunde genau; der Song, der über Mitternacht UTC laufen würde, wird abgeschnitten). Es gibt keinen
 Überspringen-Knopf – wie bei einem echten Radio; nach einer Pause geht es live weiter. Spätere Starts gehen sofort. Als
 **Jingles** dienen die kurzen Aufnahmen (Senderkennungen und DJ-Ansagen), die nur dieser Sender benutzt; bei den
 Club-DJ-Sets ist das eine begründete Vermutung. Braucht wie der Extractor `ffplay`.
+
+**Überblenden.** Überblendet wird nur von einem **Song in den nächsten** (Standard: 3 Sekunden). Jingles, Werbung,
+Talk-Sendungen und Podcasts werden nie überblendet, sie folgen direkt aufeinander. Die Überblendung lässt sich
+ausschalten oder auf 1–12 Sekunden stellen – am PC mit **Überblenden** oben im Fenster, in der App auf der
+Einstellungsseite. Sie ist Teil des Zeitplans: PC und Handy laufen nur mit derselben Einstellung gleich. *Neu im
+Quellcode (App 1.9); das neueste Release v2.7.0 mit App 1.8 blendet noch rund um Jingles und Werbung und hat keine
+Einstellung.*
 
 **Werbung.** Jeder Sender hat zwei Programme nach derselben Uhr: ohne Werbung (Standard) und mit Werbung. Am PC dafür den
 Haken **Werbung** setzen, in der App den Schalter **Werbung** einschalten. Nach etwa 9 bis 15 Minuten Musik folgt ein Block
@@ -94,6 +100,8 @@ Dazu hat sie einen eigenen Bereich für die [Podcasts](#podcasts). Zur App gehö
   Englisch. Senderraster, kleiner Player und großer Player in der Farbe des Senderlogos; Wiedergabe im Hintergrund mit
   Medien-Benachrichtigung, Sperrbildschirm- und Kopfhörertasten; Einschlaftimer; Schalter für **Werbung** (von Haus aus aus); **Android Auto** (vorher in dessen
   Entwicklereinstellungen „Unbekannte Quellen“ aktivieren, weil die App nicht aus dem Play Store kommt).
+* **Einstellungsseite** (App 1.9, noch in keinem Release) - Überblenden ein/aus und Dauer, Werbung, Pack-Ordner und neu
+  laden, Akku-Einstellungen, Info und Protokoll; zu öffnen über das Drei-Punkte-Menü.
 * **Radiowecker** - mehrere Wecker mit Wochentagen, Sender, Lautstärke, sanftem Start, Schlummern und Vibration. Er klingelt
   mit der Weckerlautstärke des Handys und zeigt einen Bildschirm über dem Sperrbildschirm. Ist vom Radio nach 10 Sekunden
   nichts zu hören (Pack fehlt, Player-Fehler, Handy nach einem Neustart noch nicht entsperrt), klingelt der Weckton des
