@@ -8,6 +8,10 @@
 |:---:|:---:|
 | ![AWC Audio Extractor](extractor/docs/screenshots/04-german.png) | ![AWC Radio](radio/docs/screenshots/06-radio.png) |
 
+| 📱 AWC Radio auf Android – Sender | 📱 AWC Radio auf Android – Player |
+|:---:|:---:|
+| <img src="radio/docs/screenshots/09-app-radio-de.png" width="300" alt="Sender"> | <img src="radio/docs/screenshots/10-app-player-de.png" width="300" alt="Player"> |
+
 > ⚠️ **Bitte lies den [Disclaimer](DISCLAIMER.de.md).** Es sind keine Spieldaten enthalten: Du brauchst dein eigenes
 > Exemplar des Spiels. Nichts wird entschlüsselt, kein Kopierschutz umgangen und nichts am Spiel verändert.
 
