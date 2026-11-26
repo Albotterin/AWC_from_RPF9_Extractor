@@ -35,6 +35,7 @@ final class PackStore {
     private static final ExecutorService worker = Executors.newSingleThreadExecutor();
     private static Catalog catalog;
     static volatile String error = "";             // why the folder could not be read, for the UI
+    private static volatile boolean ready;         // the folder has been read once
 
     private PackStore() {
     }
@@ -73,7 +74,14 @@ final class PackStore {
     /** The loaded packs; the folder is read on the first call. Never null. */
     static synchronized Catalog get(Context ctx) {
         if (catalog == null) catalog = scan(ctx.getApplicationContext(), null);
+        ready = true;
         return catalog;
+    }
+
+    /** Runs `done` on the main thread once the folder has been read: at once if it has, else after reading it. */
+    static void whenLoaded(Context ctx, Runnable done) {
+        if (ready) done.run();
+        else reload(ctx, false, done);
     }
 
     /** Use another folder; the listeners are told once it is read. */

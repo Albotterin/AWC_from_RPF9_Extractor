@@ -696,6 +696,7 @@ public class MainActivity extends Activity implements PackStore.Listener {
         super.onStart();
         bound = bindService(new Intent(this, RadioService.class), conn, Context.BIND_AUTO_CREATE);
         PackStore.addListener(this);
+        Updates.onStart(this);
         Catalog now = PackStore.get(this);
         if (stations != now.stations || podcasts != now.podcasts || scores != now.scores) buildScreen();   // changed while away
         else if (alarms != null) alarms.refresh();                         // back from the editor or the settings

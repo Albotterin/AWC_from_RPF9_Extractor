@@ -60,6 +60,9 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
     static final String EXTRA_STATION = "station";        // the station's name
     static final String EXTRA_MINUTES = "minutes";
     static final String EXTRA_QUERY = "query";            // a spoken station name from the voice assistant
+    static final String ACTION_WIDGET = "org.awctool.radio.WIDGET";      // a tap on a widget of the home screen
+    static final String EXTRA_DO = "do";                  // ... which one of these; EXTRA_STATION: a station's tile
+    static final int WIDGET_PREV = -1, WIDGET_TOGGLE = 0, WIDGET_NEXT = 1;
 
     static final int STOPPED = 0, PLAYING = 1, PAUSED = 2;
 
@@ -95,7 +98,7 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
     private AudioFocusRequest focusRequest;
     private PowerManager.WakeLock wakeLock;
     private MediaSession session;
-    private boolean pausedByFocus, noisyRegistered, timeRegistered, started;
+    private boolean pausedByFocus, noisyRegistered, timeRegistered, started, destroyed;
     private float focusDuck = 1f;
     private Episodes episodes;                    // set while a podcast is on; `station` then is the podcast
     private boolean episodeLoading;
@@ -519,7 +522,13 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
         String action = intent != null ? intent.getAction() : null;
         started = true;
         try {
-            if (ACTION_PLAY.equals(action)) {
+            if (ACTION_WIDGET.equals(action)) {
+                startForegroundNow();             // a widget starts the service like this too
+                final int what = intent.getIntExtra(EXTRA_DO, WIDGET_TOGGLE);
+                final String name = intent.getStringExtra(EXTRA_STATION);
+                PackStore.whenLoaded(this, () -> fromWidget(what, name));    // after a restart the packs are read first
+                return START_NOT_STICKY;
+            } else if (ACTION_PLAY.equals(action)) {
                 startForegroundNow();             // must happen within seconds of startForegroundService(), whatever follows
                 play(intent.hasExtra(EXTRA_QUERY) ? stationForQuery(intent.getStringExtra(EXTRA_QUERY))
                         : Catalog.indexOf(PackStore.get(this).stations, intent.getStringExtra(EXTRA_STATION)));
@@ -555,6 +564,45 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
         return START_NOT_STICKY;
     }
 
+    /** What a tap on a widget does; the service ends again if nothing plays afterwards. */
+    private void fromWidget(int what, String name) {
+        if (destroyed) return;
+        try {
+            if (name != null) {                                          // a station's tile
+                if (state != STOPPED && episodes == null && name.equals(stationName)) {
+                    toggle();
+                } else {
+                    int at = Catalog.indexOf(PackStore.get(this).stations, name);
+                    if (at >= 0) play(at);
+                    else AppLog.d("widget: no pack for " + name);
+                }
+            } else if (what != WIDGET_TOGGLE) {
+                skip(what);
+            } else if (state == STOPPED) {
+                play(lastStation());
+            } else {
+                toggle();
+            }
+        } catch (RuntimeException e) {
+            AppLog.e("widget", e);
+        }
+        if (state == STOPPED) {
+            started = false;
+            stopForeground(true);
+            stopSelf();
+        }
+    }
+
+    /** The widgets of the home screen show what the radio does. */
+    private void publishWidgets() {
+        if (state == STOPPED || station == null) {
+            Widgets.off(this);
+            return;
+        }
+        Library.Station cover = episodes != null ? station.coverOf(episodes.index()) : station;
+        Widgets.on(this, cover, episodes == null ? stationName : "", label(), title, artist, state == PLAYING);
+    }
+
     @Override
     public void onTaskRemoved(Intent rootIntent) {
         // swiping the app away keeps the music going (like Spotify); a paused radio is not worth keeping alive
@@ -565,6 +613,8 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
     @Override
     public void onDestroy() {
         AppLog.d("service destroyed");
+        destroyed = true;
+        Widgets.off(this);
         PackStore.removeListener(this);
         getSharedPreferences(PREFS, MODE_PRIVATE).unregisterOnSharedPreferenceChangeListener(settingsListener);
         handler.removeCallbacksAndMessages(null);
@@ -1024,6 +1074,7 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
             session.setPlaybackState(new PlaybackState.Builder().setState(PlaybackState.STATE_STOPPED, 0, 0f).build());
             session.setActive(false);
         }
+        Widgets.off(this);
         stopForeground(true);
         stopSelf();
     }
@@ -1110,6 +1161,7 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
     }
 
     private void updateSession() {
+        publishWidgets();
         if (session == null) return;
         int ps = state == PLAYING ? PlaybackState.STATE_PLAYING : state == PAUSED ? PlaybackState.STATE_PAUSED : PlaybackState.STATE_STOPPED;
         if (episodes != null) {

@@ -419,14 +419,14 @@ final class Ui {
     }
 
     /** Pick one of the stations (with their logos). */
-    static void stationSheet(Context c, CharSequence title, List<Library.Station> stations, String chosen, CharSequence first,
+    static Dialog stationSheet(Context c, CharSequence title, List<Library.Station> stations, String chosen, CharSequence first,
                              java.util.function.Consumer<String> picked) {
         List<Choice> out = new ArrayList<>();
         if (first != null) out.add(new Choice(first, null, chosen.isEmpty(), () -> picked.accept("")));
         for (Library.Station s : stations) {
             out.add(new Choice(s.name, Logos.get(s, 128), s.name.equals(chosen), () -> picked.accept(s.name)));
         }
-        sheet(c, title, out);
+        return sheet(c, title, out);
     }
 
     // ------------------------------------------------------------------------------------------ words

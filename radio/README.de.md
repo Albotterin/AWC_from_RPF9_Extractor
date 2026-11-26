@@ -157,13 +157,13 @@ Die Handy-App spielt dasselbe Live-Programm wie der PC: gleiche Uhr und Zeitzone
 Übergänge.
 Dazu hat sie einen eigenen Bereich für die [Podcasts](#podcasts). Zur App gehören die Packs:
 
-* **`AWC-Radio.apk`** - die App (Version 1.17), für alle dieselbe Datei, ohne Spieldaten. Android 7.0 oder neuer, Deutsch und
+* **`AWC-Radio.apk`** - die App (Version 1.19), für alle dieselbe Datei, ohne Spieldaten. Android 7.0 oder neuer, Deutsch und
   Englisch. Senderraster, kleiner Player und großer Player in der Farbe des Senderlogos; Wiedergabe im Hintergrund mit
   Medien-Benachrichtigung, Sperrbildschirm- und Kopfhörertasten; Einschlaftimer; Schalter für das, was zwischen den Songs läuft; **Android Auto** (vorher in dessen
   Entwicklereinstellungen „Unbekannte Quellen“ aktivieren, weil die App nicht aus dem Play Store kommt).
 * **On-Demand-Reiter** – Suche, Interpreten und Playlisten über die Songs aller Packs, siehe [On-Demand](#on-demand).
 * **Einstellungsseite** - Überblenden ein/aus und Dauer (Clubs und Mixe), Inhalte zwischen den Songs, DJ über Songs, Pack-Ordner und neu
-  laden, Akku-Einstellungen, Info und Protokoll; zu öffnen über das Drei-Punkte-Menü.
+  laden, Updates, Akku-Einstellungen, Info und Protokoll; zu öffnen über das Drei-Punkte-Menü.
 * **Score-Reiter** – der Score des Spiels aus den `.scorepak`-Dateien: fünf Gruppen (die fünfte, **Musik an Orten**,
   enthält die fertigen Aufnahmen von Fahrstühlen, Hotellobbys, einer Minigolfanlage und anderen Orten),
   darin Untergruppen (eine Mission, ein Gebiet) und Stücke; ein Stück läuft von vorn, danach geht die Gruppe weiter. Die
@@ -173,6 +173,14 @@ Dazu hat sie einen eigenen Bereich für die [Podcasts](#podcasts). Zur App gehö
   mit der Weckerlautstärke des Handys und zeigt einen Bildschirm über dem Sperrbildschirm. Ist vom Radio nach 10 Sekunden
   nichts zu hören (Pack fehlt, Player-Fehler, Handy nach einem Neustart noch nicht entsperrt), klingelt der Weckton des
   Handys. Nach 30 Minuten hört er von selbst auf.
+* **Widgets** – lange auf den Startbildschirm drücken und *Widgets*, dann AWC Radio wählen. **Player**: Logo, Titel und
+  Interpret in der Farbe des Senders mit Zurück, Pause und Weiter; in der Größe anpassbar, von Logo mit Pause bis zu zwei
+  Zeilen. Ist das Radio aus, zeigt er den zuletzt gehörten Sender, und Play schaltet ihn ein. **Sender-Kachel**: einen
+  Sender wählen; ein Tipp spielt ihn, ein weiterer pausiert.
+* **Updates** – beim Start, höchstens einmal am Tag, fragt die App bei github.com nach der Liste der Releases. Eine neuere
+  Version wird mit ihrem Changelog vorgeschlagen (herunterladen, später oder überspringen); der Download öffnet sich im
+  Browser, ein Tipp auf die Datei installiert sie über die App. **Auf Updates prüfen** in den Einstellungen fragt jederzeit
+  und zeigt immer einen Changelog; die automatische Prüfung ist dort abschaltbar. Sonst nutzt die App das Internet nicht.
 * **Packs** - eine Datei je Sender (`.radiopak`), je Podcast (`.podpak`), eine mit den Nachrichten (`news.newspak`), eine für
   das Soundtrack-Album (`.playlistpak`) und eine je Score-Gruppe (`.scorepak`), am PC erzeugt: in AWC Radio auf **Android-Packs…** klicken, einen
   Ordner wählen und schreiben. Ein Sender-Pack enthält die Songs des Senders in der Originalqualität des Spiels (ca. 128 kbit/s, nicht

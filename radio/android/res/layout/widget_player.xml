@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- the player in one row -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/background"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/w_bg"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:importantForAccessibility="no"
+        android:scaleType="fitXY"
+        android:src="@drawable/widget_bg" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="6dp">
+
+        <ImageView
+            android:id="@+id/w_logo"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:adjustViewBounds="true"
+            android:contentDescription="@string/app_name"
+            android:maxHeight="64dp"
+            android:maxWidth="64dp"
+            android:scaleType="fitCenter"
+            android:src="@mipmap/ic_launcher" />
+
+        <LinearLayout
+            android:id="@+id/w_texts"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center_vertical"
+            android:orientation="vertical"
+            android:paddingEnd="2dp"
+            android:paddingStart="10dp">
+
+            <TextView
+                android:id="@+id/w_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="@string/widget_preview_title"
+                android:textColor="#FFFFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/w_artist"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="@string/widget_preview_artist"
+                android:textColor="#CCFFFFFF"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <ImageButton
+            android:id="@+id/w_prev"
+            android:layout_width="40dp"
+            android:layout_height="48dp"
+            android:background="@drawable/widget_ripple"
+            android:contentDescription="@string/act_prev"
+            android:scaleType="center"
+            android:src="@drawable/ic_prev" />
+
+        <ImageButton
+            android:id="@+id/w_play"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@drawable/widget_ripple"
+            android:contentDescription="@string/act_play"
+            android:scaleType="center"
+            android:src="@drawable/ic_play" />
+
+        <ImageButton
+            android:id="@+id/w_next"
+            android:layout_width="40dp"
+            android:layout_height="48dp"
+            android:background="@drawable/widget_ripple"
+            android:contentDescription="@string/act_next"
+            android:scaleType="center"
+            android:src="@drawable/ic_next" />
+    </LinearLayout>
+</FrameLayout>

@@ -154,13 +154,13 @@ The current list of all stations with their content and length: [all stations](d
 The phone app plays the same live programme as the PC: same clock, same order, same transitions (in the same time
 zone). It consists of the app and the packs:
 
-* **`AWC-Radio.apk`** - the app (version 1.17), the same file for everybody, no game data inside. Android 7.0 or newer,
+* **`AWC-Radio.apk`** - the app (version 1.19), the same file for everybody, no game data inside. Android 7.0 or newer,
   English and German. Station grid, mini player and a large player in the colour of the station's logo; background playback
   with a media notification, lock-screen and headset buttons; sleep timer; switches for what runs between the songs; **Android Auto** (switch on *Unknown sources* in
   its developer settings first, because the app does not come from the Play Store).
 * **On-Demand tab** - search, artists and playlists over the songs of all packs, see [On-Demand](#on-demand).
 * **Settings page** - crossfade on/off and length (clubs and mixes), what runs between the songs, DJ over songs, pack folder and reload,
-  battery settings, info and log; open it from the three-dot menu.
+  updates, battery settings, info and log; open it from the three-dot menu.
 * **Score tab** - the game's score from the `.scorepak` files: five groups (the fifth, **Music in places**, holds the
   finished recordings of lifts, lobbies, a minigolf course and other places), their sub
   groups (a mission, an area) and pieces; a piece plays from its start and the group goes on. The names are the working
@@ -169,6 +169,13 @@ zone). It consists of the app and the packs:
 * **Radio alarm** - several alarms with weekdays, station, volume, gentle start, snooze and vibration. It rings on the phone's
   alarm volume with a screen over the lock screen. If nothing can be heard from the radio within 10 seconds (pack missing,
   player error, phone not yet unlocked after a restart), the phone's own alarm tone rings. It stops by itself after 30 minutes.
+* **Widgets** - long-press the home screen and choose *Widgets*, then AWC Radio. **Player**: logo, title and artist in the
+  station's colour with previous, pause and next; resizable, from logo and pause to two rows. While the radio is off it
+  shows the station heard last, and play tunes in. **Station tile**: choose a station; a tap plays it, another pauses.
+* **Updates** - at the start, at most once a day, the app asks github.com for the list of releases. A newer version is
+  proposed with its changelog (download, later, or skip this version); the download opens in the browser, and a tap on the
+  file installs it over the app. **Check for updates** in the settings asks at any time and always shows a changelog; the
+  automatic check can be switched off there. Nothing else uses the internet.
 * **Packs** - one file per station (`.radiopak`), per podcast (`.podpak`), one with the news (`news.newspak`), one for the soundtrack album (`.playlistpak`) and one per
   score group (`.scorepak`), made on the PC: in AWC Radio click **Android packs…**, choose a
   folder and write them. Each holds the station's songs in the game's own quality (about 128 kbit/s, not re-encoded), its logo

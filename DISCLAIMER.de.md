@@ -62,7 +62,12 @@ einer Konsole, bieten keine Cheats, greifen nicht in ein laufendes Spiel ein und
 Spiels oder der Plattform.
 
 Der einzige Netzwerkzugriff der PC-Programme ist der Download der **öffentlichen Credits-Webseite des Publishers**, um
-Songs zu benennen. Die Android-App hat keine Internet-Berechtigung.
+Songs zu benennen.
+
+Die Android-App nutzt das Internet nur für eines: Sie fragt bei github.com nach der Liste der Releases dieses Projekts, um
+auf eine neuere Version hinzuweisen – beim Start höchstens einmal am Tag (in den Einstellungen abschaltbar) und auf
+Knopfdruck dort. Dabei wird nichts über dich oder deine Dateien übertragen; wie bei jedem Seitenaufruf sieht GitHub die
+IP-Adresse des Handys. Ein gewählter Download öffnet sich in deinem Browser.
 
 ## 5. Deine eigenen Dateien
 

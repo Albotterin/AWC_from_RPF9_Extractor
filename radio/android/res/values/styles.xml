@@ -23,6 +23,11 @@
         <item name="android:colorBackgroundFloating">@color/surface</item>
     </style>
 
+    <!-- only a sheet over the home screen: which station a widget plays -->
+    <style name="AppPicker" parent="android:Theme.Translucent.NoTitleBar">
+        <item name="android:colorAccent">@color/sun</item>
+    </style>
+
     <!-- the sheets that slide up from the bottom -->
     <style name="AppSheet" parent="android:Theme.Material.Dialog">
         <item name="android:windowBackground">@android:color/transparent</item>

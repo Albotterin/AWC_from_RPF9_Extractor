@@ -31,7 +31,7 @@ import java.util.Locale;
 import java.util.TimeZone;
 
 /**
- * The settings: how the radio plays (crossfade, content), where the packs lie, the phone's battery settings and the
+ * The settings: how the radio plays (crossfade, content), where the packs lie, updates, the phone's battery settings and the
  * information with the log. The radio service notices a changed setting by itself.
  */
 public class SettingsActivity extends Activity implements PackStore.Listener {
@@ -164,6 +164,12 @@ public class SettingsActivity extends Activity implements PackStore.Listener {
         folderValue.setGravity(Gravity.END);
         folder.addView(folderValue, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         row(packs, R.string.menu_reload, v -> reload());
+
+        // ---- newer versions of the app
+        LinearLayout updates = section(box, R.string.settings_updates);
+        row(updates, R.string.update_check, v -> Updates.check(this));
+        toggleRow(updates, R.string.update_auto, R.string.update_auto_what, Updates.automatic(this),
+                on -> Updates.setAutomatic(this, on));
 
         // ---- the phone and the app
         LinearLayout more = section(box, R.string.settings_more);

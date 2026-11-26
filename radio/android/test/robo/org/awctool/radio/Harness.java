@@ -80,7 +80,14 @@ final class Harness {
 
     /** Forgets everything an earlier test left in the static fields. */
     static void reset() {
+        Updates.source = url -> {                                  // no test goes to the internet
+            throw new java.io.IOException("offline in the tests");
+        };
+        ReflectionHelpers.setStaticField(Updates.class, "busy", false);
         ReflectionHelpers.setStaticField(PackStore.class, "catalog", null);
+        ReflectionHelpers.setStaticField(PackStore.class, "ready", false);
+        ReflectionHelpers.setStaticField(Widgets.class, "now", null);
+        ReflectionHelpers.setStaticField(Widgets.class, "shown", "");
         AlarmService.running = null;
         Logos.clear();
         Ui.displayFont = null;

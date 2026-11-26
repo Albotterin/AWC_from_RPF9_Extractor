@@ -59,7 +59,12 @@ The game files are opened **for reading only**. The programs do not change them,
 cheats, do not touch a running game and do not connect to game or platform services.
 
 The only network access of the PC programs is the download of the **publisher's public credits web page**, used to name
-songs. The Android app has no internet permission.
+songs.
+
+The Android app uses the internet for one thing only: it asks github.com for the list of this project's releases, to tell
+you about a newer version - at the start at most once a day (this can be switched off in its settings) and when you press
+the button there. It sends nothing about you or your files; as with any web request, GitHub sees the phone's IP address.
+A download you choose opens in your browser.
 
 ## 5. Your own files
 

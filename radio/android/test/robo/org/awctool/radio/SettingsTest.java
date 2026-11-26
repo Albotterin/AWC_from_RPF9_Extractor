@@ -84,13 +84,13 @@ public class SettingsTest {
         Harness.settle();
         View root = a.getWindow().getDecorView();
         for (String text : new String[]{"Wiedergabe", "Überblenden", "Dauer", "3 s", "Zwischen den Songs", "Werbung", "Nachrichten",
-                "DJ-Beiträge", "Talk und Sendungen", "Jingles", "DJ über Songs", "Pack-Ordner", "AWC-Radio", "Sender neu laden",
-                "Akku-Einstellungen", "AWC Radio 1.17"}) {
+                "DJ-Beiträge", "Talk und Sendungen", "Jingles", "DJ über Songs", "Pack-Ordner", "AWC-Radio", "Sender neu laden", "Auf Updates prüfen", "Beim Start prüfen",
+                "Akku-Einstellungen", "AWC Radio 1.19"}) {
             Assert.assertTrue(text, shows(root, text));
         }
         ScreenshotTest.shot(a, "50_settings", null);
         List<Switch> switches = views(root, Switch.class);
-        Assert.assertEquals(7, switches.size());
+        Assert.assertEquals(8, switches.size());
         Switch fade = switches.get(0), ads = switches.get(1);
         SeekBar bar = views(root, SeekBar.class).get(0);
         Assert.assertTrue(fade.isChecked() && bar.isEnabled() && !ads.isChecked());

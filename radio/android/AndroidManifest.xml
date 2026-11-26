@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="org.awctool.radio"
-    android:versionCode="18"
-    android:versionName="1.17">
+    android:versionCode="20"
+    android:versionName="1.19">
 
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="34" />
 
@@ -16,6 +16,8 @@
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- only to ask GitHub for the list of releases: is there a newer app? -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:name=".App"
@@ -77,6 +79,43 @@
             android:exported="false"
             android:directBootAware="true"
             android:foregroundServiceType="mediaPlayback" />
+
+        <!-- widgets of the home screen: the player, and a tile per station -->
+        <receiver
+            android:name=".PlayerWidget"
+            android:exported="false"
+            android:label="@string/widget_player_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_player_info" />
+        </receiver>
+
+        <receiver
+            android:name=".StationWidget"
+            android:exported="false"
+            android:label="@string/widget_station_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_station_info" />
+        </receiver>
+
+        <!-- exported: the home screen opens it to ask for a tile's station -->
+        <activity
+            android:name=".StationWidgetActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@style/AppPicker">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
 
         <!-- Android Auto: tells the car app that this is a media app (the browse tree and playback come from RadioService) -->
         <meta-data
