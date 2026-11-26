@@ -180,7 +180,7 @@ public final class CatalogTest {
             }
             djWindows += talked;
             Schedule plain = s.programme(false, Schedule.FADE);
-            check(plain == s.programme(false, Schedule.FADE) && (s.programme(true, Schedule.FADE) == plain) == s.ads.isEmpty()
+            check(plain == s.programme(false, Schedule.FADE) && (s.programme(true, Schedule.FADE) == plain) == ((s.available() & ~Schedule.STANDARD) == 0)
                     && (s.programme(false, 0) == plain) == s.mixedAsInGame(), "programmes of " + s.name);
             for (Schedule.Track t : all) {
                 Pack.Entry e = s.pack.entry("t/" + t.key);

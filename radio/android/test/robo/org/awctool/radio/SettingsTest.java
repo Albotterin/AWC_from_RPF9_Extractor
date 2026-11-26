@@ -46,7 +46,7 @@ public class SettingsTest {
         return out;
     }
 
-    private static boolean shows(View root, String text) {
+    static boolean shows(View root, String text) {
         for (TextView t : views(root, TextView.class)) if (t.getText().toString().contains(text)) return true;
         return false;
     }
@@ -65,7 +65,7 @@ public class SettingsTest {
     public void crossfadeAndAdverts() throws Exception {
         Context app = Harness.app();
         Assert.assertEquals("on, three seconds", 3.0, RadioService.crossfade(app), 0);
-        Assert.assertFalse(RadioService.adverts(app));
+        Assert.assertEquals(Schedule.STANDARD, RadioService.content(app));
         ActivityController<MainActivity> main = Robolectric.buildActivity(MainActivity.class).setup();
         Harness.settle();
         radio.play(Catalog.indexOf(PackStore.get(app).stations, "Flash FM"));
@@ -83,12 +83,14 @@ public class SettingsTest {
         SettingsActivity a = Robolectric.buildActivity(SettingsActivity.class).setup().get();
         Harness.settle();
         View root = a.getWindow().getDecorView();
-        for (String text : new String[]{"Wiedergabe", "Überblenden", "Dauer", "3 s", "Werbung", "Pack-Ordner", "AWC-Radio",
-                "Sender neu laden", "Akku-Einstellungen", "AWC Radio 1.16"}) {
+        for (String text : new String[]{"Wiedergabe", "Überblenden", "Dauer", "3 s", "Zwischen den Songs", "Werbung", "Nachrichten",
+                "DJ-Beiträge", "Talk und Sendungen", "Jingles", "DJ über Songs", "Pack-Ordner", "AWC-Radio", "Sender neu laden",
+                "Akku-Einstellungen", "AWC Radio 1.17"}) {
             Assert.assertTrue(text, shows(root, text));
         }
         ScreenshotTest.shot(a, "50_settings", null);
         List<Switch> switches = views(root, Switch.class);
+        Assert.assertEquals(7, switches.size());
         Switch fade = switches.get(0), ads = switches.get(1);
         SeekBar bar = views(root, SeekBar.class).get(0);
         Assert.assertTrue(fade.isChecked() && bar.isEnabled() && !ads.isChecked());
@@ -117,12 +119,34 @@ public class SettingsTest {
         Assert.assertEquals(8.0, RadioService.crossfade(app), 0);
         Assert.assertSame(flash.programme(false, 8), playing());
 
+        Assert.assertTrue("DJ talk and jingles are on", switches.get(3).isChecked() && switches.get(5).isChecked()
+                && !switches.get(2).isChecked() && !switches.get(4).isChecked());
         ads.performClick();
         Harness.pass(500);
+        int withAds = Schedule.STANDARD | Schedule.ADS;
+        Assert.assertEquals(withAds, RadioService.content(app));
+        Assert.assertSame(flash.programme(withAds, 8), playing());
+        switches.get(5).performClick();                                   // jingles off
+        Harness.pass(500);
+        Assert.assertSame(flash.programme(withAds & ~Schedule.JINGLES, 8), playing());
+        java.util.Set<String> idents = new java.util.HashSet<>(flash.rules.pools.get("ident"));
+        for (Schedule.Item it : playing().itemsFrom(System.currentTimeMillis() / 1000.0, 200)) {
+            Assert.assertFalse("no station ident: " + it.track.key, idents.contains(it.track.key));
+        }
+        switches.get(5).performClick();
+        Harness.pass(500);
+        int heard = 0;
+        for (Schedule.Item it : playing().itemsFrom(System.currentTimeMillis() / 1000.0, 200)) {
+            if (idents.contains(it.track.key)) heard++;
+        }
+        Assert.assertTrue("the idents are back: " + heard, heard > 0);
+        for (int i = 1; i <= 5; i++) if (!switches.get(i).isChecked()) switches.get(i).performClick();
+        Harness.pass(500);
+        Assert.assertEquals(Schedule.EVERYTHING, RadioService.content(app));
         Assert.assertSame(flash.programme(true, 8), playing());
 
         // the DJ: off unless switched on; he comes and goes without tuning in anew
-        Switch dj = views(root, Switch.class).get(2);
+        Switch dj = views(root, Switch.class).get(6);
         Assert.assertTrue(shows(root, "DJ"));
         Assert.assertFalse(dj.isChecked() || RadioService.dj(app));
         Object running = ReflectionHelpers.getField(radio, "engine");
@@ -158,7 +182,8 @@ public class SettingsTest {
         p.edit().putInt(RadioService.PREF_FADE_SEC, 5).commit();
         Harness.pass(300);
         Assert.assertEquals(RadioService.PAUSED, radio.state);
-        Assert.assertSame(flash.programme(false, 5), playing());
+        Assert.assertEquals(Schedule.EVERYTHING & ~Schedule.ADS, RadioService.content(app));
+        Assert.assertSame(flash.programme(RadioService.content(app), 5), playing());
         radio.toggle();
         Assert.assertEquals(RadioService.PLAYING, radio.state);
 

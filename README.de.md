@@ -72,8 +72,9 @@ python radio/awc_radio.py        # das Radio
 * Lange DJ-Mixe zeigen den Titel des aktuellen Abschnitts.
 * **Der DJ**, wenn man ihn einschaltet: Ansagen über den Anfang und das Ende der Songs, in den Fenstern, die die Songdateien
   dafür markieren (von Haus aus aus).
-* **Werbung, News & Talk wahlweise** (Standard: aus): Werbeblöcke, Nachrichten, Wortbeiträge und die Nachtshow
-  **Liquid City** auf Honey FM.
+* **Du bestimmst, was zwischen den Songs läuft**: Werbung, Nachrichten, DJ-Beiträge, Talk und Sendungen (mit der
+  Nachtshow **Liquid City** auf Honey FM) und Jingles, jeweils mit eigenem Schalter. Von Haus aus sind DJ-Beiträge und
+  Jingles an.
 * **Podcasts**: die 5 Podcasts des Spiels mit ihren 20 Folgen und deren Titeln, abspielbar in der Android-App und am PC.
 * **On-Demand** (App): Songs und Interpreten suchen wie in einer Musik-App, mit einer Playlist für jeden Sender und
   einer für das Soundtrack-Album des Spiels.
@@ -83,7 +84,7 @@ python radio/awc_radio.py        # das Radio
 
 ## 📱 Die AWC-Radio-App für Android
 
-Das Radio für die Hosentasche, fürs Auto und für den Nachttisch. **`AWC-Radio.apk`** (Version 1.16; Version 1.11 ist auf einem echten Android-Handy getestet) spielt dasselbe
+Das Radio für die Hosentasche, fürs Auto und für den Nachttisch. **`AWC-Radio.apk`** (Version 1.17; Version 1.11 ist auf einem echten Android-Handy getestet) spielt dasselbe
 Live-Programm wie der PC: gleiche Uhr, gleiche Reihenfolge, gleiche Übergänge – mit Sender-Packs derselben Version
 spielen Handy und PC zur selben Zeit dasselbe.
 
@@ -92,13 +93,13 @@ spielen Handy und PC zur selben Zeit dasselbe.
 | 🎧 **Hören** | Senderlogos als Raster, ein kleiner und ein großer Player in der Farbe des Senders; Wischen über das Logo wechselt den Sender. Spielt im Hintergrund weiter, mit Medien-Benachrichtigung, Sperrbildschirm-, Kopfhörer- und Bluetooth-Tasten |
 | 🔎 **On-Demand** | Ein Reiter wie eine Musik-App: Songs und Interpreten suchen, alle Songs, die Interpreten, eine Playlist für jeden Sender und eine für das Soundtrack-Album mit seinem Cover; Zufall und Wiederholen |
 | 🎙 **Podcasts** | Ein eigener Bereich neben dem Radio: Cover, Folgenliste, Player mit Positionsleiste, 15 Sekunden zurück und 30 vor; die Stelle in jeder Folge wird gemerkt, die nächste folgt von selbst |
-| 🗣 **DJ** | Ansagen über den Songs, in den Einstellungen einzuschalten; die Musik tritt zurück, solange der DJ spricht |
+| 🗣 **DJ über Songs** | Ansagen über den Songs, in den Einstellungen einzuschalten; die Musik tritt zurück, solange der DJ spricht |
 | 🎼 **Score** | Ein eigener Reiter: offene Welt, Missionen, Stützpunkte, Aktivitäten und Musik an Orten (Fahrstühle, Hotellobbys, Minigolf), jeweils mit Untergruppen und Stücken |
 | ⏰ **Radiowecker** | Mehrere Wecker mit Wochentagen, Sender, Lautstärke, sanftem Start und Schlummern; ein Sonnenaufgang-Bildschirm über dem Sperrbildschirm. Ist das Radio nicht zu hören, klingelt der Weckton des Handys; Wecker bleiben nach einem Neustart erhalten |
 | 🚗 **Android Auto** | Die Sender als Raster mit ihren Logos, Song und Sender auf dem Player-Bildschirm, Sprachbefehle wie *„Spiele Radio On-U auf AWC Radio“* |
 | 😴 **Einschlaftimer** | Stoppt das Radio nach der gewählten Zeit |
-| 📢 **Werbung, News & Talk** | Schalter im Player und auf der Einstellungsseite, von Haus aus aus; Nachrichten und Werbung bei 18 Sendern |
-| ⚙️ **Einstellungen** | Eine Einstellungsseite: Überblenden ein/aus und 1–12 s (nur für Clubs und Mixe; die anderen Sender werden wie im Spiel gemischt), Werbung, News & Talk, DJ, Pack-Ordner, Akku-Einstellungen, Info und Protokoll |
+| 📢 **Zwischen den Songs** | Je ein Schalter für Werbung, Nachrichten, DJ-Beiträge, Talk und Sendungen sowie Jingles, im Player und auf der Einstellungsseite; ein Sender bietet an, was er hat |
+| ⚙️ **Einstellungen** | Eine Einstellungsseite: Überblenden ein/aus und 1–12 s (nur für Clubs und Mixe; die anderen Sender werden wie im Spiel gemischt), Inhalte zwischen den Songs, DJ über Songs, Pack-Ordner, Akku-Einstellungen, Info und Protokoll |
 | 📦 **Packs** | Eine Datei je Sender (`.radiopak`), je Podcast (`.podpak`), eine mit den Nachrichten (`.newspak`), eine für das Soundtrack-Album (`.playlistpak`) und je Score-Gruppe (`.scorepak`), alle in einem Ordner auf dem Handy: einzeln hinzufügen oder aktualisieren, ohne alles neu zu kopieren |
 | 🔒 **Offline** | Die App hat keine Internet-Berechtigung: Alles kommt aus den Packs auf dem Handy |
 | 🌍 **Sprachen** | Deutsch und Englisch |
@@ -120,7 +121,7 @@ spielen Handy und PC zur selben Zeit dasselbe.
 
 ## Fortschritt
 
-Stand **2026-11-26** (v2.11.0), gemessen an einer 28,5 GB großen `audio.rpf`.
+Stand **2026-11-26** (v2.12.0), gemessen an einer 28,5 GB großen `audio.rpf`.
 
 | Bereich | Stand | |
 |---|---|---|
@@ -140,7 +141,7 @@ Stand **2026-11-26** (v2.11.0), gemessen an einer 28,5 GB großen `audio.rpf`.
 | Podcasts | alle 5, die die Credits nennen, mit 20 Folgen samt Titeln (3 Std. 36 Min.), in der App und am PC | ✅ |
 | Score | 2.543 Stücke (rund 33 Std.) und 113 Aufnahmen von Orten (4,8 Std.), im Extractor in einem eigenen Ordner; 1.078 ab 30 Sekunden (31 Std.) kommen in die App-Packs | ✅ |
 | Titel aus `data.rpf` | 839 der 865 Titel-Nummern, die die Aufnahmen tragen, haben in der Tabelle des Spiels Titel und Interpret | ✅ |
-| Android-App | Version 1.16: Radio, On-Demand, Podcasts, Score, DJ, Werbung, News & Talk, Radiowecker, Android Auto; Version 1.11 läuft auf einem echten Android-Handy | ✅ |
+| Android-App | Version 1.17: Radio, On-Demand, Podcasts, Score, DJ, Inhalts-Schalter, Radiowecker, Android Auto; Version 1.11 läuft auf einem echten Android-Handy | ✅ |
 | The Vault Radio | läuft als ein langer Mix; 23 seiner 24 gelisteten Songs sind als Teile darin benannt | 🎚 |
 
 ![AWC Radio – Fortschritt der Sender](radio/docs/radio-progress.svg)
@@ -151,17 +152,20 @@ Details zu jedem Sender: [Fortschritt des Radios](radio/docs/RADIO-PROGRESS.de.m
 
 - [ ] 3 Titel des Soundtrack-Albums stecken, soweit durchsucht, in keiner Aufnahme des Archivs: *Starting From Zero*
       (Justice), *Burn This Shit Down* (Travis Scott) und *Touch & Go* (Anitta). *Windsor Drop* und *Banshee* sind im
-      Spiel kürzer als auf dem Album
+      Spiel kürzer als auf dem Album. *Starting From Zero* steht in den Untertiteltexten des Spiels; der Ton der Videos in
+      `movies.rpf` ist nicht durchsucht, weil FFmpeg ihre neuere Bink-Variante nicht dekodieren kann
 - [ ] 15 gelistete Songs ohne eigene Datei bei ihrem Sender (die Club-DJ-Sets und ein Jingle von Worldwide FM):
       6 laufen auf Vice City Rap Radio und Dirty South Classics; 5 wurden am Klang in den Club-Sets gefunden
       (*O Let's Do It*, *Wipe Me Down*, *My Neck, My Back* und *B.M.F.* bei Jack of Hearts, *Love Me* bei VYB), ohne
       Marken, die ihren Beginn nennen; 4 fehlen weiterhin (*Faneto*, *Dreams and Nightmares*, *Can't Fuck wit Me*, der
       Jingle *Yu Done Know*), ebenso ein Titel von The Vault Radio (*FTH*)
-- [ ] Die 8 eigens geschriebenen Songs von „Honey FM – Liquid City“: Die Sendung selbst läuft; ob die Songs in ihren
-      Aufnahmen stecken, ist nicht geprüft, keine eigene Datei trägt ihre Namen, und Hörproben waren nicht zu finden
+- [ ] Die 8 eigens geschriebenen Songs von „Honey FM – Liquid City“: Die Sendung selbst läuft, und in einigen ihrer
+      Aufnahmen lässt sich Musik messen (dieselben ersten Sekunden in allen neun Eröffnungen, eine Passage in zwei
+      Eröffnungen, gleichmäßige Takte in manchen Talk-Teilen). Welche Songs das sind, ist nicht geprüft: Keine Datei trägt
+      ihre Namen, und Hörproben waren nicht zu finden
 - [ ] Programm und Mischung nach den Spieldaten sind nicht per Ohr mit dem Spiel verglichen; die Tiefpass-Verläufe
       mancher Misch-Regeln und Regeln, die vom Spielstand abhängen, sind nicht übernommen
-- [ ] App 1.16 auf einem echten Handy
+- [ ] App 1.17 auf einem echten Handy
 - [x] Die Überlappungen der Beiträge (die Misch-Regeln des Spiels) und die Musik unter dem DJ sind übernommen
 - [x] Der bisher namenlose Titel von Radio On-U ist *Ras Menilik Congo (Harp)* von Augustus Pablo
 - [x] Die Podcast-Folgen heißen wie im Spiel
@@ -195,6 +199,7 @@ Details zu jedem Sender: [Fortschritt des Radios](radio/docs/RADIO-PROGRESS.de.m
 | [v2.9.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.9.0) | 2026-11-26 | 🏷 Titel aus der Tabelle des Spiels: alle 20 Podcast-Folgen, die Teile der Mixe, 5 korrigierte und 2 ergänzte Songnamen · 🎼 der Score als Gruppen im AWC-Tool · App 1.12 |
 | [v2.10.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.10.0) | 2026-11-26 | 📻 Die Programmregeln des Spiels, Nachrichten, Talk, die Nachtshow Liquid City, Talk-Radio Teil für Teil · 🎼 Musik an Orten · App 1.14 |
 | [v2.11.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.11.0) | 2026-11-26 | 📻 Übergänge wie im Spiel mit Musik unter dem DJ · 🔎 On-Demand mit Suche, Playlisten und Soundtrack-Album · App 1.16 |
+| [v2.12.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.12.0) | 2026-11-26 | 📻 Eigene Schalter für Werbung, Nachrichten, DJ-Beiträge, Talk und Jingles (PC und App) · App 1.17 |
 
 ## Aufbau des Repositorys
 

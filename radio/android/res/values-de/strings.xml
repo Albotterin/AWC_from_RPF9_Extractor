@@ -115,10 +115,6 @@
     <string name="notif_alarm_info">Schlummernde und verpasste Wecker</string>
 
     <string name="advert">Werbung</string>
-    <string name="adverts_switch">Werbung, News &amp; Talk</string>
-    <string name="adverts_none">Dieser Sender hat nur Musik und Jingles</string>
-    <string name="adverts_on">An: Werbung, Nachrichten und Talk zwischen den Songs</string>
-    <string name="adverts_off">Aus: nur Songs und Jingles</string>
     <string name="tab_podcasts">Podcasts</string>
     <string name="podcast">Podcast</string>
     <string name="episode_n">Folge %1$d</string>
@@ -149,7 +145,6 @@
     <string name="crossfade_length">Dauer</string>
     <string name="seconds_short">%1$d s</string>
     <string name="crossfade_sync">Bei Clubs und Mixen spielen Handy und PC nur mit derselben Überblendung zur selben Zeit dasselbe (Standard: %1$d s).</string>
-    <string name="adverts_what">Werbeblöcke, Nachrichten, Talk und die Nachtshow bei den Sendern, die das haben</string>
     <string name="news">Nachrichten</string>
     <string name="talk">Talk</string>
     <string name="score_places">Musik an Orten</string>
@@ -182,7 +177,7 @@
         <item quantity="one">%1$d Stück · %2$d Min.</item>
         <item quantity="other">%1$d Stücke · %2$d Min.</item>
     </plurals>
-    <string name="dj_switch">DJ</string>
+    <string name="dj_switch">DJ über Songs</string>
     <string name="dj_what">Ansagen über den Anfang und das Ende der Songs</string>
     <string name="tab_music">On-Demand</string>
     <string name="search_hint">Song oder Interpret</string>
@@ -212,4 +207,21 @@
         <item quantity="one">%d Interpret</item>
         <item quantity="other">%d Interpreten</item>
     </plurals>
+    <string name="content_title">Zwischen den Songs</string>
+    <string name="content_row">Inhalte: %1$s</string>
+    <string name="content_all">alles</string>
+    <string name="content_songs_only">nur Songs</string>
+    <string name="content_shows_only">nur Sendungen</string>
+    <string name="content_nothing">Dieser Sender spielt nur Songs</string>
+    <string name="content_not_here">Gibt es auf diesem Sender nicht</string>
+    <string name="c_ads">Werbung</string>
+    <string name="c_ads_what">Werbeblöcke</string>
+    <string name="c_news">Nachrichten</string>
+    <string name="c_news_what">Bei den Sendern, die Nachrichten senden</string>
+    <string name="c_dj">DJ-Beiträge</string>
+    <string name="c_dj_what">Die Moderation zwischen den Songs</string>
+    <string name="c_talk">Talk und Sendungen</string>
+    <string name="c_talk_what">Talk, Sendungsteile, Eröffnungen und die Nachtshow</string>
+    <string name="c_jingles">Jingles</string>
+    <string name="c_jingles_what">Jingles und Senderkennungen</string>
 </resources>

@@ -115,10 +115,6 @@
     <string name="notif_alarm_info">Snoozed and missed alarms</string>
 
     <string name="advert">Advert</string>
-    <string name="adverts_switch">Adverts, news &amp; talk</string>
-    <string name="adverts_none">This station has music and jingles only</string>
-    <string name="adverts_on">On: adverts, news and talk between the songs</string>
-    <string name="adverts_off">Off: songs and jingles only</string>
     <string name="tab_podcasts">Podcasts</string>
     <string name="podcast">Podcast</string>
     <string name="episode_n">Episode %1$d</string>
@@ -149,7 +145,6 @@
     <string name="crossfade_length">Length</string>
     <string name="seconds_short">%1$d s</string>
     <string name="crossfade_sync">For clubs and mixes, phone and PC play the same at the same moment only with the same crossfade (standard: %1$d s).</string>
-    <string name="adverts_what">Advert breaks, news, talk and the night show on the stations that have them</string>
     <string name="news">News</string>
     <string name="talk">Talk</string>
     <string name="score_places">Music in places</string>
@@ -182,7 +177,7 @@
         <item quantity="one">%1$d piece · %2$d min</item>
         <item quantity="other">%1$d pieces · %2$d min</item>
     </plurals>
-    <string name="dj_switch">DJ</string>
+    <string name="dj_switch">DJ over songs</string>
     <string name="dj_what">Intros and outros over the songs</string>
     <string name="tab_music">On-Demand</string>
     <string name="search_hint">Search songs and artists</string>
@@ -212,4 +207,21 @@
         <item quantity="one">%d artist</item>
         <item quantity="other">%d artists</item>
     </plurals>
+    <string name="content_title">Between the songs</string>
+    <string name="content_row">Content: %1$s</string>
+    <string name="content_all">everything</string>
+    <string name="content_songs_only">songs only</string>
+    <string name="content_shows_only">shows only</string>
+    <string name="content_nothing">This station plays songs only</string>
+    <string name="content_not_here">This station has none of these</string>
+    <string name="c_ads">Adverts</string>
+    <string name="c_ads_what">Advert breaks</string>
+    <string name="c_news">News</string>
+    <string name="c_news_what">The news on the stations that carry them</string>
+    <string name="c_dj">DJ talk</string>
+    <string name="c_dj_what">The DJ between the songs</string>
+    <string name="c_talk">Talk and shows</string>
+    <string name="c_talk_what">Talk, show segments, openings and the night show</string>
+    <string name="c_jingles">Jingles</string>
+    <string name="c_jingles_what">Jingles and station idents</string>
 </resources>

@@ -31,7 +31,7 @@ import java.util.Locale;
 import java.util.TimeZone;
 
 /**
- * The settings: how the radio plays (crossfade, adverts), where the packs lie, the phone's battery settings and the
+ * The settings: how the radio plays (crossfade, content), where the packs lie, the phone's battery settings and the
  * information with the log. The radio service notices a changed setting by itself.
  */
 public class SettingsActivity extends Activity implements PackStore.Listener {
@@ -146,9 +146,15 @@ public class SettingsActivity extends Activity implements PackStore.Listener {
         sync.setPadding(dp(18), 0, dp(18), dp(10));
         sync.setLineSpacing(0, 1.12f);
         play.addView(sync);
-        toggleRow(play, R.string.adverts_switch, R.string.adverts_what, RadioService.adverts(this),
-                on -> prefs.edit().putBoolean(RadioService.PREF_ADS, on).apply());
-        toggleRow(play, R.string.dj_switch, R.string.dj_what, RadioService.dj(this),
+
+        // ---- what comes between the songs
+        LinearLayout between = section(box, R.string.content_title);
+        for (int i = 0; i < Content.KINDS.length; i++) {
+            int kind = Content.KINDS[i];
+            toggleRow(between, Content.NAMES[i], Content.WHAT[i], (RadioService.content(this) & kind) != 0,
+                    on -> RadioService.setContent(this, kind, on));
+        }
+        toggleRow(between, R.string.dj_switch, R.string.dj_what, RadioService.dj(this),
                 on -> prefs.edit().putBoolean(RadioService.PREF_DJ, on).apply());
 
         // ---- the packs

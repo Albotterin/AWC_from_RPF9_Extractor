@@ -81,10 +81,18 @@ in halben Stunden (die Spieluhr läuft viel schneller als eine echte); Schalter,
 nicht gesetzt; ein Gewicht „nach Anzahl in Folge“ wird als eines für den 1., 2., 3. Beitrag gelesen. In verschiedenen
 Zeitzonen weicht das Programm rund um Tag und Nacht voneinander ab.
 
-**Werbung, News & Talk** (von Haus aus aus). Am PC anhaken oder in der App einschalten. Aus spielt ein Musiksender Songs,
-Senderkennungen und kurze DJ-Ansagen, ausgewählt nach denselben Regeln; an läuft alles: Werbung, Nachrichten, längere
-DJ-Beiträge, Talk und die gesprochenen Teile der Nachtshow. Talk-Radio ist in beiden Fällen Talk; dort betrifft der
-Schalter nur die Werbung.
+**Was zwischen den Songs läuft.** Fünf Schalter, am PC unter **Inhalte** oben im Fenster, in der App im Player und auf
+der Einstellungsseite:
+
+* **Werbung** – die Werbeblöcke.
+* **Nachrichten** – die Meldungen, bei den Sendern, die Nachrichten senden.
+* **DJ-Beiträge** – die Moderation zwischen den Songs.
+* **Talk und Sendungen** – Wortbeiträge, Eröffnungen und Schlüsse von Sendungen, die gesprochenen Teile der Nachtshow.
+* **Jingles** – Jingles und Senderkennungen.
+
+Von Haus aus sind DJ-Beiträge und Jingles an. Das Programm wird nach denselben Regeln ausgewählt, Abgeschaltetes wird
+übersprungen. Songs laufen immer, ebenso die Sendungen eines Talk-Senders. Dass der DJ aus der Werbung oder den
+Nachrichten zurückkommt, hört man nur, wenn dieser Teil an ist. PC und Handy spielen nur mit denselben Schaltern dasselbe.
 
 **Übergänge wie im Spiel.** Die Audio-Konfiguration sagt auch, wie ein Beitrag an den nächsten übergibt, abhängig
 davon, was endet und was folgt: wie viel früher der nächste beginnt (meist 0,5 bis 3 Sekunden), ob einer von beiden
@@ -101,7 +109,7 @@ dieses Programm, und die Tiefpass-Verläufe mancher Regeln fehlen.
 Sekunden), aus oder 1–12 Sekunden – am PC mit **Überblenden** oben im Fenster, in der App auf der Einstellungsseite. Die
 Überblendung ist Teil des Zeitplans: PC und Handy laufen nur mit derselben Einstellung gleich.
 
-**Der DJ.** Am PC **DJ** anhaken oder in den Einstellungen der App einschalten (von Haus aus aus). Die Songdateien
+**Der DJ über den Songs.** Am PC **DJ über Songs** anhaken oder in den Einstellungen der App einschalten (von Haus aus aus). Die Songdateien
 markieren, wo der DJ über Anfang und Ende sprechen darf; die Sprach-Container des Senders halten Ansagen für diese Stellen,
 die meisten genau zu diesem Song. Über einem Song spricht der DJ dann jedes zweite Mal das Intro und jedes dritte Mal das
 Outro, und vor einem Werbeblock oder den Nachrichten leitet er über. Die Musik tritt zurück, solange er spricht. Welche
@@ -149,12 +157,12 @@ Die Handy-App spielt dasselbe Live-Programm wie der PC: gleiche Uhr und Zeitzone
 Übergänge.
 Dazu hat sie einen eigenen Bereich für die [Podcasts](#podcasts). Zur App gehören die Packs:
 
-* **`AWC-Radio.apk`** - die App (Version 1.16), für alle dieselbe Datei, ohne Spieldaten. Android 7.0 oder neuer, Deutsch und
+* **`AWC-Radio.apk`** - die App (Version 1.17), für alle dieselbe Datei, ohne Spieldaten. Android 7.0 oder neuer, Deutsch und
   Englisch. Senderraster, kleiner Player und großer Player in der Farbe des Senderlogos; Wiedergabe im Hintergrund mit
-  Medien-Benachrichtigung, Sperrbildschirm- und Kopfhörertasten; Einschlaftimer; Schalter **Werbung, News & Talk** (von Haus aus aus); **Android Auto** (vorher in dessen
+  Medien-Benachrichtigung, Sperrbildschirm- und Kopfhörertasten; Einschlaftimer; Schalter für das, was zwischen den Songs läuft; **Android Auto** (vorher in dessen
   Entwicklereinstellungen „Unbekannte Quellen“ aktivieren, weil die App nicht aus dem Play Store kommt).
 * **On-Demand-Reiter** – Suche, Interpreten und Playlisten über die Songs aller Packs, siehe [On-Demand](#on-demand).
-* **Einstellungsseite** - Überblenden ein/aus und Dauer (Clubs und Mixe), Werbung, News & Talk, DJ, Pack-Ordner und neu
+* **Einstellungsseite** - Überblenden ein/aus und Dauer (Clubs und Mixe), Inhalte zwischen den Songs, DJ über Songs, Pack-Ordner und neu
   laden, Akku-Einstellungen, Info und Protokoll; zu öffnen über das Drei-Punkte-Menü.
 * **Score-Reiter** – der Score des Spiels aus den `.scorepak`-Dateien: fünf Gruppen (die fünfte, **Musik an Orten**,
   enthält die fertigen Aufnahmen von Fahrstühlen, Hotellobbys, einer Minigolfanlage und anderen Orten),

@@ -11,6 +11,9 @@ import java.io.PrintStream;
  *   java ProgramDump <pack folder> <output file> <unix time> [<unix time> ...]
  */
 public final class ProgramDump {
+    // {content switches, a crossfade, another one}: the same list as in run_tests.py
+    private static final int[][] CHOICES = {{20, 0, 3}, {31, 3, 8}, {0, 3, 3}, {1, 3, 3}, {26, 3, 3}, {6, 3, 3}};
+
     private static String fade(Schedule.Fade f) {
         return f == null ? "-" : String.format(java.util.Locale.ROOT, "%.6f,%.6f,%d", f.at, f.len, f.shape);
     }
@@ -31,20 +34,21 @@ public final class ProgramDump {
                     if (news != null) s.setNews(news.news(), news);
                     for (int a = 2; a < args.length; a++) {
                         double now = Double.parseDouble(args[a]);
-                        for (boolean adverts : new boolean[]{false, true}) {
-                            for (int fade : new int[]{0, 3, 8}) {
-                                for (Schedule.Item it : s.programme(adverts, fade).itemsFrom(now, 40)) {
+                        for (int[] chosen : CHOICES) {
+                            int content = chosen[0];
+                            for (int fade : new int[]{chosen[1], chosen[2]}) {
+                                for (Schedule.Item it : s.programme(content, fade).itemsFrom(now, 40)) {
                                     out.printf(java.util.Locale.ROOT, "%s|%d|%s%d|%s|%s|%.6f|%.6f|%s|%s%n", s.name, a - 2,
-                                            adverts ? "ads" : "no", fade, it.kind, it.track.key,
+                                            "c" + content + "f", fade, it.kind, it.track.key,
                                             it.start, it.end, fade(it.fadeIn), fade(it.fadeOut));
-                                    Schedule.Track bed = s.programme(adverts, fade).bedOf(it);
+                                    Schedule.Track bed = s.programme(content, fade).bedOf(it);
                                     if (bed != null) {
                                         out.printf(java.util.Locale.ROOT, "%s|%d|%s%d|bed|%s|%.6f%n", s.name, a - 2,
-                                                adverts ? "ads" : "no", fade, bed.key, it.start);
+                                                "c" + content + "f", fade, bed.key, it.start);
                                     }
-                                    for (Schedule.Voice v : s.programme(adverts, fade).voices(it)) {
+                                    for (Schedule.Voice v : s.programme(content, fade).voices(it)) {
                                         out.printf(java.util.Locale.ROOT, "%s|%d|%s%d|voice|%s|%.6f|%.6f%n", s.name, a - 2,
-                                                adverts ? "ads" : "no", fade, v.line.key, it.start, v.at);
+                                                "c" + content + "f", fade, v.line.key, it.start, v.at);
                                     }
                                 }
                             }

@@ -67,7 +67,7 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
     private static final String CHANNEL = "radio";
     private static final long PAUSE_TIMEOUT_MS = 30L * 60 * 1000;     // a pause that is forgotten ends the service
     private static final long SLEEP_FADE_MS = 8000;
-    static final String PREFS = "radio", PREF_LAST = "lastName", PREF_ADS = "ads", PREF_DJ = "dj";
+    static final String PREFS = "radio", PREF_LAST = "lastName", PREF_ADS = "ads", PREF_DJ = "dj", PREF_CONTENT = "content";
     static final String PREF_FADE_ON = "xfade", PREF_FADE_SEC = "xfadeSec";      // crossfade between two songs
     static final int FADE_MAX = Schedule.FADE_MAX;
     private static final long WAKE_LOCK_MS = 30L * 60 * 1000;
@@ -102,7 +102,7 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
 
     /** A setting that shapes the programme changed (the switches in the player and on the settings page). */
     private final SharedPreferences.OnSharedPreferenceChangeListener settingsListener = (p, key) -> {
-        if (PREF_ADS.equals(key) || PREF_FADE_ON.equals(key) || PREF_FADE_SEC.equals(key)) applyProgramme();
+        if (PREF_CONTENT.equals(key) || PREF_FADE_ON.equals(key) || PREF_FADE_SEC.equals(key)) applyProgramme();
         if (PREF_DJ.equals(key) && engine != null) engine.setDj(dj(this));
     };
 
@@ -631,7 +631,7 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
     }
 
     private Engine newEngine(Library.Station st) {
-        Engine e = new Engine(st.programme(adverts(this), crossfade(this)), clock,
+        Engine e = new Engine(st.programme(content(this), crossfade(this)), clock,
                 track -> new PackPlayer(st.packOf(track), "t/" + track.key, AudioAttributes.USAGE_MEDIA));
         e.setDj(dj(this));
         return e;
@@ -642,9 +642,20 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
         return c.getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(PREF_DJ, false);
     }
 
-    /** Whether the listener wants adverts, news and talk (off unless switched on). */
-    static boolean adverts(Context c) {
-        return c.getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(PREF_ADS, false);
+    /**
+     * What the listener wants between the songs (the switches of Schedule). Until one of them is moved: the standard
+     * ones, or everything for who had switched on "adverts, news and talk" in an earlier version.
+     */
+    static int content(Context c) {
+        android.content.SharedPreferences p = c.getSharedPreferences(PREFS, MODE_PRIVATE);
+        if (p.contains(PREF_CONTENT)) return p.getInt(PREF_CONTENT, Schedule.STANDARD) & Schedule.EVERYTHING;
+        return p.getBoolean(PREF_ADS, false) ? Schedule.EVERYTHING : Schedule.STANDARD;
+    }
+
+    /** One of the switches is moved. */
+    static void setContent(Context c, int kind, boolean on) {
+        int now = content(c);
+        c.getSharedPreferences(PREFS, MODE_PRIVATE).edit().putInt(PREF_CONTENT, on ? now | kind : now & ~kind).apply();
     }
 
     /** The chosen length of the crossfade in seconds (kept while the crossfade is switched off). */
@@ -661,8 +672,8 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
     /** A setting changed: the station goes on with its other programme (nothing happens if it is the same one). */
     private void applyProgramme() {
         if (station == null || engine == null || state == STOPPED || episodes != null) return;
-        if (engine.schedule() == station.programme(adverts(this), crossfade(this))) return;
-        AppLog.d("programme: adverts " + (adverts(this) ? "on" : "off") + ", crossfade " + crossfade(this) + " s");
+        if (engine.schedule() == station.programme(content(this), crossfade(this))) return;
+        AppLog.d("programme: content " + content(this) + ", crossfade " + crossfade(this) + " s");
         if (state == PLAYING) {
             play(stationIndex);
         } else {

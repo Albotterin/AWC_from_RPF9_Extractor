@@ -14,7 +14,7 @@ import java.util.Map;
 
 /**
  * The programmes of the real packs: every recording a programme puts on air lies in the station's own pack or in the
- * news pack, without the switch a music station plays only songs and jingles, and the night show comes in the evening.
+ * news pack, with the standard content a music station plays no adverts or news, and the night show comes in the evening.
  */
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 34, qualifiers = "de-rDE-w393dp-h851dp-port-xhdpi")
@@ -49,7 +49,9 @@ public class NewsTest {
                     for (Schedule.Voice v : programme.voices(it)) {
                         Assert.assertNotNull(st.name + ": line " + v.line.key, st.packOf(v.line).entry("t/" + v.line.key));
                     }
-                    if (!extras && !st.talk) Assert.assertTrue(st.name + ": " + it.kind, it.jingle || Schedule.SONG.equals(it.kind));
+                    if (!extras && !st.talk) {
+                        Assert.assertFalse(st.name + ": " + it.kind, it.ad || Schedule.NEWS.equals(it.kind));
+                    }
                     if (!extras) Assert.assertFalse(st.name, it.ad);
                     if (extras && st.name.equals("Honey FM")) honeyKinds.merge(it.kind + " " + it.track.title, 1, Integer::sum);
                 }

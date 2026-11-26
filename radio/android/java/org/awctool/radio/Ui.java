@@ -342,6 +342,82 @@ final class Ui {
         return d;
     }
 
+    /** One switch in a bottom sheet. */
+    static final class Toggle {
+        final CharSequence name, what;
+        final boolean on, enabled;
+        final java.util.function.Consumer<Boolean> changed;
+
+        Toggle(CharSequence name, CharSequence what, boolean on, boolean enabled, java.util.function.Consumer<Boolean> changed) {
+            this.name = name;
+            this.what = what;
+            this.on = on;
+            this.enabled = enabled;
+            this.changed = changed;
+        }
+    }
+
+    /** Switches in a sheet that slides up from the bottom; it stays open until it is dismissed. */
+    static Dialog switchSheet(Context c, CharSequence title, List<Toggle> toggles) {
+        final Dialog d = new Dialog(c, R.style.AppSheet);
+        LinearLayout box = new LinearLayout(c);
+        box.setOrientation(LinearLayout.VERTICAL);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(SURFACE);
+        float r = dp(c, 28);
+        bg.setCornerRadii(new float[]{r, r, r, r, 0, 0, 0, 0});
+        box.setBackground(bg);
+        box.setPadding(0, dp(c, 20), 0, dp(c, 8));
+        TextView head = display(c, title, 26, TEXT);
+        head.setPadding(dp(c, 24), 0, dp(c, 24), dp(c, 8));
+        box.addView(head);
+        LinearLayout rows = new LinearLayout(c);
+        rows.setOrientation(LinearLayout.VERTICAL);
+        for (Toggle t : toggles) {
+            LinearLayout row = new LinearLayout(c);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setMinimumHeight(dp(c, 60));
+            row.setPadding(dp(c, 24), dp(c, 6), dp(c, 20), dp(c, 6));
+            row.setBackground(ripple(null, new ColorDrawable(Color.WHITE)));
+            LinearLayout words = new LinearLayout(c);
+            words.setOrientation(LinearLayout.VERTICAL);
+            words.setPadding(0, 0, dp(c, 12), 0);
+            words.addView(strong(c, t.name, 16, TEXT));
+            words.addView(text(c, t.what, 13, MUTED));
+            row.addView(words, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+            Switch s = toggle(c, t.on);
+            s.setContentDescription(t.name);
+            s.setEnabled(t.enabled);
+            s.setOnCheckedChangeListener((v, now) -> t.changed.accept(now));
+            row.addView(s);
+            if (t.enabled) {
+                row.setClickable(true);
+                row.setFocusable(true);
+                row.setOnClickListener(v -> s.toggle());
+            } else {
+                row.setAlpha(0.45f);
+            }
+            rows.addView(row);
+        }
+        final ScrollView scroll = new ScrollView(c) {
+            @Override
+            protected void onMeasure(int w, int h) {          // never higher than most of the screen
+                int max = (int) (getResources().getDisplayMetrics().heightPixels * 0.78f);
+                super.onMeasure(w, MeasureSpec.makeMeasureSpec(max, MeasureSpec.AT_MOST));
+            }
+        };
+        scroll.addView(rows);
+        box.addView(scroll);
+        d.setContentView(box);
+        Window w = d.getWindow();
+        if (w != null) {
+            w.setGravity(Gravity.BOTTOM);
+            w.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+        d.show();
+        return d;
+    }
+
     /** Pick one of the stations (with their logos). */
     static void stationSheet(Context c, CharSequence title, List<Library.Station> stations, String chosen, CharSequence first,
                              java.util.function.Consumer<String> picked) {

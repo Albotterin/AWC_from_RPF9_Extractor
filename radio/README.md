@@ -78,9 +78,18 @@ half hours (the game's own clock runs much faster than a real one); switches tha
 as not set; a weight "by the number in a row" is read as for the 1st, 2nd, 3rd item. Listeners in different time zones hear
 different programmes around day and night.
 
-**Adverts, news & talk** (default: off). Tick it on the PC, or switch it on in the app. Off, a music station plays songs,
-station idents and the DJ's short links, chosen by the same rules; on, everything: adverts, news, longer DJ links, talk and
-the night show's spoken parts. Talk radio is talk in both; there the switch is about its adverts.
+**What runs between the songs.** Five switches, on the PC under **Content** at the top of the window, in the app in the
+player and on the settings page:
+
+* **Adverts** - the advert breaks.
+* **News** - the bulletins, on the stations that carry them.
+* **DJ talk** - the DJ's links between the songs.
+* **Talk and shows** - spoken segments, show openings and closings, the spoken parts of the night show.
+* **Jingles** - jingles and station idents.
+
+At first DJ talk and jingles are on. The programme is chosen by the same rules, and what is switched off is stepped over.
+Songs always play, and so do the shows of a talk station. A DJ coming back from the adverts or the news is only heard when
+that break is on. PC and phone play the same only with the same switches.
 
 **Transitions as in the game.** The audio config also says how one item hands over to the next, by the kind of the one
 that ends and of the one that follows: how much earlier the next one starts (usually 0.5 to 3 seconds), whether either of
@@ -96,7 +105,7 @@ sweeps some rules describe are left out.
 1-12 seconds - on the PC with **Crossfade** at the top of the window, in the app on the settings page. The overlap is part
 of the timetable, so PC and phone stay in step only with the same setting.
 
-**The DJ.** Tick **DJ** on the PC, or switch it on in the app's settings (default: off). The song files mark where the DJ
+**The DJ over songs.** Tick **DJ over songs** on the PC, or switch it on in the app's settings (default: off). The song files mark where the DJ
 may talk over their beginning and their end; the speech containers of the station hold lines for those places, most of
 them about the very song. Over a song the DJ then speaks its intro every second time and its outro every third time, and
 before an advert break or the news he leads into it. The music steps back while he talks. Which line is said follows the
@@ -145,12 +154,12 @@ The current list of all stations with their content and length: [all stations](d
 The phone app plays the same live programme as the PC: same clock, same order, same transitions (in the same time
 zone). It consists of the app and the packs:
 
-* **`AWC-Radio.apk`** - the app (version 1.16), the same file for everybody, no game data inside. Android 7.0 or newer,
+* **`AWC-Radio.apk`** - the app (version 1.17), the same file for everybody, no game data inside. Android 7.0 or newer,
   English and German. Station grid, mini player and a large player in the colour of the station's logo; background playback
-  with a media notification, lock-screen and headset buttons; sleep timer; **Adverts, news & talk** switch (off by default); **Android Auto** (switch on *Unknown sources* in
+  with a media notification, lock-screen and headset buttons; sleep timer; switches for what runs between the songs; **Android Auto** (switch on *Unknown sources* in
   its developer settings first, because the app does not come from the Play Store).
 * **On-Demand tab** - search, artists and playlists over the songs of all packs, see [On-Demand](#on-demand).
-* **Settings page** - crossfade on/off and length (clubs and mixes), adverts, news & talk, the DJ, pack folder and reload,
+* **Settings page** - crossfade on/off and length (clubs and mixes), what runs between the songs, DJ over songs, pack folder and reload,
   battery settings, info and log; open it from the three-dot menu.
 * **Score tab** - the game's score from the `.scorepak` files: five groups (the fifth, **Music in places**, holds the
   finished recordings of lifts, lobbies, a minigolf course and other places), their sub

@@ -140,7 +140,7 @@ In the sample archive 18 stations list adverts, 239 different ones, each station
   stations. That fits two language versions of one spot - listeners report the exclusive ones as Spanish. The programs
   do not recognise languages.
 
-AWC Radio plays the adverts of a station only with the switch **Adverts, news & talk**.
+AWC Radio plays the adverts of a station only with the switch **Adverts**.
 
 ## Podcasts
 

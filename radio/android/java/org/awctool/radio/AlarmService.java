@@ -208,7 +208,7 @@ public class AlarmService extends Service {
             }
             station = list.get(i);
             final Library.Station tuned = station;
-            engine = new Engine(station.programme(RadioService.adverts(this), RadioService.crossfade(this)), () -> System.currentTimeMillis() / 1000.0, track -> {
+            engine = new Engine(station.programme(RadioService.content(this), RadioService.crossfade(this)), () -> System.currentTimeMillis() / 1000.0, track -> {
                 PackPlayer p = new PackPlayer(tuned.packOf(track), "t/" + track.key, AudioAttributes.USAGE_ALARM);
                 players.add(p);
                 return p;

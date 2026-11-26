@@ -32,6 +32,7 @@ final class Library {
         private List<Schedule.Track> news = java.util.Collections.emptyList();   // the bulletins of the news pack
         private Pack newsPack;
         private final java.util.Map<String, Schedule> programmes = new java.util.HashMap<>();
+        private int found = -1;                                    // the answer of available(), once worked out
 
         /** The news of the folder (empty: there is no news pack); stations that play them get a new programme. */
         synchronized void setNews(List<Schedule.Track> bulletins, Pack from) {
@@ -39,11 +40,37 @@ final class Library {
             news = bulletins;
             newsPack = from;
             programmes.clear();
+            found = -1;
         }
 
-        /** Whether the switch for adverts, news and talk changes anything on this station. */
+        /** The switches of Schedule that change anything on this station. */
+        synchronized int available() {
+            if (found >= 0) return found;
+            if (rules == null) return found = jingles.isEmpty() ? 0 : Schedule.JINGLES;
+            int all = news.isEmpty() ? 0 : Schedule.NEWS_ON;
+            java.util.Map<String, Schedule.Track> tracks = tracks();
+            for (java.util.Map.Entry<String, List<String>> pool : rules.pools.entrySet()) {
+                for (String key : pool.getValue()) {
+                    Schedule.Track t = tracks.get(key);
+                    if (t == null) continue;
+                    String kind = Schedule.kindOf(rules, pool.getKey(), t);
+                    all |= Schedule.switchesOf(pool.getKey(), kind, rules.talkRadio) & Schedule.EVERYTHING;
+                }
+            }
+            return found = all;
+        }
+
+        /** Whether any switch changes something on this station. */
         synchronized boolean hasMore() {
-            return rules != null && (!ads.isEmpty() || !news.isEmpty() || (!rules.talkRadio && !says.isEmpty()));
+            return available() != 0;
+        }
+
+        private java.util.Map<String, Schedule.Track> tracks() {
+            java.util.Map<String, Schedule.Track> tracks = new java.util.HashMap<>();
+            for (List<Schedule.Track> list : java.util.Arrays.asList(songs, jingles, says, ads)) {
+                for (Schedule.Track t : list) tracks.put(t.key, t);
+            }
+            return tracks;
         }
 
         /** The file a recording of this station lies in: its own pack, or for a bulletin the news pack; a song of a queue
@@ -78,21 +105,21 @@ final class Library {
             return rules != null && rules.mix != null;
         }
 
-        /** The station's programme: with adverts, news and talk if wanted and the station has any, and with this crossfade. */
-        synchronized Schedule programme(boolean extras, double fade) {
-            boolean with = extras && hasMore();
+        /** The station's programme with everything or with the standard content, and with this crossfade. */
+        synchronized Schedule programme(boolean everything, double fade) {
+            return programme(everything ? Schedule.EVERYTHING : Schedule.STANDARD, fade);
+        }
+
+        /** The station's programme with these kinds of content (the switches of Schedule) and with this crossfade. */
+        synchronized Schedule programme(int content, double fade) {
+            int with = content & available();              // a switch that changes nothing here makes no other programme
             if (mixedAsInGame()) fade = Schedule.FADE;             // one programme, whatever the setting says
             String key = with + " " + fade;
             Schedule s = programmes.get(key);
             if (s == null) {
                 s = new Schedule(name, songs, jingles, fade, talk && rules == null);
-                if (rules != null) {
-                    java.util.Map<String, Schedule.Track> tracks = new java.util.HashMap<>();
-                    for (List<Schedule.Track> list : java.util.Arrays.asList(songs, jingles, says, ads)) {
-                        for (Schedule.Track t : list) tracks.put(t.key, t);
-                    }
-                    s.setRules(rules, tracks, news, with);
-                }
+                s.setContent(with);
+                if (rules != null) s.setRules(rules, tracks(), news, with);
                 s.setBeds(beds);
                 s.setLinesIntoAds(toads);
                 s.setLinesIntoNews(tonews);

@@ -307,8 +307,8 @@ public class MainActivity extends Activity implements PackStore.Listener {
                 }
 
                 @Override
-                public void adverts(boolean on) {
-                    setAdverts(on);
+                public void content() {
+                    showContent();
                 }
 
                 @Override
@@ -798,10 +798,10 @@ public class MainActivity extends Activity implements PackStore.Listener {
         Toast.makeText(this, minutes > 0 ? getString(R.string.sleep_set, minutes) : getString(R.string.sleep_cleared), Toast.LENGTH_SHORT).show();
     }
 
-    /** The advert switch: remembered for all stations; a playing station goes on with its other programme. */
-    private void setAdverts(boolean on) {
-        getSharedPreferences(RadioService.PREFS, MODE_PRIVATE).edit().putBoolean(RadioService.PREF_ADS, on).apply();
-        Toast.makeText(this, on ? R.string.adverts_on : R.string.adverts_off, Toast.LENGTH_SHORT).show();
+    /** The switches for what comes between the songs; a playing station goes on with its other programme. */
+    private void showContent() {
+        Library.Station st = shownStation();
+        if (st != null && st.hasMore()) Content.sheet(this, st);
     }
 
     // ------------------------------------------------------------------------------------------ menu and dialogs

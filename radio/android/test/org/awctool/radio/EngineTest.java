@@ -294,7 +294,7 @@ public class EngineTest {
         rules.pools.put("ident", idents);
         rules.pools.put("dj_banter", talk);
         Schedule sch = new Schedule("Mixed FM", songs, new ArrayList<>(), 3, false);
-        sch.setRules(rules, tracks, new ArrayList<>(), true);
+        sch.setRules(rules, tracks, new ArrayList<>(), Schedule.EVERYTHING);
         sch.setBeds(beds);
 
         List<Schedule.Item> items = sch.itemsFrom(start, 200);

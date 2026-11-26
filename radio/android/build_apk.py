@@ -72,7 +72,10 @@ def main():
     run(["javac", "-encoding", "UTF-8", "--release", "8", "-g:none", "-Xlint:-options", "-classpath", JAR,
          "-d", os.path.join(BUILD, "classes")] + sources)
     classes = glob.glob(os.path.join(BUILD, "classes", "**", "*.class"), recursive=True)
-    run([os.path.join(BT, "d8.bat"), "--lib", JAR, "--min-api", "24", "--output", os.path.join(BUILD, "dex")] + classes)
+    listed = os.path.join(BUILD, "classes.txt")             # in a file: Windows limits the length of a command line
+    with open(listed, "w", encoding="utf-8") as f:
+        f.write("\n".join(classes))
+    run([os.path.join(BT, "d8.bat"), "--lib", JAR, "--min-api", "24", "--output", os.path.join(BUILD, "dex"), "@" + listed])
     unsigned = os.path.join(BUILD, "unsigned.apk")
     with zipfile.ZipFile(os.path.join(BUILD, "base.apk")) as base, zipfile.ZipFile(unsigned, "w", zipfile.ZIP_DEFLATED) as out:
         for info in base.infolist():

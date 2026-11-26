@@ -16,8 +16,8 @@ import java.util.zip.CRC32;
  *
  * This is a line-by-line port of class Schedule in awc_radio.py and must give exactly the same result (same order,
  * same times, same crossfades), so that the phone and the PC play the same item at the same second. A station that
- * brings the game's programme rules follows them (setRules): with adverts, news and talk if wanted, else songs and
- * jingles; what comes at which hour is asked of the phone's clock. A station without rules plays its songs shuffled with
+ * brings the game's programme rules follows them (setRules); the listener chooses which kinds of content go on air
+ * (setContent), the rest is stepped over. What comes at which hour is asked of the phone's clock. A station without rules plays its songs shuffled with
  * jingles. How an item hands over to the next is part of the timetable: where the pack has the game's mixing rules
  * they say by the two categories how early the next one starts and how both are faded; otherwise only two songs that
  * follow each other are crossfaded. Under the DJ's talk a station with music beds plays one of them (bedOf).
@@ -28,6 +28,10 @@ public final class Schedule {
     public static final double DAY = 86400.0;
     public static final double FADE = 3.0;               // standard seconds of crossfade between two songs
     public static final int FADE_MAX = 12;
+    // what the listener can switch on and off besides the songs and a talk station's shows (CONTENT in awc_radio.py)
+    public static final int ADS = 1, NEWS_ON = 2, DJ_TALK = 4, TALK_ON = 8, JINGLES = 16;
+    public static final int EVERYTHING = ADS | NEWS_ON | DJ_TALK | TALK_ON | JINGLES, STANDARD = DJ_TALK | JINGLES;
+    private static final int MUSIC = 32, SHOW = 64;                    // no switch: always on air
     // per cent: how often the DJ talks over an intro, an outro, into an advert break
     private static final int DJ_INTRO = 50, DJ_OUTRO = 35, DJ_BEFORE_ADS = 70;
     private static final double SPOKEN_FROM = 25.0;      // a longer spoken item is talk, a shorter one a jingle
@@ -112,15 +116,40 @@ public final class Schedule {
         }
     }
 
-    /** One recording of a category and its kind. */
+    /** One recording of a category, its kind and the switches it needs (all of them) to go on air. */
     private static final class Entry {
         final String kind;
         final Track track;
+        final int what;
 
-        Entry(String kind, Track track) {
+        Entry(String kind, Track track, int what) {
             this.kind = kind;
             this.track = track;
+            this.what = what;
         }
+    }
+
+    /**
+     * The switches an item of this category and kind needs, all of them (switches_of in awc_radio.py); the DJ coming back
+     * from the adverts or the news needs the break itself as well.
+     */
+    static int switchesOf(String category, String kind, boolean talkRadio) {
+        if (SONG.equals(kind)) return MUSIC;
+        if (AD.equals(kind)) return ADS;
+        if (NEWS.equals(kind)) return NEWS_ON;
+        if (talkRadio) return JINGLE.equals(kind) ? JINGLES : SHOW;
+        if (category.startsWith("dj_banter")) {
+            if (category.equals("dj_banter_from_ads")) return DJ_TALK | ADS;
+            return category.equals("dj_banter_from_news") ? DJ_TALK | NEWS_ON : DJ_TALK;
+        }
+        if (category.startsWith("show") || TALK_CATEGORIES.contains(category)) return TALK_ON;
+        return TALK.equals(kind) ? TALK_ON : JINGLES;
+    }
+
+    /** The kind of a recording of a category of the rules. */
+    static String kindOf(Rules rules, String category, Track t) {
+        return SONG_CATEGORIES.contains(category) ? SONG : category.equals("advert") || rules.ads.contains(t.key) ? AD
+                : TALK_CATEGORIES.contains(category) || t.sec > SPOKEN_FROM ? TALK : JINGLE;
     }
 
     /** Where the DJ may talk over a song (seconds into it) and the lines that fit there. */
@@ -308,9 +337,8 @@ public final class Schedule {
     private List<Track> toads = Collections.emptyList();  // the DJ's lines into an advert break
     private List<Track> tonews = Collections.emptyList(); // ... and into the news
     private Rules rules;                                  // null: songs and jingles
-    private boolean extras;
+    private int content = STANDARD;                       // the switches that are on
     private final Map<String, List<Entry>> pools = new HashMap<>();
-    private final Set<String> passed = new HashSet<>();   // kinds that are stepped over
     private final Set<String> hosted = new HashSet<>();   // songs of a night show: it has a host of its own
     private String zone = "";                             // the time zone the days were calculated for
     private List<Track> beds = Collections.emptyList();   // the music that lies under the DJ's talk
@@ -369,14 +397,18 @@ public final class Schedule {
         tonews = lines;
     }
 
+    /** Which kinds of content go on air (the switches above); set before the first use. */
+    void setContent(int on) {
+        content = on & EVERYTHING;
+    }
+
     /**
      * The programme follows the game's rules (set before the first use). `tracks`: the station's recordings by key;
-     * `bulletins`: the news it plays (empty: none); `extras`: with adverts, news and talk, else songs and jingles only
-     * (talk radio is talk in both; there the adverts are stepped over without them).
+     * `bulletins`: the news it plays (empty: none); `on`: the kinds of content the listener wants.
      */
-    void setRules(Rules rules, Map<String, Track> tracks, List<Track> bulletins, boolean extras) {
+    void setRules(Rules rules, Map<String, Track> tracks, List<Track> bulletins, int on) {
         this.rules = rules;
-        this.extras = extras;
+        setContent(on);
         pools.clear();
         for (Map.Entry<String, List<String>> pool : rules.pools.entrySet()) {
             String category = pool.getKey();
@@ -384,20 +416,16 @@ public final class Schedule {
             for (String key : pool.getValue()) {
                 Track t = tracks.get(key);
                 if (t == null) continue;
-                String kind = SONG_CATEGORIES.contains(category) ? SONG : category.equals("advert") || rules.ads.contains(key) ? AD
-                        : TALK_CATEGORIES.contains(category) || t.sec > SPOKEN_FROM ? TALK : JINGLE;
-                if (!extras && !rules.talkRadio && !SONG.equals(kind) && !JINGLE.equals(kind)) continue;
-                own.add(new Entry(kind, t));
+                String kind = kindOf(rules, category, t);
+                own.add(new Entry(kind, t, switchesOf(category, kind, rules.talkRadio)));
             }
             if (!own.isEmpty()) pools.put(category, own);
         }
-        if (!bulletins.isEmpty() && (extras || rules.talkRadio)) {
+        if (!bulletins.isEmpty()) {
             List<Entry> own = new ArrayList<>();
-            for (Track t : sorted(bulletins)) own.add(new Entry(NEWS, t));
+            for (Track t : sorted(bulletins)) own.add(new Entry(NEWS, t, NEWS_ON));
             pools.put("news", own);
         }
-        passed.clear();
-        if (!extras && rules.talkRadio) passed.add(AD);
         hosted.clear();
         if (rules.pools.containsKey("showintro_night")) {
             for (String category : new String[]{"music_night", "music_night2"}) {
@@ -435,7 +463,7 @@ public final class Schedule {
         if (window != null) {
             List<Track> lines = window.lines;
             int chance = DJ_OUTRO;
-            if (extras && !hosted.contains(tr.key)) {
+            if (!hosted.contains(tr.key)) {
                 String following = itemsFrom(item.start + 0.001, 2).get(1).kind;
                 List<Track> lead = AD.equals(following) ? toads : NEWS.equals(following) ? tonews : Collections.<Track>emptyList();
                 List<Track> fit = new ArrayList<>();
@@ -507,7 +535,7 @@ public final class Schedule {
         while (true) {
             Track tr;
             String kind;
-            if (!jingles.isEmpty() && count >= target) {
+            if (!jingles.isEmpty() && (content & JINGLES) != 0 && count >= target) {
                 jn++;
                 count = 0;
                 target = 2 + (int) (h(name, d, "target", jn) % 3);
@@ -533,11 +561,12 @@ public final class Schedule {
     }
 
     /** The rows that are allowed now, with their weights. */
-    private List<Object[]> weigh(List<Row> rows, String current, int run, Map<String, Double> heard, double now, double hour) {
+    private List<Object[]> weigh(List<Row> rows, String current, int run, Map<String, Double> heard, double now, double hour,
+                                 Set<String> allowed) {
         List<Object[]> found = new ArrayList<>();
         if (rows == null) return found;
         for (Row row : rows) {
-            if (!pools.containsKey(row.next)) continue;
+            if (!pools.containsKey(row.next) || (allowed != null && !allowed.contains(row.next))) continue;
             double weight = 1.0;
             for (Factor f : row.factors) {
                 double value;
@@ -560,15 +589,16 @@ public final class Schedule {
     }
 
     /** The category that follows, as the rules weigh them at second `now` of the day. */
-    private String nextCategory(int d, int step, String current, int run, Map<String, Double> heard, double now) {
+    private String nextCategory(int d, int step, String current, int run, Map<String, Double> heard, double now,
+                                Set<String> allowed) {
         double hour = hourOf(d * DAY + now);
-        List<Object[]> found = weigh(current.isEmpty() ? null : rules.table.get(current), current, run, heard, now, hour);
-        if (found.isEmpty()) found = weigh(rules.table.get(""), current, run, heard, now, hour);
+        List<Object[]> found = weigh(current.isEmpty() ? null : rules.table.get(current), current, run, heard, now, hour, allowed);
+        if (found.isEmpty()) found = weigh(rules.table.get(""), current, run, heard, now, hour, allowed);
         if (found.isEmpty()) {                                     // nothing is allowed: music (else whatever there is)
             for (String category : new String[]{"music", "music_night", "music_dj2"}) {
-                if (pools.containsKey(category)) return category;
+                if (pools.containsKey(category) && (allowed == null || allowed.contains(category))) return category;
             }
-            List<String> ordered = new ArrayList<>(pools.keySet());
+            List<String> ordered = new ArrayList<>(allowed == null ? pools.keySet() : allowed);
             Collections.sort(ordered);
             return ordered.get((int) (h(name, d, "any", step) % ordered.size()));
         }
@@ -598,9 +628,29 @@ public final class Schedule {
         String aired = "";                                        // the category of the last item that went on air
         int run = 0, step = 0, stepped = 0;
         double now = 0.0;
+        int on = content | MUSIC | SHOW;                          // what may go on air
         while (!pools.isEmpty()) {
-            String category = nextCategory(d, step, current, run, heard, now);
+            // after a long row of things that are switched off, only what may go on air is asked for
+            Set<String> allowed = null;
+            if (stepped >= 20) {
+                allowed = new HashSet<>();
+                for (Map.Entry<String, List<Entry>> p : pools.entrySet()) {
+                    for (Entry e : p.getValue()) {
+                        if ((e.what & on) == e.what) {
+                            allowed.add(p.getKey());
+                            break;
+                        }
+                    }
+                }
+                if (allowed.isEmpty()) break;
+            }
+            String category = nextCategory(d, step, current, run, heard, now, allowed);
             List<Entry> pool = pools.get(category);
+            if (allowed != null) {
+                List<Entry> may = new ArrayList<>();
+                for (Entry e : pool) if ((e.what & on) == e.what) may.add(e);
+                pool = may;
+            }
             Entry chosen;
             if (rules.sequence.contains(category)) {
                 Long at = place.get(category);
@@ -625,7 +675,7 @@ public final class Schedule {
                 while (last.size() > Math.max(0, keep)) last.remove(0);
             }
             step++;
-            if (passed.contains(chosen.kind) && stepped < 50) {   // talk radio without adverts: stepped over
+            if ((chosen.what & on) != chosen.what) {              // switched off: the rules go on past it
                 stepped++;
             } else {
                 stepped = 0;

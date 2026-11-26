@@ -56,7 +56,8 @@ STR = {
         "err_ffplay": "ffplay was not found. Put ffplay.exe next to the program or into your PATH.",
         "err_credits": "The credits page could not be downloaded:\n{e}\n\nPick the page saved from your browser instead?",
         "err_html": "HTML page", "err_generic": "Something went wrong:\n{e}", "err_nostations": "No station with songs was found.",
-        "kind_song": "SONG", "kind_jingle": "JINGLE", "kind_ad": "ADVERT", "advert": "Advert", "chk_ads": "Adverts, news & talk", "chk_dj": "DJ",
+        "kind_song": "SONG", "kind_jingle": "JINGLE", "kind_ad": "ADVERT", "advert": "Advert", "btn_content": "Content", "c_ads": "Adverts", "c_news": "News", "c_dj": "DJ talk between the songs",
+        "c_talk": "Talk and show segments", "c_jingles": "Jingles and station idents", "chk_dj": "DJ over songs",
         "kind_news": "NEWS", "news": "News", "kind_talk": "TALK", "talk": "Talk",
         "dj_needs_ffmpeg": "The DJ needs FFmpeg (ffmpeg.exe) next to the program or in your PATH.",
         "lbl_fade": "Crossfade (clubs, mixes)", "fade_off": "Off", "fade_s": "{n} s",
@@ -79,7 +80,8 @@ STR = {
         "err_ffplay": "ffplay wurde nicht gefunden. ffplay.exe neben das Programm legen oder in den PATH aufnehmen.",
         "err_credits": "Die Credits-Seite konnte nicht geladen werden:\n{e}\n\nStattdessen die im Browser gespeicherte Seite wählen?",
         "err_html": "HTML-Seite", "err_generic": "Es ist ein Fehler aufgetreten:\n{e}", "err_nostations": "Es wurde kein Sender mit Songs gefunden.",
-        "kind_song": "SONG", "kind_jingle": "JINGLE", "kind_ad": "WERBUNG", "advert": "Werbung", "chk_ads": "Werbung, News & Talk", "chk_dj": "DJ",
+        "kind_song": "SONG", "kind_jingle": "JINGLE", "kind_ad": "WERBUNG", "advert": "Werbung", "btn_content": "Inhalte", "c_ads": "Werbung", "c_news": "Nachrichten", "c_dj": "DJ-Beiträge zwischen den Songs",
+        "c_talk": "Talk und Sendungsteile", "c_jingles": "Jingles und Senderkennungen", "chk_dj": "DJ über Songs",
         "kind_news": "NACHRICHTEN", "news": "Nachrichten", "kind_talk": "TALK", "talk": "Talk",
         "dj_needs_ffmpeg": "Für den DJ wird FFmpeg (ffmpeg.exe) neben dem Programm oder im PATH gebraucht.",
         "lbl_fade": "Überblenden (Clubs, Mixe)", "fade_off": "Aus", "fade_s": "{n} s",
@@ -593,6 +595,19 @@ TAIL = 0.3                                 # an item that is not faded out may p
 AD_AFTER = (540, 361)                      # with adverts: a break after 9 to 15 minutes of programme (540 + 0..360 s)
 DJ_INTRO, DJ_OUTRO, DJ_BEFORE_ADS = 50, 35, 70      # per cent: how often the DJ talks over an intro, an outro, into a break
 SPOKEN_FROM = 25.0                         # seconds: a station's longer spoken item is talk, a shorter one a jingle
+# what the listener can switch on and off, besides the songs and a talk station's shows: adverts, the news, the DJ's
+# talk between the songs, other talk and show segments, jingles and station idents
+CONTENT = ("ads", "news", "dj", "talk", "jingles")
+CONTENT_DEFAULT = ("dj", "jingles")
+
+
+def content_set(value):
+    """The switched-on kinds: True everything, False or None the standard ones, else the names given."""
+    if value is True:
+        return frozenset(CONTENT)
+    if value is False or value is None:
+        return frozenset(CONTENT_DEFAULT)
+    return frozenset(x for x in value if x in CONTENT)
 
 
 def hour_of(now):
@@ -647,6 +662,23 @@ def _h(*parts):
     return zlib.crc32("|".join(str(p) for p in parts).encode("utf-8"))
 
 
+def switches_of(category, kind, talk_radio):
+    """The switches an item of this category and kind needs, all of them, to go on air; "song" and "show" are always on.
+    The DJ coming back from the adverts or the news needs the break itself as well."""
+    if kind == "song":
+        return frozenset(("song",))
+    if kind in ("ad", "news"):
+        return frozenset(("ads" if kind == "ad" else "news",))
+    if talk_radio:
+        return frozenset(("jingles" if kind == "jingle" else "show",))
+    if category.startswith("dj_banter"):
+        after = {"dj_banter_from_ads": ("ads",), "dj_banter_from_news": ("news",)}.get(category, ())
+        return frozenset(("dj",) + after)
+    if category.startswith("show") or category in gamedata.TALK_CATEGORIES:
+        return frozenset(("talk",))
+    return frozenset(("talk" if kind == "talk" else "jingles",))
+
+
 class Schedule:
     """The programme of one station, a pure function of the station and the UTC clock.
 
@@ -666,16 +698,16 @@ class Schedule:
 
     A station that brings the game's programme rules (station["rules"]) follows them: after an item of one category the
     rules weigh which categories may follow, by the seconds since each was last heard, the number of its items in a row
-    and the hour of the listener's clock (so a night show comes at night; listeners in one time zone hear the same). Its
-    second programme (ads=True) has everything: songs, jingles, adverts, the news (`news`) and what is said. Without it
-    only songs and jingles are left, and the rules decide among those. Talk radio is talk in both; there the switch is
-    about its adverts, which are stepped over.
+    and the hour of the listener's clock (so a night show comes at night; listeners in one time zone hear the same). Which
+    kinds of content go on air is the listener's choice (content, see CONTENT): the rules run as in the game, and what is
+    switched off is stepped over. Songs, and a talk station's shows, always play. Listeners hear the same only with the
+    same switches.
 
     A station without rules plays its songs in a shuffled order with a jingle after every 2-4 songs.
 
     With the DJ switched on, voices() says what the DJ says over an item; that changes nothing in the timetable."""
 
-    def __init__(self, name, station, ads=False, fade=FADE, news=()):
+    def __init__(self, name, station, content=False, fade=FADE, news=()):
         self.name = name
         self.fade = min(float(FADE_MAX), max(0.0, float(fade)))
         self.talk = any(_is_show(s) for s in station["songs"])        # items that are whole talk shows: never faded
@@ -684,34 +716,32 @@ class Schedule:
         self.rules = station.get("rules")
         self.mix = self.rules.get("mix") if self.rules else None      # the game's mixing; None: the plain crossfade
         self.beds = sorted(station.get("beds", []), key=_tkey)
-        self.extras = bool(ads)
+        self.on = content_set(content)
         self.toads = station.get("toads", [])                          # the DJ's lines into an advert break
         self.tonews = station.get("tonews", [])                        # ... and into the news
-        self.pools, self.passed, self.hosted = {}, (), set()
+        self.pools, self.hosted = {}, set()
+        self.enabled = self.on | {"song", "show"}                      # what may go on air
         if self.rules:
             self._gather(station, news)
         self.days = {}
 
     def _gather(self, station, news):
-        """The recordings of every category of the rules, each with its kind."""
+        """The recordings of every category of the rules, each with its kind and with the switch it belongs to."""
         tracks = {_tkey(x): x for x in station["songs"] + station["jingles"] + station.get("talk", []) + station.get("ads", [])}
         flagged = set(self.rules.get("ads", ()))
         talk_radio = bool(self.rules.get("talkradio"))
 
-        def kind(category, key):
+        def entry(category, key):
             if category in gamedata.SONG_CATEGORIES:
-                return "song"
-            if category == "advert" or key in flagged:
-                return "ad"
-            return "talk" if category in gamedata.TALK_CATEGORIES or tracks[key]["sec"] > SPOKEN_FROM else "jingle"
-        pools = {c: [(kind(c, k), tracks[k]) for k in keys if k in tracks] for c, keys in self.rules["pools"].items()}
-        if station.get("news") and news:
-            pools["news"] = [("news", x) for x in sorted(news, key=_tkey)]
-        if not self.extras:
-            if talk_radio:
-                self.passed = ("ad",)                          # the chain of its shows goes on past them
+                kind = "song"
+            elif category == "advert" or key in flagged:
+                kind = "ad"
             else:
-                pools = {c: [x for x in v if x[0] not in ("ad", "news", "talk")] for c, v in pools.items()}
+                kind = "talk" if category in gamedata.TALK_CATEGORIES or tracks[key]["sec"] > SPOKEN_FROM else "jingle"
+            return kind, tracks[key], switches_of(category, kind, talk_radio)
+        pools = {c: [entry(c, k) for k in keys if k in tracks] for c, keys in self.rules["pools"].items()}
+        if station.get("news") and news:
+            pools["news"] = [("news", x, frozenset(("news",))) for x in sorted(news, key=_tkey)]
         self.pools = {c: v for c, v in pools.items() if v}
         if "showintro_night" in self.rules["pools"]:           # a night show has a host of its own
             self.hosted = {k for c in ("music_night", "music_night2") for k in self.rules["pools"].get(c, ())}
@@ -783,7 +813,7 @@ class Schedule:
         deck, npass, last_song, last_jingle, jn = [], 0, None, None, 0
         count, target = 0, 2 + _h(name, d, "target", 0) % 3
         while True:
-            if self.jingles and count >= target:
+            if self.jingles and "jingles" in self.on and count >= target:
                 jn += 1
                 count, target = 0, 2 + _h(name, d, "target", jn) % 3
                 pool = [j for j in self.jingles if j is not last_jingle] or self.jingles
@@ -801,7 +831,7 @@ class Schedule:
             if not self._add(starts, entries, kind, tr_):
                 return starts, entries
 
-    def _next_category(self, d, step, current, run, heard, now, hour):
+    def _next_category(self, d, step, current, run, heard, now, hour, allowed=None):
         """The category that follows, as the rules weigh them at second `now` of the day."""
         table = self.rules["table"]
 
@@ -818,7 +848,7 @@ class Schedule:
         def weigh(rows):
             found = []
             for follower, factors in rows:
-                if follower in self.pools:
+                if follower in self.pools and (allowed is None or follower in allowed):
                     weight = 1.0
                     for factor in factors:
                         weight *= value(factor)
@@ -831,9 +861,9 @@ class Schedule:
         found = found or weigh(table.get("", []))
         if not found:                                          # nothing is allowed: music (else whatever there is)
             for category in ("music", "music_night", "music_dj2"):
-                if category in self.pools:
+                if category in self.pools and (allowed is None or category in allowed):
                     return category
-            ordered = sorted(self.pools)
+            ordered = sorted(self.pools if allowed is None else allowed)
             return ordered[_h(self.name, d, "any", step) % len(ordered)]
         at = _h(self.name, d, "next", step) / 4294967296.0 * sum(w for _c, w in found)
         for category, weight in found:
@@ -857,25 +887,30 @@ class Schedule:
         aired = ""                                             # the category of the last item that went on air
         now, step, passed = 0.0, 0, 0
         while self.pools:
-            category = self._next_category(d, step, current, run, heard, now, hour_of(d * DAY + now))
+            # after a long row of things that are switched off, only what may go on air is asked for
+            allowed = {c for c, v in self.pools.items() if any(x[2] <= self.enabled for x in v)} if passed >= 20 else None
+            if allowed is not None and not allowed:
+                break
+            category = self._next_category(d, step, current, run, heard, now, hour_of(d * DAY + now), allowed)
             pool = self.pools[category]
+            if allowed is not None:
+                pool = [x for x in pool if x[2] <= self.enabled]
             if category in sequence:
                 at = place.get(category)
                 if at is None:
                     at = _h(name, d, "order", category) % len(pool)
-                kind, tr_ = pool[at % len(pool)]
+                kind, tr_, what = pool[at % len(pool)]
                 place[category] = at + 1
             else:
                 keep = min(history.get(category, len(pool) * 2 // 3), len(pool) - 1)
                 last = recent.setdefault(category, [])
                 free = [x for x in pool if _tkey(x[1]) not in last]
                 free = [x for x in free if _tkey(x[1]) != previous] or free
-                kind, tr_ = free[_h(name, d, "item", category, step) % len(free)]
+                kind, tr_, what = free[_h(name, d, "item", category, step) % len(free)]
                 last.append(_tkey(tr_))
                 del last[:max(0, len(last) - keep)]
             step += 1
-            skip = kind in self.passed and passed < 50
-            if skip:
+            if not what <= self.enabled:                       # switched off: the rules go on past it
                 passed += 1
             else:
                 passed = 0
@@ -909,7 +944,7 @@ class Schedule:
         window = dj.get("o")
         if window:
             lines, chance = window[2], DJ_OUTRO
-            if self.extras and _tkey(tr_) not in self.hosted:            # (not into a night show's breaks)
+            if _tkey(tr_) not in self.hosted:                            # (not into a night show's breaks)
                 following = self.items_from(start + 0.001, 2)[1][2]
                 lead = self.toads if following == "ad" else self.tonews if following == "news" else []
                 fit = [x for x in lead if x[2] <= window[1] - window[0] + 0.6]
@@ -1015,6 +1050,8 @@ class RadioApp(tk.Tk):
         s.map("TCheckbutton", background=[("active", BG)])
         s.configure("TButton", background=CARD, foreground=FG, padding=(12, 6), borderwidth=0)
         s.map("TButton", background=[("active", CARD_SEL), ("disabled", PANEL)])
+        s.configure("TMenubutton", background=CARD, foreground=FG, arrowcolor=FG, padding=(12, 6), borderwidth=0)
+        s.map("TMenubutton", background=[("active", CARD_SEL)])
         s.configure("Accent.TButton", background=ACCENT, foreground="white", padding=(18, 8), font=("Segoe UI", 11, "bold"))
         s.map("Accent.TButton", background=[("active", "#ff7a58")])
         s.configure("TEntry", fieldbackground=PANEL, foreground=FG, insertcolor=FG)
@@ -1063,8 +1100,15 @@ class RadioApp(tk.Tk):
         ttk.Button(top, text=t("btn_settings"), command=self._show_setup).pack(side="right", padx=8, pady=6)
         ttk.Button(top, text=t("btn_rescan"), command=lambda: self._start_clicked(force=True)).pack(side="right")
         ttk.Button(top, text=t("btn_android"), command=self._android).pack(side="right", padx=8)
-        self.var_ads = tk.BooleanVar(value=bool(self.cfg.get("ads", False)))         # off unless the listener wants them
-        ttk.Checkbutton(top, text=t("chk_ads"), variable=self.var_ads, command=self._toggle_ads).pack(side="right", padx=8)
+        chosen = content_set(self.cfg.get("content", bool(self.cfg.get("ads", False))))   # (older settings: one switch)
+        self.var_content = {k: tk.BooleanVar(value=k in chosen) for k in CONTENT}
+        button = ttk.Menubutton(top, text=t("btn_content"))
+        menu = tk.Menu(button, tearoff=False, bg=PANEL, fg=FG, activebackground=CARD_SEL, activeforeground=FG,
+                       selectcolor=FG, borderwidth=0)
+        for key in CONTENT:
+            menu.add_checkbutton(label=t("c_" + key), variable=self.var_content[key], command=self._content_changed)
+        button["menu"] = menu
+        button.pack(side="right", padx=8)
         self.var_dj = tk.BooleanVar(value=bool(self.cfg.get("dj", False)))           # the DJ's intros and outros: off too
         ttk.Checkbutton(top, text=t("chk_dj"), variable=self.var_dj, command=self._toggle_dj).pack(side="right", padx=(8, 0))
         self.box_fade = ttk.Combobox(top, state="readonly", width=5,                  # between two songs: off or 1-12 s
@@ -1431,11 +1475,12 @@ class RadioApp(tk.Tk):
         return t("st_fade_note") if self._fade() != int(FADE) and not ruled else t("st_ready", n=len(self.stations))
 
     def _programme(self, name):
-        return Schedule(name, self.stations[name], self.var_ads.get(), self._fade(), self.index.get("news", []))
+        content = [k for k in CONTENT if self.var_content[k].get()]
+        return Schedule(name, self.stations[name], content, self._fade(), self.index.get("news", []))
 
-    def _toggle_ads(self):
-        """The other programme of the station: with or without adverts, news and talk."""
-        self.cfg["ads"] = bool(self.var_ads.get())
+    def _content_changed(self):
+        """The other programme of the station: something between the songs was switched on or off."""
+        self.cfg["content"] = [k for k in CONTENT if self.var_content[k].get()]
         save_settings(self.cfg)
         self._retune()
 

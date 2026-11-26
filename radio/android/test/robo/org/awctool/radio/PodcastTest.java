@@ -270,7 +270,7 @@ public class PodcastTest {
         radio.playEpisode("Drunk Kings", 0);
         seconds(3);
         Harness.app().getSharedPreferences(RadioService.PREFS, 0).edit()      // radio settings do not disturb a podcast
-                .putBoolean(RadioService.PREF_ADS, true).putInt(RadioService.PREF_FADE_SEC, 9).commit();
+                .putInt(RadioService.PREF_CONTENT, Schedule.EVERYTHING).putInt(RadioService.PREF_FADE_SEC, 9).commit();
         Harness.pass(300);
         Assert.assertTrue(radio.isPodcast());
         command(RadioService.ACTION_SLEEP, RadioService.EXTRA_MINUTES, 1);

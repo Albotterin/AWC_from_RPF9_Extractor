@@ -13,7 +13,6 @@ import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
-import android.widget.Switch;
 import android.widget.TextView;
 
 /**
@@ -32,7 +31,7 @@ final class PlayerScreen extends LinearLayout {
 
         void alarm();
 
-        void adverts(boolean on);
+        void content();
     }
 
     private static final int SOFT = 0xCCFFFFFF;         // second-rank text on the coloured background
@@ -45,12 +44,10 @@ final class PlayerScreen extends LinearLayout {
     private final Ui.EqView eq;
     private final TextView live;
     private final LinearLayout air;
-    private final Switch adverts;
-    private final TextView advertsLabel;
-    private final LinearLayout adRow;
+    private final TextView contentLabel;
+    private final LinearLayout contentRow;
     private final boolean compact;
     private final Actions actions;
-    private boolean showing;                 // set while show() moves the switch itself
     private Library.Station shown;
     private int colorShown;
 
@@ -179,27 +176,25 @@ final class PlayerScreen extends LinearLayout {
         extras.addView(alarm, right);
         col.addView(extras);
 
-        // advert breaks on or off (one switch for all stations)
-        LinearLayout adRow = new LinearLayout(a);
-        adRow.setGravity(Gravity.CENTER_VERTICAL);
-        adRow.setPadding(dp(16), 0, dp(10), 0);
-        adRow.setBackground(Ui.rounded(a, 0x18FFFFFF, 18));
-        advertsLabel = Ui.oneLine(Ui.strong(a, a.getString(R.string.adverts_switch), 13, Color.WHITE));
-        adRow.addView(advertsLabel, new LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        adverts = Ui.toggle(a, false);
-        adverts.setContentDescription(a.getString(R.string.adverts_switch));
-        adverts.setOnCheckedChangeListener((v, on) -> {
-            if (!showing) actions.adverts(on);
-        });
-        adRow.addView(adverts);
-        adRow.setClickable(true);
-        adRow.setOnClickListener(v -> {
-            if (adverts.isEnabled()) adverts.toggle();
-        });
-        LayoutParams alp = new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(wide || small ? 40 : 48));
-        alp.topMargin = dp(wide || small ? 6 : 10);
-        col.addView(adRow, alp);
-        this.adRow = adRow;
+        // what comes between the songs: the row says it and opens the switches (one choice for all stations)
+        LinearLayout row = new LinearLayout(a);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(16), 0, dp(10), 0);
+        row.setBackground(Ui.ripple(Ui.rounded(a, 0x18FFFFFF, 18), Ui.rounded(a, Color.WHITE, 18)));
+        contentLabel = Ui.oneLine(Ui.strong(a, "", 13, Color.WHITE));
+        row.addView(contentLabel, new LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        ImageView more = new ImageView(a);
+        more.setImageResource(R.drawable.ic_down);
+        more.setColorFilter(Color.WHITE);
+        more.setRotation(-90);
+        row.addView(more, new LayoutParams(dp(24), dp(24)));
+        row.setClickable(true);
+        row.setFocusable(true);
+        row.setOnClickListener(v -> actions.content());
+        LayoutParams clp = new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(wide || small ? 40 : 48));
+        clp.topMargin = dp(wide || small ? 6 : 10);
+        col.addView(row, clp);
+        this.contentRow = row;
 
         next = Ui.oneLine(Ui.text(a, "", 13, SOFT));
         next.setGravity(Gravity.CENTER);
@@ -279,15 +274,15 @@ final class PlayerScreen extends LinearLayout {
 
     /** Shows what the radio is doing; `st` is the station on air, or the one that "play" would start. */
     void show(Library.Station st, RadioService radio) {
-        boolean has = st != null && st.hasMore(), want = has && RadioService.adverts(getContext());
-        showing = true;                            // touch the switch only on a change: every call starts its animation
-        if (adverts.isChecked() != want) adverts.setChecked(want);
-        if (adverts.isEnabled() != has) adverts.setEnabled(has);
-        showing = false;
-        set(advertsLabel, getContext().getString(has ? R.string.adverts_switch : R.string.adverts_none));
+        boolean has = st != null && st.hasMore();
+        set(contentLabel, Content.summary(getContext(), st));
+        if (contentRow.isEnabled() != has) {
+            contentRow.setEnabled(has);
+            contentRow.setClickable(has);
+        }
         int row = has || !compact ? VISIBLE : GONE;              // on a small phone the row only where it does something
-        if (adRow.getVisibility() != row) adRow.setVisibility(row);
-        advertsLabel.setAlpha(has ? 1f : 0.55f);
+        if (contentRow.getVisibility() != row) contentRow.setVisibility(row);
+        contentRow.setAlpha(has ? 1f : 0.55f);
         boolean active = radio != null && radio.state != RadioService.STOPPED && st != null && st.name.equals(radio.stationName);
         boolean playing = active && radio.state == RadioService.PLAYING;
         if (st != shown) {
