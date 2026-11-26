@@ -183,8 +183,8 @@ by position back.
   `%APPDATA%\AWC-Tool\advert_names.json` as `{"<stream ID, hex>": "<name>"}`.
 * The **podcasts** stand in a group of their own, **Podcasts**, each with its cover and episodes; extraction writes
   the folders `Podcasts/<name>/`.
-* The **score** has a folder of its own, **Score**, built by itself: **Open world**, **Missions**, **Compounds** and
-  **Activities**, their sub groups and the pieces (see [The score](#the-score)). The first time it takes a few minutes
+* The **score** has a folder of its own, **Score**, built by itself: **Open world**, **Missions**, **Compounds**,
+  **Activities** and **Music in places**, their sub groups and the pieces (see [The score](#the-score)). The first time it takes a few minutes
   after the stations are there. Double-click listens, **Extract selected** writes
   `Score/<group>/<sub group>/<title>` – for a piece, a sub group or a whole group. A piece is mixed when you play or
   extract it (needs FFmpeg); **Extract all streams** leaves the score out.
@@ -202,7 +202,10 @@ a few minutes the first time) and offers **pieces**: a section the game starts b
 follow it by themselves, mixed from their layers with FFmpeg. In the sample archive that is 2,543 pieces, about 33 hours;
 974 are at least 30 seconds long.
 
-* Groups: **Open world**, **Missions**, **Compounds**, **Activities**, each with sub groups. The names are the developers'
+**Music in places** holds what is no interactive music and no radio either: 113 finished recordings (4.8 hours) of lifts,
+hotel lobbies, a minigolf course and other places. They are taken over as they are.
+
+* Groups: **Open world**, **Missions**, **Compounds**, **Activities**, **Music in places**, each with sub groups. The names are the developers'
   working names (`CG_RAID_CAUGHT_SHOOTOUT_A`) – there are no official titles, and they may give away the story.
 * Double-click listens; **Save** writes `Score/<group>/<sub group>/<title>.opus`; **App packs** writes one `.scorepak`
   per group for [AWC Radio on Android](../radio/README.md#awc-radio-for-android).

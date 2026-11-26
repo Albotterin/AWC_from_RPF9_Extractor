@@ -11,7 +11,8 @@ The game does not store its score as finished songs. The music file of the confi
 
 Each sound ends in a stereo Opus stream of a "sound bank" (ADAT with flags 0xFF21/0xFF61), found by a pass over the
 archive. A *piece* here is a section the game starts by an event, together with the sections that follow it by
-themselves (until the music would loop or the next event is needed). render() mixes the stems of a piece into one Ogg
+themselves (until the music would loop or the next event is needed). The group "places" holds the music of shops, lobbies, lifts
+and other places that are no radio station: finished recordings, taken over as they are. render() mixes the stems of a piece into one Ogg
 Opus file: loops fill their section, a stem that plays once rings out until a later section gives its layer something
 new (or stops it); silence at the end is cut off. That is a reconstruction: in the game, layers also come and go with what the player does. The names
 are the developers' working names. Nothing is decrypted.
@@ -35,7 +36,7 @@ import awc_core as core
 import awc_gamedata as gamedata
 from awc_names import STREAM_ID_MASK
 
-VERSION = 3                                  # of the cached catalog
+VERSION = 4                                  # of the cached catalog
 RATE = 48000
 FRAME = 4                                    # bytes of a decoded stereo frame (16 bit)
 BANK_FLAGS = (0xFF21, 0xFF61)
@@ -47,7 +48,7 @@ NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 NONE = 0xFFFFFFFF
 T_PROJECT, T_NAMES, T_SECTION, T_STEM, T_CLIP, T_FOLLOW = 95, 103, 104, 105, 107, 109
 S_WRAPPER = 6
-GROUPS = ("openworld", "mission", "compound", "activity")
+GROUPS = ("openworld", "mission", "compound", "activity", "places")
 ACTIVITY = ((re.compile(r"^(?:MEDITATION|MED)_"), "Meditation", 1), (re.compile(r"^DANCINGMINIGAME_"), "Dancing Minigame", 1),
             (re.compile(r"^DRN_RACE_"), "Drone Race", 2), (re.compile(r"^DRUG_"), "Drugs", 1), (re.compile(r"^PUZZLE_"), "Puzzle", 1),
             (re.compile(r"^SECRELM_"), "Secrelm", 1))
@@ -443,6 +444,59 @@ def build_pieces(sections, places):
     return pieces
 
 
+# ------------------------------------------------------------------------------------------------ places
+def place_pieces(places, items):
+    """The recordings of the places (gamedata.parse_places) among the scanned banks, as pieces. Songs (recordings with
+    a track number) are left out: they are music of the radio, not of a place."""
+    by_id = {}
+    for it in items:
+        if it.get("tid") is None and not it.get("cues"):
+            for s in it["streams"]:
+                by_id.setdefault(s["id"] & STREAM_ID_MASK, (it, s))
+    found, taken = [], set()
+    for _object, name, waves in places:                          # a recording belongs to the first place that has it
+        own = []
+        for wave in waves:
+            hit = by_id.get(wave[1] & STREAM_ID_MASK)
+            if hit and (hit[0]["base"], hit[1]["i"]) not in taken:
+                taken.add((hit[0]["base"], hit[1]["i"]))
+                own.append(hit)
+        if own:
+            found.append((name, sorted(own, key=lambda x: (x[0]["base"], x[1]["i"]))))
+    unnamed = sorted((v for v in found if not v[0]), key=lambda v: v[1][0][0]["base"])
+    labels = {id(v[1]): "Place %02d" % n for n, v in enumerate(unnamed, 1)}
+    pieces = []
+    for name, own in found:
+        sub = name or labels[id(own)]
+        for n, (it, s) in enumerate(own, 1):
+            key = hashlib.sha1(("place %d %d %d" % (it["base"], s["i"], s["id"])).encode()).hexdigest()[:20]
+            pieces.append({"id": key, "name": "%08X" % s["id"], "group": "places", "sub": sub, "title": "Track %02d" % n,
+                           "bpm": 0, "sec": s["sec"], "parts": [],
+                           "copy": [{k: v for k, v in it.items() if k != "path"}, s["i"]]})
+    return sorted(pieces, key=_order)
+
+
+def _copy(path, piece, out, ffmpeg, cancel, tags):
+    """A recording of a place as it is in the archive; tags are added when FFmpeg is there."""
+    item, index = piece["copy"]
+    folder = os.path.dirname(os.path.abspath(out))
+    os.makedirs(folder, exist_ok=True)
+    _need_space(folder, 2 * item["length"])
+    work = tempfile.mkdtemp(prefix=".score_", dir=folder)
+    try:
+        plain = os.path.join(work, "plain.opus")
+        core.AwcRef(dict(item, path=path)).extract({index: plain}, cancel=cancel)
+        done = plain
+        extra = [x for k, v in (tags or {}).items() if v for x in ("-metadata", "%s=%s" % (k, v))]
+        if extra and ffmpeg:
+            done = os.path.join(work, "out.opus")
+            _run([ffmpeg, "-v", "error", "-y", "-i", plain, "-c", "copy"] + extra + ["-f", "ogg", done], cancel)
+        os.replace(done, out)
+        return piece["sec"]
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
 # ------------------------------------------------------------------------------------------------ catalog
 def cache_file():
     d = os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~"), "AWC-Tool")
@@ -477,6 +531,13 @@ def load(path, progress=None, cancel=None, use_cache=True):
     pieces = build_pieces(sections, locate(waves, banks))
     if not pieces:
         raise ScoreError("the sound banks of the score were not found in this file")
+    try:
+        places = gamedata.read_places(path)
+    except (OSError, ValueError):
+        places = []
+    if places:
+        items = core.scan_container_cached(path, cancel=cancel)[0]
+        pieces = sorted(pieces + place_pieces(places, items), key=_order)
     try:
         with open(cache_file(), "w", encoding="utf-8") as fh:
             json.dump({"v": VERSION, "path": path, "size": st.st_size, "mtime": int(st.st_mtime), "pieces": pieces}, fh,
@@ -573,6 +634,8 @@ def render(path, piece, out, ffmpeg=None, cancel=None, tags=None, bitrate=BITRAT
     """Mix the piece into the Ogg Opus file `out`. Returns its length in seconds (silence at its end is left out,
     so it can be shorter than piece["sec"])."""
     ffmpeg = ffmpeg or find_ffmpeg()
+    if piece.get("copy"):
+        return _copy(path, piece, out, ffmpeg, cancel, tags)
     if not ffmpeg:
         raise ScoreError("FFmpeg is needed to mix the score (see the FFmpeg note of the program)")
     folder = os.path.dirname(os.path.abspath(out))

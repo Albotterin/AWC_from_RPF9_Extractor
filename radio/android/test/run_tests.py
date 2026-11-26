@@ -125,7 +125,8 @@ def main():
 
 
 def compare_programmes(cp, folder):
-    """The app and the PC must put the same item on air at the same moment, with and without adverts."""
+    """The app and the PC must put the same item on air at the same moment, with and without adverts, news and talk, by
+    day and by night."""
     import json
     import struct
 
@@ -135,6 +136,7 @@ def compare_programmes(cp, folder):
             sys.path.insert(0, d)
     import awc_radio as radio
     moments = [1795000000.0, 1795046399.5, 1795132800.0, time.time(), 1811111111.25]
+    moments += [time.mktime((2026, m, d, h, 40, 0, 0, 0, -1)) for m, d in ((11, 26), (3, 28), (10, 31)) for h in (21, 1, 5)]
     out = os.path.join(OUT, "programme.txt")
     r = subprocess.run(["java", "-cp", cp, "org.awctool.radio.ProgramDump", folder, out] + [repr(m) for m in moments])
     if r.returncode:
@@ -149,24 +151,40 @@ def compare_programmes(cp, folder):
             tr["set"] = not talk                       # made of parts: a talk show, or a club's DJ set
         return tr
 
-    want = []
-    for name in sorted(f for f in os.listdir(folder) if f.endswith(".radiopak")):
+    def index_of(name):
         with open(os.path.join(folder, name), "rb") as f:
             offset, length = struct.unpack_from("<QQ", f.read(32), 16)
             f.seek(offset)
-            stations = json.loads(f.read(length))["stations"]
+            return json.loads(f.read(length))
+
+    news = []
+    for name in sorted(f for f in os.listdir(folder) if f.endswith(".newspak")):
+        news = [track(x) for x in index_of(name)["news"][0]["items"]]
+
+    want = []
+    spoken_radio = set()                          # talk radio: talk is what it plays, with or without the switch
+    for name in sorted(f for f in os.listdir(folder) if f.endswith(".radiopak")):
+        stations = index_of(name)["stations"]
         if not stations:
             continue                                   # a podcast pack has no programme
         st = stations[0]
         talk = st.get("kind") == "talk"
-        station = {"songs": [track(x) for x in st["songs"]], "jingles": [track(x) for x in st["jingles"]],
-                   "ads": [track(x) for x in st.get("ads", [])]}
+        if st.get("rules", {}).get("talkradio"):
+            spoken_radio.add(st["name"])
+        station = {"songs": [track(x) for x in st["songs"]], "jingles": [track(x) for x in st["jingles"]]}
+        for key in ("ads", "talk"):
+            station[key] = [track(x) for x in st.get(key, [])]
+        station["news"] = st.get("news", False)
+        if "rules" in st:
+            station["rules"] = st["rules"]
+            talk = False                               # no recording of a ruled station is a whole show
         spoken = {x["k"]: [int(x["k"].split("_")[0]), int(x["k"].split("_")[1]), x["s"]] for x in st.get("voices", [])}
         for entry, own in zip(st["songs"], station["songs"]):
             if "dj" in entry:
                 own["dj"] = {w: [v[0], v[1], [spoken[k] for k in v[2]]] for w, v in entry["dj"].items()}
         station["toads"] = [spoken[k] for k in st.get("toads", [])]
-        programmes = [("%s%d" % (tag, fade), radio.Schedule(st["name"], station, tag == "ads", fade))
+        station["tonews"] = [spoken[k] for k in st.get("tonews", [])]
+        programmes = [("%s%d" % (tag, fade), radio.Schedule(st["name"], station, tag == "ads", fade, news))
                       for tag in ("no", "ads") for fade in (0, 3, 8)]
         for i, now in enumerate(moments):
             for tag, schedule in programmes:
@@ -179,17 +197,19 @@ def compare_programmes(cp, folder):
     got.sort()
     want.sort()
     ads = sum(1 for x in want if "|ad|" in x)
+    kinds = {k: sum(1 for x in want if "|%s|" % k in x) for k in ("news", "talk")}
     said = sum(1 for x in want if "|voice|" in x)
     bad = [(a, b) for a, b in zip(got, want) if a != b]
     if len(got) != len(want) or bad:
         print("programme differs: %d lines from the app, %d from the PC; first: %s" % (len(got), len(want), bad[:3]))
         sys.exit(1)
-    leaked = sum(1 for x in want if "|no|ad|" in x)
+    leaked = sum(1 for x in want if x.split("|")[2].startswith("no")
+                 and x.split("|")[3] in (("ad", "news") if x.split("|")[0] in spoken_radio else ("ad", "news", "talk")))
     if leaked or not ads:
-        print("adverts: %d in the advert programme, %d in the advert-free one" % (ads, leaked))
+        print("adverts: %d in the full programme, %d adverts/news/talk in the plain one" % (ads, leaked))
         sys.exit(1)
-    print("Programme: app and PC identical (%d lines compared: %d adverts, %d DJ lines, no advert in the advert-free programme)"
-          % (len(want), ads, said))
+    print("Programme: app and PC identical (%d lines compared: %d adverts, %d news, %d talk, %d DJ lines; none of the first "
+          "three in the plain programme)" % (len(want), ads, kinds["news"], kinds["talk"], said))
 
 
 if __name__ == "__main__":

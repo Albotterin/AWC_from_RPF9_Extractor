@@ -14,18 +14,24 @@ public final class ProgramDump {
     public static void main(String[] args) throws Exception {
         File[] files = new File(args[0]).listFiles((d, n) -> n.endsWith(".radiopak"));
         java.util.Arrays.sort(files);
+        Pack news = null;
+        for (File f : new File(args[0]).listFiles((d, n) -> n.endsWith(".newspak"))) {
+            FileInputStream in = new FileInputStream(f);
+            news = new Pack(in.getChannel(), in.getFD(), in);
+        }
         try (PrintStream out = new PrintStream(args[1], "UTF-8")) {
             for (File f : files) {
                 FileInputStream in = new FileInputStream(f);
                 Pack pack = new Pack(in.getChannel(), in.getFD(), in);
                 for (Library.Station s : pack.stations()) {
+                    if (news != null) s.setNews(news.news(), news);
                     for (int a = 2; a < args.length; a++) {
                         double now = Double.parseDouble(args[a]);
                         for (boolean adverts : new boolean[]{false, true}) {
                             for (int fade : new int[]{0, 3, 8}) {
                                 for (Schedule.Item it : s.programme(adverts, fade).itemsFrom(now, 40)) {
                                     out.printf(java.util.Locale.ROOT, "%s|%d|%s%d|%s|%s|%.6f|%.6f|%.6f|%.6f%n", s.name, a - 2,
-                                            adverts ? "ads" : "no", fade, it.ad ? "ad" : it.jingle ? "jingle" : "song", it.track.key,
+                                            adverts ? "ads" : "no", fade, it.kind, it.track.key,
                                             it.start, it.end, it.fadeIn, it.fadeOut);
                                     for (Schedule.Voice v : s.programme(adverts, fade).voices(it)) {
                                         out.printf(java.util.Locale.ROOT, "%s|%d|%s%d|voice|%s|%.6f|%.6f%n", s.name, a - 2,

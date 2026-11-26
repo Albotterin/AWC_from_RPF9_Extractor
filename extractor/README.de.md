@@ -172,7 +172,7 @@ länger). Ohne Haken erscheint wieder die Ansicht nach Lage im Archiv.
 * Die **Podcasts** stehen in einer eigenen Gruppe **Podcasts**, je Podcast mit Cover und seinen Folgen; beim Extrahieren
   entstehen die Ordner `Podcasts/<Name>/`.
 * Der **Score** hat einen eigenen Ordner, **Score**, der von selbst entsteht: **Offene Welt**, **Missionen**,
-  **Stützpunkte** und **Aktivitäten**, darunter die Untergruppen und die Stücke (siehe [Der Score](#der-score)). Beim
+  **Stützpunkte**, **Aktivitäten** und **Musik an Orten**, darunter die Untergruppen und die Stücke (siehe [Der Score](#der-score)). Beim
   ersten Mal dauert das nach den Sendern noch einige Minuten. Doppelklick spielt ab, **Markierte extrahieren** schreibt
   `Score/<Gruppe>/<Untergruppe>/<Titel>` – für ein Stück, eine Untergruppe oder eine ganze Gruppe. Ein Stück wird beim
   Abspielen oder Extrahieren gemischt (braucht FFmpeg); **Alle Streams extrahieren** lässt den Score aus.
@@ -190,7 +190,10 @@ durch das Archiv, beim ersten Mal einige Minuten) und bietet **Stücke** an: ein
 Ereignis startet, samt denen, die von selbst folgen, mit FFmpeg aus ihren Spuren gemischt. Im Beispielarchiv sind das
 2.543 Stücke, rund 33 Stunden; 974 davon dauern mindestens 30 Sekunden.
 
-* Gruppen: **Offene Welt**, **Missionen**, **Stützpunkte**, **Aktivitäten**, jeweils mit Untergruppen. Die Namen sind
+**Musik an Orten** enthält, was weder interaktive Musik noch Radio ist: 113 fertige Aufnahmen (4,8 Stunden) aus
+Fahrstühlen, Hotellobbys, einer Minigolfanlage und anderen Orten. Sie werden unverändert übernommen.
+
+* Gruppen: **Offene Welt**, **Missionen**, **Stützpunkte**, **Aktivitäten**, **Musik an Orten**, jeweils mit Untergruppen. Die Namen sind
   Arbeitsnamen der Entwickler (`CG_RAID_CAUGHT_SHOOTOUT_A`) – offizielle Titel gibt es nicht, und sie können die Handlung
   verraten.
 * Doppelklick spielt ab; **Speichern** schreibt `Score/<Gruppe>/<Untergruppe>/<Titel>.opus`; **App-Packs** schreibt je

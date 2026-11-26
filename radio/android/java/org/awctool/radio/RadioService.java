@@ -600,9 +600,8 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
     }
 
     private Engine newEngine(Library.Station st) {
-        final Pack p = st.pack;
         Engine e = new Engine(st.programme(adverts(this), crossfade(this)), clock,
-                track -> new PackPlayer(p, "t/" + track.key, AudioAttributes.USAGE_MEDIA));
+                track -> new PackPlayer(st.packOf(track), "t/" + track.key, AudioAttributes.USAGE_MEDIA));
         e.setDj(dj(this));
         return e;
     }
@@ -612,7 +611,7 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
         return c.getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(PREF_DJ, false);
     }
 
-    /** Whether the listener wants advert breaks (off unless switched on). */
+    /** Whether the listener wants adverts, news and talk (off unless switched on). */
     static boolean adverts(Context c) {
         return c.getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(PREF_ADS, false);
     }
@@ -814,6 +813,7 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
             }
         } else if (state != STOPPED) {
             List<Library.Station> list = PackStore.get(this).stations;
+            applyProgramme();                                        // (the news pack may have come or gone)
             int idx = Catalog.indexOf(list, stationName);
             if (idx < 0) {
                 AppLog.d("the pack of " + stationName + " is gone: stop");
@@ -959,7 +959,7 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
     /** A long mix shows the title of the part that is playing now (from the markers in the pack). */
     private void updatePart() {
         Schedule.Item it = engine.current();
-        if (it == null || it.jingle || it.track.partStart == null || it != lastItemShown) return;
+        if (it == null || !Schedule.SONG.equals(it.kind) || it.track.partStart == null || it != lastItemShown) return;
         int k = it.track.partAt(System.currentTimeMillis() / 1000.0 - it.start);
         if (k == partShown) return;
         partShown = k;
@@ -970,8 +970,19 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
         updateNotification();
     }
 
-    static String advertTitle(Context c, Schedule.Track t) {
-        return t.title.isEmpty() ? c.getString(R.string.advert) : t.title;
+    /** What an item is called on the screen. */
+    static String itemTitle(Context c, Schedule.Item it) {
+        if (it.jingle) return c.getString(R.string.jingle);
+        if (it.ad) return it.track.title.isEmpty() ? c.getString(R.string.advert) : it.track.title;
+        if (Schedule.NEWS.equals(it.kind)) return c.getString(R.string.news);
+        if (Schedule.TALK.equals(it.kind) && it.track.title.isEmpty()) return c.getString(R.string.talk);
+        return it.track.title;
+    }
+
+    /** The line under it: the artist of a song, "Advert" over a product's name, else nothing. */
+    static String itemArtist(Context c, Schedule.Item it) {
+        if (it.ad) return it.track.title.isEmpty() ? "" : c.getString(R.string.advert);
+        return Schedule.SONG.equals(it.kind) || Schedule.TALK.equals(it.kind) ? it.track.artist : "";
     }
 
     private void onItemChanged() {
@@ -980,12 +991,12 @@ public class RadioService extends MediaBrowserService implements PackStore.Liste
         lastItemShown = it;
         partShown = -2;
         jingle = it.jingle;
-        title = jingle ? getString(R.string.jingle) : it.ad ? advertTitle(this, it.track) : it.track.title;
-        artist = jingle ? "" : it.ad ? (it.track.title.isEmpty() ? "" : getString(R.string.advert)) : it.track.artist;
+        title = itemTitle(this, it);
+        artist = itemArtist(this, it);
         itemStart = it.start;
         itemEnd = it.end;
         Schedule.Item nx = engine.itemAfter(it);
-        nextText = nx == null ? "" : nx.jingle ? getString(R.string.jingle) : nx.ad ? getString(R.string.advert)
+        nextText = nx == null ? "" : nx.ad ? getString(R.string.advert) : !Schedule.SONG.equals(nx.kind) ? itemTitle(this, nx)
                 : (nx.track.artist.isEmpty() ? nx.track.title : nx.track.artist + " - " + nx.track.title);
         AppLog.d("on air: " + (jingle ? "jingle" : artist + " - " + title) + " (" + it.track.key + ")"
                 + (engine.failures() > 0 ? ", player failures so far: " + engine.failures() : ""));

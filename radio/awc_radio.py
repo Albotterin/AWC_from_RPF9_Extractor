@@ -10,6 +10,7 @@ It uses the same scan cache as awc_tool.py and needs ffplay (next to the program
 import bisect
 import hashlib
 import json
+import math
 import os
 import queue
 import re
@@ -37,7 +38,7 @@ NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 SONG_MIN, SONG_MAX = 60.0, 1500.0          # seconds: shorter is not a song, longer is a mix
 JINGLE_MIN, JINGLE_MAX = 2.0, 25.0         # unnamed short streams of a station are used as jingles
 MIN_SONGS = 5                              # a station needs at least this many songs to be listed
-INDEX_VERSION = 10
+INDEX_VERSION = 12
 
 BG, PANEL, CARD, CARD_SEL, FG, DIM, ACCENT = "#14161c", "#1c1f27", "#232733", "#2f3550", "#eceef4", "#8b91a3", "#ff5a36"
 
@@ -54,11 +55,12 @@ STR = {
         "err_ffplay": "ffplay was not found. Put ffplay.exe next to the program or into your PATH.",
         "err_credits": "The credits page could not be downloaded:\n{e}\n\nPick the page saved from your browser instead?",
         "err_html": "HTML page", "err_generic": "Something went wrong:\n{e}", "err_nostations": "No station with songs was found.",
-        "kind_song": "SONG", "kind_jingle": "JINGLE", "kind_ad": "ADVERT", "advert": "Advert", "chk_ads": "Adverts", "chk_dj": "DJ",
+        "kind_song": "SONG", "kind_jingle": "JINGLE", "kind_ad": "ADVERT", "advert": "Advert", "chk_ads": "Adverts, news & talk", "chk_dj": "DJ",
+        "kind_news": "NEWS", "news": "News", "kind_talk": "TALK", "talk": "Talk",
         "dj_needs_ffmpeg": "The DJ needs FFmpeg (ffmpeg.exe) next to the program or in your PATH.",
         "lbl_fade": "Crossfade", "fade_off": "Off", "fade_s": "{n} s",
         "st_fade_note": "The programme now differs from devices with another crossfade setting (standard: 3 s).", "btn_play": "▶ Play (live)", "btn_pause": "⏸ Pause",
-        "sync_hint": "Live: the stations run by the UTC clock, everyone with the same time hears the same song.", "lbl_volume": "Volume", "n_songs": "{n} songs", "n_shows": "{n} shows", "kind_show": "SHOW", "st_loading": "Loading …",
+        "sync_hint": "Live: the stations run by the clock, everyone with the same time and time zone hears the same.", "lbl_volume": "Volume", "n_songs": "{n} songs", "n_shows": "{n} shows", "n_segments": "{n} segments", "kind_show": "SHOW", "st_loading": "Loading …",
         "lbl_next": "Up next:", "tune": "Tune in to a station on the left", "no_logo_hint": "",
         "pod_header": "Podcasts", "pod_episode": "Episode {n}", "pod_summary": "{n} episodes · {m} min", "pod_heard": "heard",
         "pod_resume": "continue at {t}", "pod_back": "−{n} s", "pod_forward": "+{n} s", "pod_error": "cannot be played",
@@ -76,11 +78,12 @@ STR = {
         "err_ffplay": "ffplay wurde nicht gefunden. ffplay.exe neben das Programm legen oder in den PATH aufnehmen.",
         "err_credits": "Die Credits-Seite konnte nicht geladen werden:\n{e}\n\nStattdessen die im Browser gespeicherte Seite wählen?",
         "err_html": "HTML-Seite", "err_generic": "Es ist ein Fehler aufgetreten:\n{e}", "err_nostations": "Es wurde kein Sender mit Songs gefunden.",
-        "kind_song": "SONG", "kind_jingle": "JINGLE", "kind_ad": "WERBUNG", "advert": "Werbung", "chk_ads": "Werbung", "chk_dj": "DJ",
+        "kind_song": "SONG", "kind_jingle": "JINGLE", "kind_ad": "WERBUNG", "advert": "Werbung", "chk_ads": "Werbung, News & Talk", "chk_dj": "DJ",
+        "kind_news": "NACHRICHTEN", "news": "Nachrichten", "kind_talk": "TALK", "talk": "Talk",
         "dj_needs_ffmpeg": "Für den DJ wird FFmpeg (ffmpeg.exe) neben dem Programm oder im PATH gebraucht.",
         "lbl_fade": "Überblenden", "fade_off": "Aus", "fade_s": "{n} s",
         "st_fade_note": "Das Programm weicht jetzt von Geräten mit anderer Überblendung ab (Standard: 3 s).", "btn_play": "▶ Abspielen (live)", "btn_pause": "⏸ Pause",
-        "sync_hint": "Live: Die Sender laufen nach der UTC-Uhrzeit, alle mit derselben Zeit hören denselben Song.", "lbl_volume": "Lautstärke", "n_songs": "{n} Songs", "n_shows": "{n} Sendungen", "kind_show": "SENDUNG", "st_loading": "Lade …",
+        "sync_hint": "Live: Die Sender laufen nach der Uhr, alle mit derselben Zeit und Zeitzone hören dasselbe.", "lbl_volume": "Lautstärke", "n_songs": "{n} Songs", "n_shows": "{n} Sendungen", "n_segments": "{n} Beiträge", "kind_show": "SENDUNG", "st_loading": "Lade …",
         "lbl_next": "Als Nächstes:", "tune": "Links einen Sender wählen", "no_logo_hint": "",
         "pod_header": "Podcasts", "pod_episode": "Folge {n}", "pod_summary": "{n} Folgen · {m} Min.", "pod_heard": "gehört",
         "pod_resume": "weiter bei {t}", "pod_back": "−{n} s", "pod_forward": "+{n} s", "pod_error": "lässt sich nicht abspielen",
@@ -411,27 +414,38 @@ def make_index(rpf, pool, get_songs, status=None, progress=None):
         if sid not in found:                                      # for the parts of the long mixes
             hit = credits.lookup(songs, station, title, artists)
             found[sid] = (hit or (gamecfg.pretty(title), ", ".join(gamecfg.pretty(a) for a in artists))) + (station,)
+    try:
+        rules = gamedata.read_rules(rpf)                      # what the game lets follow what, and how often
+    except (OSError, ValueError):
+        rules = {}
+    try:
+        news = gamedata.build_news(items, gamedata.read_news(rpf))
+    except (OSError, ValueError):
+        news = []
     if status:
         status(t("st_build"), 0.88)
     unnamed = {}
     stations = build_stations(items, found, cfg_names, unnamed)
     fill_unnamed(stations, unnamed, songs, found)
     stations.update(build_mixes(items, found, songs))
-    for name, st in gamedata.build(items, game, songs, matched, cfg_names).items():
-        if not st["jingles"] and name in stations:                # a bare playlist: keep the jingles found for the station
+    for name, st in gamedata.build(items, game, songs, matched, cfg_names, rules).items():
+        if not news:
+            st.pop("news", None)
+        if not st["jingles"] and "rules" not in st and name in stations:  # a bare playlist: keep the jingles found for it
             songs_ = {_tkey(x) for x in st["songs"]}
             st["jingles"] = [j for j in stations[name]["jingles"] if _tkey(j) not in songs_]
         stations[name] = st                                       # replaces the guessed station of the same name
     for name, st in stations.items():
         for tr_ in st["songs"]:                                   # "Six Four Five" -> "6:45" with its artist
-            if not tr_["artist"] and not tr_.get("parts"):
+            if not tr_["artist"] and not tr_.get("parts") and not st.get("rules", {}).get("talkradio"):
                 hit = credits.lookup(songs, name, tr_["title"], own_only=True)
                 if hit:
                     tr_["title"], tr_["artist"] = hit
     add_venues(stations, items, rpf, songs, matched, cfg_names)
     adverts = gamedata.advert_keys(items, game)
     for st in stations.values():                        # an advert is never a jingle: it only runs when adverts are wanted
-        st["jingles"] = [j for j in st["jingles"] if (j["base"], j["idx"]) not in adverts]
+        if "rules" not in st:
+            st["jingles"] = [j for j in st["jingles"] if (j["base"], j["idx"]) not in adverts]
     stations = dict(sorted(stations.items(), key=lambda kv: sort_key(kv[0])))
     try:
         spoken = awc_dj.collect(rpf, items, stations)            # the DJ's windows and lines of every song
@@ -446,33 +460,43 @@ def make_index(rpf, pool, get_songs, status=None, progress=None):
     numbered = {it["base"]: it.get("tid") for it in items}
     runs = [[numbered.get(e["base"]) for e in st["songs"]] for st in podcasts.values()]
     wanted = texts.numbers(items) | {n for run in runs for n in texts.fill_gaps(run) if n is not None}
-    apply_titles(stations, podcasts, items, texts.read_titles(rpf, wanted), songs)
+    shows = {}
+    titles = texts.read_titles(rpf, wanted, shows)
+    apply_titles(stations, podcasts, items, titles, songs, shows)
+    if not any(st.get("news") for st in stations.values()):
+        news = []
     used = {}
-    for st in list(stations.values()) + list(podcasts.values()):
-        for tr_ in st["songs"] + st["jingles"] + st.get("ads", []):
-            for base, _idx in tr_.get("parts") or [(tr_["base"], tr_["idx"])]:
-                used[base] = None
+    for tr_ in [x for st in list(stations.values()) + list(podcasts.values()) for x in gamedata.tracks_of(st)] + news:
+        for base, _idx in tr_.get("parts") or [(tr_["base"], tr_["idx"])]:
+            used[base] = None
     by_base = {it["base"]: it for it in items}
     by_base.update(spoken)                                      # the speech containers of the DJ lines
     for st in stations.values():
-        for line in [x for s in st["songs"] for w in s.get("dj", {}).values() for x in w[2]] + st.get("toads", []):
-            used[line[0]] = None
-    idx = {"fp": fingerprint(rpf, pool), "stations": stations, "podcasts": podcasts,
+        for line in awc_dj.station_lines(st):
+            used[line["base"]] = None
+    idx = {"fp": fingerprint(rpf, pool), "stations": stations, "podcasts": podcasts, "news": news,
            "items": {str(b): by_base[b] for b in used}}
     with open(index_path(), "w", encoding="utf-8") as f:
         json.dump(idx, f)
     return idx
 
 
-def apply_titles(stations, podcasts, items, titles, songs):
+def apply_titles(stations, podcasts, items, titles, songs, shows=None):
     """Names from the game's own table (awc_texts), by the track number every recording carries: songs that had no or
-    another name, the parts of the long mixes and the titles of the podcast episodes. `titles` is empty when there is no
-    data.rpf next to the archive: then everything stays as it is."""
+    another name, the parts of the long mixes, the titles of the podcast episodes and (from `shows`) the name of a show
+    its spoken parts belong to. `titles` is empty when there is no data.rpf next to the archive: then everything stays
+    as it is."""
     if not titles:
         return
     by_base = {it["base"]: it for it in items}
     for name, st in stations.items():
         station = name[:-6] if name.endswith(" (Mix)") else name
+        for tr_ in st.get("talk", []) + st["jingles"]:
+            number = (by_base.get(tr_["base"]) or {}).get("tid")
+            if shows and number in shows:
+                tr_["title"] = texts.pretty(shows[number])
+        if st.get("rules", {}).get("talkradio"):                  # its items are shows, named after their streams
+            continue
         for tr_ in st["songs"]:
             it = by_base.get(tr_["base"])
             if tr_.get("parts") or not it:
@@ -525,6 +549,30 @@ LEAD = 0.4                                 # ffplay needs about this long to sta
 TAIL = 0.3                                 # an item that is not faded out may play this much longer than scheduled
 AD_AFTER = (540, 361)                      # with adverts: a break after 9 to 15 minutes of programme (540 + 0..360 s)
 DJ_INTRO, DJ_OUTRO, DJ_BEFORE_ADS = 50, 35, 70      # per cent: how often the DJ talks over an intro, an outro, into a break
+SPOKEN_FROM = 25.0                         # seconds: a station's longer spoken item is talk, a shorter one a jingle
+
+
+def hour_of(now):
+    """The hour of the listener's clock as the game's curves are asked for it: 0.0, 0.5, ... 23.5. The game's clock runs
+    much faster than a real one, so an item there carries it across a change from day to night; counting in
+    half hours keeps that: a night show does not open shortly before its time only to close again."""
+    lt = time.localtime(math.floor(now))
+    return lt.tm_hour + (0.5 if lt.tm_min >= 30 else 0.0)
+
+
+def curve_value(curve, x):
+    """A curve of the rules at x: straight lines between [x, y] points, or a table by the number of items in a row."""
+    if not isinstance(curve[0], list):
+        return curve[min(max(int(x) - 1, 0), len(curve) - 1)]
+    if x < curve[0][0]:
+        return curve[0][1]
+    i = 0
+    while i + 1 < len(curve) and curve[i + 1][0] <= x:
+        i += 1
+    if i + 1 == len(curve):
+        return curve[i][1]
+    (x0, y0), (x1, y1) = curve[i], curve[i + 1]
+    return y0 + (y1 - y0) * (x - x0) / (x1 - x0)
 
 
 def segment_at(tr_, pos):
@@ -555,60 +603,97 @@ def _h(*parts):
 class Schedule:
     """The programme of one station, a pure function of the station and the UTC clock.
 
-    Every UTC day gets its own order: the songs are 'shuffled' by hashing (station, day, pass, song), one jingle is
-    placed after every 2-4 songs, and the day is filled from 00:00:00 UTC onwards. Nothing random and nothing stored,
-    so everybody with the same game files and the same clock hears the same song at the same second. The one song that
-    would cross midnight UTC is cut there.
+    Every UTC day gets its own order and is filled from 00:00:00 UTC onwards. Nothing random and nothing stored (every
+    choice is a hash of station, day and place), so everybody with the same game files and the same clock hears the same
+    item at the same second. The item that would cross midnight UTC is cut there.
 
     Two songs that follow each other overlap by `fade` seconds (a crossfade like on a real radio): the next one starts
-    while the previous one fades out. Jingles, adverts and talk shows are never faded: they follow back to back. The
-    overlap is part of the timetable, so listeners hear the same only with the same crossfade (standard: FADE).
+    while the previous one fades out. Nothing else is faded: it follows back to back. The overlap is part of the
+    timetable, so listeners hear the same only with the same crossfade (standard: FADE).
 
-    With the DJ switched on, voices() says what the DJ says over an item; that changes nothing in the timetable.
+    A station that brings the game's programme rules (station["rules"]) follows them: after an item of one category the
+    rules weigh which categories may follow, by the seconds since each was last heard, the number of its items in a row
+    and the hour of the listener's clock (so a night show comes at night; listeners in one time zone hear the same). Its
+    second programme (ads=True) has everything: songs, jingles, adverts, the news (`news`) and what is said. Without it
+    only songs and jingles are left, and the rules decide among those. Talk radio is talk in both; there the switch is
+    about its adverts, which are stepped over.
 
-    Every station has a second programme with adverts (ads=True, for stations that have an advert list): after 9 to 15
-    minutes of songs comes a break of two or three adverts, then a jingle. Without adverts the programme is the same as
-    for a station that has none."""
+    A station without rules plays its songs in a shuffled order with a jingle after every 2-4 songs.
 
-    def __init__(self, name, station, ads=False, fade=FADE):
+    With the DJ switched on, voices() says what the DJ says over an item; that changes nothing in the timetable."""
+
+    def __init__(self, name, station, ads=False, fade=FADE, news=()):
         self.name = name
         self.fade = min(float(FADE_MAX), max(0.0, float(fade)))
-        self.talk = any(_is_show(s) for s in station["songs"])        # talk radio: its items are shows, not songs
+        self.talk = any(_is_show(s) for s in station["songs"])        # items that are whole talk shows: never faded
         self.songs = sorted(station["songs"], key=_tkey)
         self.jingles = sorted(station["jingles"], key=_tkey)
-        self.ads = sorted(station.get("ads", []), key=_tkey) if ads else []
+        self.rules = station.get("rules")
+        self.extras = bool(ads)
         self.toads = station.get("toads", [])                          # the DJ's lines into an advert break
+        self.tonews = station.get("tonews", [])                        # ... and into the news
+        self.pools, self.passed, self.hosted = {}, (), set()
+        if self.rules:
+            self._gather(station, news)
         self.days = {}
+
+    def _gather(self, station, news):
+        """The recordings of every category of the rules, each with its kind."""
+        tracks = {_tkey(x): x for x in station["songs"] + station["jingles"] + station.get("talk", []) + station.get("ads", [])}
+        flagged = set(self.rules.get("ads", ()))
+        talk_radio = bool(self.rules.get("talkradio"))
+
+        def kind(category, key):
+            if category in gamedata.SONG_CATEGORIES:
+                return "song"
+            if category == "advert" or key in flagged:
+                return "ad"
+            return "talk" if category in gamedata.TALK_CATEGORIES or tracks[key]["sec"] > SPOKEN_FROM else "jingle"
+        pools = {c: [(kind(c, k), tracks[k]) for k in keys if k in tracks] for c, keys in self.rules["pools"].items()}
+        if station.get("news") and news:
+            pools["news"] = [("news", x) for x in sorted(news, key=_tkey)]
+        if not self.extras:
+            if talk_radio:
+                self.passed = ("ad",)                          # the chain of its shows goes on past them
+            else:
+                pools = {c: [x for x in v if x[0] not in ("ad", "news", "talk")] for c, v in pools.items()}
+        self.pools = {c: v for c, v in pools.items() if v}
+        if "showintro_night" in self.rules["pools"]:           # a night show has a host of its own
+            self.hosted = {k for c in ("music_night", "music_night2") for k in self.rules["pools"].get(c, ())}
 
     def _day(self, d):
         """-> ([start offsets], [[kind, track, fade_in, fade_out]]) of UTC day number d."""
-        if d in self.days:
-            return self.days[d]
+        if d not in self.days:
+            made = self._ruled_day(d) if self.rules else self._plain_day(d)
+            if len(self.days) > 4:
+                self.days.clear()
+            self.days[d] = made
+        return self.days[d]
+
+    def _add(self, starts, entries, kind, tr_):
+        """Put an item behind the last one; False when it would start after the day."""
+        sec = max(1.0, tr_["sec"])
+        ov, start = 0.0, 0.0
+        if entries:
+            last = entries[-1]
+            before = max(1.0, last[1]["sec"])
+            if kind == "song" and last[0] == "song" and not self.talk:        # crossfade only from song to song
+                ov = min(self.fade, 0.25 * before, 0.25 * sec)
+            start = starts[-1] + before - ov
+            if start >= DAY:
+                return False
+            last[3] = ov
+        starts.append(start)
+        entries.append([kind, tr_, ov, 0.0])
+        return True
+
+    def _plain_day(self, d):
         name = self.name
         starts, entries = [], []
         deck, npass, last_song, last_jingle, jn = [], 0, None, None, 0
-        prev_start, prev_sec, prev_kind = 0.0, 0.0, ""
         count, target = 0, 2 + _h(name, d, "target", 0) % 3
-        played, bn, after_break = 0.0, 0, False              # played: seconds of songs since the last advert break
-        block, ad_deck, apass, last_ad = [], [], 0, None
-        threshold = AD_AFTER[0] + _h(name, d, "adt", 0) % AD_AFTER[1]
         while True:
-            if self.ads and not block and not after_break and played >= threshold:
-                bn += 1
-                for _k in range(2 + _h(name, d, "adn", bn) % 2):
-                    if not ad_deck:
-                        apass += 1
-                        ad_deck = sorted(self.ads, key=lambda s: _h(name, d, "ads", apass, _tkey(s)), reverse=True)
-                        if len(ad_deck) > 1 and ad_deck[-1] is last_ad:
-                            ad_deck[-1], ad_deck[0] = ad_deck[0], ad_deck[-1]
-                    last_ad = ad_deck.pop()
-                    block.append(last_ad)
-                played, threshold = 0.0, AD_AFTER[0] + _h(name, d, "adt", bn) % AD_AFTER[1]
-            if block:
-                tr_, kind = block.pop(0), "ad"
-                after_break = not block and bool(self.jingles)           # "you are listening to ..." after the break
-            elif self.jingles and (after_break or count >= target):
-                after_break = False
+            if self.jingles and count >= target:
                 jn += 1
                 count, target = 0, 2 + _h(name, d, "target", jn) % 3
                 pool = [j for j in self.jingles if j is not last_jingle] or self.jingles
@@ -623,31 +708,102 @@ class Schedule:
                 last_song = tr_ = deck.pop()
                 count += 1
                 kind = "song"
-                played += max(1.0, tr_["sec"])
-            sec = max(1.0, tr_["sec"])
-            if entries:
-                ov = 0.0                                          # crossfade only from one song into the next
-                if kind == "song" and prev_kind == "song" and not self.talk:
-                    ov = min(self.fade, 0.25 * prev_sec, 0.25 * sec)
-                start = prev_start + prev_sec - ov
-                if start >= DAY:
-                    break
-                entries[-1][3] = ov
+            if not self._add(starts, entries, kind, tr_):
+                return starts, entries
+
+    def _next_category(self, d, step, current, run, heard, now, hour):
+        """The category that follows, as the rules weigh them at second `now` of the day."""
+        table = self.rules["table"]
+
+        def value(factor):
+            if not isinstance(factor, list):
+                return factor
+            what, category, curve = factor
+            if what == "h":
+                return curve_value(curve, hour)
+            if what == "s":                                   # seconds since it was last heard
+                return curve_value(curve, now - heard.get(category, -1e9))
+            return curve_value(curve, run if category == current else 0)
+
+        def weigh(rows):
+            found = []
+            for follower, factors in rows:
+                if follower in self.pools:
+                    weight = 1.0
+                    for factor in factors:
+                        weight *= value(factor)
+                        if weight <= 0:
+                            break
+                    if weight > 0:
+                        found.append((follower, weight))
+            return found
+        found = weigh(table[current]) if current in table else []
+        found = found or weigh(table.get("", []))
+        if not found:                                          # nothing is allowed: music (else whatever there is)
+            for category in ("music", "music_night", "music_dj2"):
+                if category in self.pools:
+                    return category
+            ordered = sorted(self.pools)
+            return ordered[_h(self.name, d, "any", step) % len(ordered)]
+        at = _h(self.name, d, "next", step) / 4294967296.0 * sum(w for _c, w in found)
+        for category, weight in found:
+            at -= weight
+            if at < 0:
+                return category
+        return found[-1][0]
+
+    def _ruled_day(self, d):
+        name = self.name
+        history, sequence = self.rules.get("history", {}), set(self.rules.get("sequence", ()))
+        heard = {}                                             # category -> second of the day at which it last ended
+        for rows in self.rules["table"].values():
+            for _follower, factors in rows:
+                for f in factors:                              # the day begins in the middle of a programme
+                    if isinstance(f, list) and f[0] == "s":
+                        heard[f[1]] = -float(_h(name, d, "heard", f[1]) % 3600)
+        starts, entries = [], []
+        recent, place = {}, {}                                 # category -> keys just heard / the next in its order
+        current, run, previous = "", 0, ""
+        now, step, passed = 0.0, 0, 0
+        while self.pools:
+            category = self._next_category(d, step, current, run, heard, now, hour_of(d * DAY + now))
+            pool = self.pools[category]
+            if category in sequence:
+                at = place.get(category)
+                if at is None:
+                    at = _h(name, d, "order", category) % len(pool)
+                kind, tr_ = pool[at % len(pool)]
+                place[category] = at + 1
             else:
-                ov, start = 0.0, 0.0
-            starts.append(start)
-            entries.append([kind, tr_, ov, 0.0])
-            prev_start, prev_sec, prev_kind = start, sec, kind
-        if len(self.days) > 4:
-            self.days.clear()
-        self.days[d] = (starts, entries)
-        return self.days[d]
+                keep = min(history.get(category, len(pool) * 2 // 3), len(pool) - 1)
+                last = recent.setdefault(category, [])
+                free = [x for x in pool if _tkey(x[1]) not in last]
+                free = [x for x in free if _tkey(x[1]) != previous] or free
+                kind, tr_ = free[_h(name, d, "item", category, step) % len(free)]
+                last.append(_tkey(tr_))
+                del last[:max(0, len(last) - keep)]
+            step += 1
+            skip = kind in self.passed and passed < 50
+            if skip:
+                passed += 1
+            else:
+                passed = 0
+                if not self._add(starts, entries, kind, tr_):
+                    break
+                now = starts[-1] + max(1.0, tr_["sec"])
+                previous = _tkey(tr_)
+                if now >= DAY:
+                    break
+            run = run + 1 if category == current else 1
+            current = category
+            heard[category] = now
+        return starts, entries
 
     def voices(self, item):
         """What the DJ says over an item of items_from(): [(second in the item, [bank position, stream, length])].
 
         Over a song the DJ talks in its marked intro (every second time) and outro (every third time); before an advert
-        break the line that leads into it replaces the outro. The same for everybody at the same second."""
+        break or the news the line that leads into it replaces the outro. The same for everybody at the same second."""
         start, end, kind, tr_, fin, _fout = item
         dj = tr_.get("dj")
         if kind != "song" or not dj:
@@ -662,8 +818,10 @@ class Schedule:
         window = dj.get("o")
         if window:
             lines, chance = window[2], DJ_OUTRO
-            if self.ads and self.toads and self.items_from(start + 0.001, 2)[1][2] == "ad":
-                fit = [x for x in self.toads if x[2] <= window[1] - window[0] + 0.6]
+            if self.extras and _tkey(tr_) not in self.hosted:            # (not into a night show's breaks)
+                following = self.items_from(start + 0.001, 2)[1][2]
+                lead = self.toads if following == "ad" else self.tonews if following == "news" else []
+                fit = [x for x in lead if x[2] <= window[1] - window[0] + 0.6]
                 if fit:
                     lines, chance = fit, DJ_BEFORE_ADS
             if (h >> 16) % 100 < chance:
@@ -1068,7 +1226,8 @@ class RadioApp(tk.Tk):
             box.pack(side="left", fill="x", expand=True)
             lab = tk.Label(box, text=name, bg=CARD, fg=FG, font=("Segoe UI", 11, "bold"), anchor="w")
             lab.pack(fill="x")
-            count = "pod_count" if pod else "n_shows" if any(_is_show(s) for s in st["songs"]) else "n_songs"
+            count = "pod_count" if pod else "n_segments" if st.get("rules", {}).get("talkradio") \
+                else "n_shows" if any(_is_show(s) for s in st["songs"]) else "n_songs"
             sub = tk.Label(box, text=t(count, n=len(st["songs"])), bg=CARD, fg=DIM, anchor="w")
             sub.pack(fill="x")
             for w in (card, cv, box, lab, sub):
@@ -1172,10 +1331,10 @@ class RadioApp(tk.Tk):
         return t("st_fade_note") if self._fade() != int(FADE) else t("st_ready", n=len(self.stations))
 
     def _programme(self, name):
-        return Schedule(name, self.stations[name], self.var_ads.get(), self._fade())
+        return Schedule(name, self.stations[name], self.var_ads.get(), self._fade(), self.index.get("news", []))
 
     def _toggle_ads(self):
-        """The other programme of the station: with or without advert breaks."""
+        """The other programme of the station: with or without adverts, news and talk."""
         self.cfg["ads"] = bool(self.var_ads.get())
         save_settings(self.cfg)
         self._retune()
@@ -1222,6 +1381,8 @@ class RadioApp(tk.Tk):
             pair = (tr_["title"], tr_["artist"]) if _is_show(tr_) else (tr_["artist"], tr_["title"])
             if kind == "ad":
                 label = " - ".join(x for x in (t("advert"), tr_["title"]) if x)
+            elif kind in ("news", "talk"):
+                label = tr_["title"] or t(kind)
             else:
                 label = t("kind_jingle") if kind == "jingle" else "%s - %s" % pair if tr_["artist"] else tr_["title"]
             self.lbl_next.config(text="%s %s" % (t("lbl_next"), label))
@@ -1231,9 +1392,11 @@ class RadioApp(tk.Tk):
         self.cur_item = item
         self.cur_start, self.cur_end, kind, tr_, _fi, _fo = item
         self.cur = (kind, tr_)
-        self.lbl_kind.config(text=t("kind_jingle" if kind == "jingle" else "kind_ad" if kind == "ad" else "kind_show" if _is_show(tr_) else "kind_song"))
-        self.lbl_title.config(text=("♪ " + t("kind_jingle")) if kind == "jingle" else (tr_["title"] or t("advert")) if kind == "ad" else tr_["title"])
-        self.lbl_artist.config(text=tr_["artist"] if kind == "song" else self.station or "")
+        spoken = {"jingle": "kind_jingle", "ad": "kind_ad", "news": "kind_news", "talk": "kind_talk"}.get(kind)
+        self.lbl_kind.config(text=t(spoken or ("kind_show" if _is_show(tr_) else "kind_song")))
+        self.lbl_title.config(text=("♪ " + t("kind_jingle")) if kind == "jingle" else (tr_["title"] or t("advert")) if kind == "ad"
+                              else (tr_["title"] or t(kind)) if kind in ("news", "talk") else tr_["title"])
+        self.lbl_artist.config(text=tr_["artist"] if kind == "song" else (kind == "talk" and tr_["artist"]) or self.station or "")
         self.lbl_len.config(text=fmt_time(tr_["sec"]))
         self.seg_shown = None
 

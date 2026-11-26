@@ -64,17 +64,23 @@ def song_names(rpf):
     return out
 
 
+def songs_of(station):
+    """The single songs of a station (talk radio has none)."""
+    if station.get("rules", {}).get("talkradio"):
+        return []
+    return [x for x in station.get("songs", []) if not x.get("parts")]
+
+
 def assign(containers, lines, stations, names):
     """{station: [(scan item, stream)]}: whose DJ speaks in which container - the station whose songs the container's
     lines announce, else the one around it in the archive."""
     plays = collections.defaultdict(set)                     # song name -> stations
     where = []
     for station, st in stations.items():
-        for song in st["songs"]:
-            if not song.get("parts"):
-                where.append((song["base"], station))
-                for n in names.get(song["sid"] & STREAM_ID_MASK, ()):
-                    plays[n].add(station)
+        for song in songs_of(st):
+            where.append((song["base"], station))
+            for n in names.get(song["sid"] & STREAM_ID_MASK, ()):
+                plays[n].add(station)
     where.sort()
     out = collections.defaultdict(list)
     for item in containers:
@@ -90,10 +96,10 @@ def assign(containers, lines, stations, names):
 
 
 def collect(rpf, items, stations):
-    """Give the songs of the stations their DJ windows and lines (song["dj"], station["toads"]).
+    """Give the songs of the stations their DJ windows and lines (song["dj"], station["toads"], station["tonews"]).
 
     -> {position: scan item} of the speech containers that are used."""
-    songs = [s for st in stations.values() for s in st["songs"] if not s.get("parts")]
+    songs = [s for st in stations.values() for s in songs_of(st)]
     if not songs:
         return {}
     names = song_names(rpf)
@@ -118,9 +124,10 @@ def collect(rpf, items, stations):
                 used[item["base"]] = item
                 return [item["base"], s["i"], s["sec"]]
 
-            for song in st["songs"]:
-                if song.get("parts"):
-                    continue
+            pools = st.get("rules", {}).get("pools", {})
+            night = ("music_night", "music_night2") if "showintro_night" in pools else ()
+            hosted = {key for category in night for key in pools.get(category, ())}
+            for song in songs_of(st):
                 if song["base"] not in marked:
                     marked[song["base"]] = windows(f, song["base"])
                 dj = {}
@@ -128,15 +135,18 @@ def collect(rpf, items, stations):
                     own = [x for n in names.get(song["sid"] & STREAM_ID_MASK, ()) for x in by.get((kind, n), ())]
                     room = window[1] - window[0] + SLACK
                     # the lines about this song; the general ones of the station where none of those fits
-                    fit = [x for x in own if x[1]["sec"] <= room] or [x for x in by.get((kind, ""), ()) if x[1]["sec"] <= room]
+                    # (a night show has a host of its own: the day DJ's general lines are not said over its songs)
+                    general = () if "%s_%s" % (song["base"], song["idx"]) in hosted else by.get((kind, ""), ())
+                    fit = [x for x in own if x[1]["sec"] <= room] or [x for x in general if x[1]["sec"] <= room]
                     if fit:
                         fit.sort(key=lambda x: (x[0]["base"], x[1]["i"]))
                         dj[key] = [window[0], window[1], [entry(*x) for x in fit]]
                 if dj:
                     song["dj"] = dj
-            ads = sorted(by.get(("to_ads", ""), ()), key=lambda x: (x[0]["base"], x[1]["i"]))
-            if st.get("ads") and ads and any("dj" in s for s in st["songs"]):
-                st["toads"] = [entry(*x) for x in ads]
+            for key, kind, wanted in (("toads", "to_ads", st.get("ads")), ("tonews", "to_news", st.get("news"))):
+                found = sorted(by.get((kind, ""), ()), key=lambda x: (x[0]["base"], x[1]["i"]))
+                if wanted and found and any("dj" in s for s in songs_of(st)):
+                    st[key] = [entry(*x) for x in found]
     return used
 
 
@@ -148,7 +158,8 @@ def line_track(line):
 def station_lines(station):
     """Every line of a station as a track ([bank position, stream, seconds] once each)."""
     found = {}
-    for line in [x for s in station.get("songs", []) for w in s.get("dj", {}).values() for x in w[2]] + station.get("toads", []):
+    for line in ([x for s in songs_of(station) for w in s.get("dj", {}).values() for x in w[2]] + station.get("toads", [])
+                 + station.get("tonews", [])):
         found[(line[0], line[1])] = line
     return [line_track(found[k]) for k in sorted(found)]
 

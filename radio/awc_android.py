@@ -3,8 +3,9 @@
 The Android app (AWC-Radio.apk, the same file for everybody, no game data in it) plays the stations live by the UTC
 clock, exactly like AWC Radio on the PC. Its audio comes from packs in a folder on the phone, made here from the
 user's own audio.rpf: one file per station (<station>.radiopak: its songs in the game's own quality, about 128 kbit/s,
-not re-encoded, its logo and its programme data), one per podcast (<podcast>.podpak: the episodes and the cover) and
-one per group of the game's score (score_<group>.scorepak: the pieces awc_score mixes, about 128 kbit/s; needs FFmpeg).
+not re-encoded, its logo and its programme data), one per podcast (<podcast>.podpak: the episodes and the cover), one
+with the news bulletins the stations share (news.newspak) and one per group of the game's score (score_<group>.scorepak:
+the pieces awc_score mixes, about 128 kbit/s; needs FFmpeg).
 The app reads every pack of the folder, so a station or podcast is added or updated by copying just its file. Packs
 that would come out the same are not written again.
 
@@ -22,6 +23,11 @@ Pack layout (little endian), read by android/java/org/awctool/radio/Pack.java:
                  the DJ (only said when switched on): a song may carry "dj": {"i"|"o": [window start, window end,
                  [line keys]]} (over its intro, its outro), the station "voices": [{"k","s"}] (the lines) and
                  "toads": [line keys] (said over a song before an advert break)
+                 "talk": [{"k","t","s","a"?}] what is said on it, "news": true (it plays the news of the news pack),
+                 "tonews": [line keys] (said over a song before the news), "rules": the game's programme rules -
+                 {"table": {category: [[next, [factor]]]}, "pools": {category: [keys]}, "history", "sequence", "ads",
+                 "talkradio"}, a factor being a number or ["s" | "c" | "h", category, curve]
+                 the news pack (.newspak, same layout) has "stations": [] and "news": [{"name","items":[{"k","s"}]}]
                  a podcast pack (.podpak, same layout) has "stations": [] and
                  "podcasts": [{"name","logo","episodes":[{"k","s","t"?}]}] (in their order; "t": the title)
                  a score pack (.scorepak, same layout) has "stations": [] and
@@ -45,6 +51,7 @@ from concurrent.futures import ThreadPoolExecutor
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path[:0] = [HERE, os.path.join(os.path.dirname(HERE), "extractor")]   # the shared modules live with the extractor
 import awc_dj as dj  # noqa: E402
+import awc_gamedata as gamedata  # noqa: E402
 import awc_i18n  # noqa: E402
 import awc_icons as icons  # noqa: E402
 
@@ -55,7 +62,10 @@ HEADER = 32
 EXTENSION = ".radiopak"
 PODCAST_EXTENSION = ".podpak"
 SCORE_EXTENSION = ".scorepak"
-SCORE_NAMES = {"openworld": "Open World", "mission": "Missions", "compound": "Compounds", "activity": "Activities"}
+NEWS_EXTENSION = ".newspak"
+NEWS_NAME = "News"
+SCORE_NAMES = {"openworld": "Open World", "mission": "Missions", "compound": "Compounds", "activity": "Activities",
+               "places": "Places"}
 SCORE_MIN = 30.0                            # shorter pieces of the score (transitions, stingers) stay out of the packs
 SCORE_MIX = 2                               # raise when awc_score.render() sounds different: the packs are made anew
 BYTES_PER_SEC = 16200                       # the game's Opus streams are about 129 kbit/s
@@ -72,9 +82,11 @@ class ExportError(Exception):
 STR = {
     "en": {
         "title": "AWC Radio packs for Android",
-        "intro": "Makes one file per station (.radiopak), per podcast (.podpak) and per group of the score (.scorepak, once the "
-                 "score has been read in AWC Tool; mixing it needs FFmpeg and a few minutes): a station's songs in the game's own "
-                 "quality (about 128 kbit/s), the logo and the programme. Install AWC-Radio.apk on the phone, copy the packs into one folder there (for example "
+        "news": "News",
+        "intro": "Makes one file per station (.radiopak), per podcast (.podpak), one with the news (news.newspak, shared by the "
+                 "stations) and per group of the score (.scorepak, once the score has been read in AWC Tool; mixing it needs "
+                 "FFmpeg and a few minutes): a station's songs in the game's own quality (about 128 kbit/s), the logo and the "
+                 "programme. Install AWC-Radio.apk on the phone, copy the packs into one folder there (for example "
                  "\"AWC-Radio\") and choose that folder in the app. Later you only copy the new or changed files. For your own use "
                  "only: the packs contain game audio.",
         "folder": "Folder for the packs on this PC", "browse": "Browse…", "stations": "Stations, podcasts and score (Ctrl/Shift for several)",
@@ -91,9 +103,11 @@ STR = {
     },
     "de": {
         "title": "AWC Radio Packs für Android",
-        "intro": "Erzeugt eine Datei pro Sender (.radiopak), pro Podcast (.podpak) und pro Score-Gruppe (.scorepak, sobald der "
-                 "Score im AWC-Tool gelesen wurde; das Mischen braucht FFmpeg und einige Minuten): die Songs eines Senders in der "
-                 "Originalqualität des Spiels (ca. 128 kbit/s), das Logo und das Programm. Auf dem Handy AWC-Radio.apk installieren, die Packs dort in einen Ordner kopieren (zum "
+        "news": "Nachrichten",
+        "intro": "Erzeugt eine Datei pro Sender (.radiopak), pro Podcast (.podpak), eine mit den Nachrichten (news.newspak, für "
+                 "alle Sender) und pro Score-Gruppe (.scorepak, sobald der Score im AWC-Tool gelesen wurde; das Mischen braucht "
+                 "FFmpeg und einige Minuten): die Songs eines Senders in der Originalqualität des Spiels (ca. 128 kbit/s), das "
+                 "Logo und das Programm. Auf dem Handy AWC-Radio.apk installieren, die Packs dort in einen Ordner kopieren (zum "
                  "Beispiel „AWC-Radio“) und diesen Ordner in der App wählen. Später kopierst du nur die neuen oder geänderten "
                  "Dateien. Nur für den eigenen Gebrauch: die Packs enthalten Spiel-Audio.",
         "folder": "Ordner für die Packs auf diesem PC", "browse": "Durchsuchen…", "stations": "Sender, Podcasts und Score (Strg/Umschalt für mehrere)",
@@ -148,7 +162,7 @@ def estimate_bytes(stations):
     total = 0
     for st in stations.values():
         total += 150_000
-        for tr in st.get("songs", []) + st.get("jingles", []) + st.get("ads", []) + st.get("pieces", []):
+        for tr in gamedata.tracks_of(st) + st.get("pieces", []) + st.get("news_items", []):
             total += tr["sec"] * BYTES_PER_SEC + 200
         for tr in dj.station_lines(st):
             total += tr["sec"] * BYTES_PER_SEC // 2 + 200          # speech is mono
@@ -168,21 +182,22 @@ def score_sources(rpf, min_sec=SCORE_MIN):
 
 
 def pack_sources(index, rpf="", min_sec=SCORE_MIN):
-    """Everything that gets a pack of its own: the stations and podcasts of the radio index and, with the path of the
-    archive, the groups of its score: {name: entry}."""
-    return dict(dict(index["stations"], **index.get("podcasts", {})), **score_sources(rpf, min_sec))
+    """Everything that gets a pack of its own: the stations and podcasts of the radio index, its news and, with the path
+    of the archive, the groups of its score: {name: entry}."""
+    news = {NEWS_NAME: {"news_items": index["news"]}} if index.get("news") else {}
+    return dict(dict(index["stations"], **index.get("podcasts", {})), **news, **score_sources(rpf, min_sec))
 
 
-def pack_file(name, podcast=False, score=""):
+def pack_file(name, podcast=False, score="", news=False):
     """File name of a pack: 'The Chamber 106.6' -> 'the_chamber_106_6.radiopak', 'Final Act' -> 'final_act.podpak',
     the score's open world -> 'score_open_world.scorepak'."""
     if score:
         return "score_" + icons.slug(SCORE_NAMES[score]) + SCORE_EXTENSION
-    return icons.slug(name) + (PODCAST_EXTENSION if podcast else EXTENSION)
+    return icons.slug(name) + (NEWS_EXTENSION if news else PODCAST_EXTENSION if podcast else EXTENSION)
 
 
 def file_for(name, entry):
-    return pack_file(name, entry.get("podcast", False), entry.get("score", ""))
+    return pack_file(name, entry.get("podcast", False), entry.get("score", ""), "news_items" in entry)
 
 
 def _logo(name):
@@ -193,8 +208,20 @@ def _logo(name):
     return b""
 
 
+def _songs(tracks):
+    return [dict({"k": track_key(s), "t": s["title"], "a": s["artist"], "s": s["sec"]}, **({"m": s["m"]} if s.get("m") else {}))
+            for s in tracks]
+
+
+def _plain(tracks, titles=False):
+    return [dict({"k": track_key(x), "s": x["sec"]}, **({k: x[f] for k, f in (("t", "title"), ("a", "artist"))
+                                                          if titles and x.get(f)})) for x in tracks]
+
+
 def station_entry(name, st, has_logo):
-    """The station (or podcast, or score group) as it stands in the pack index."""
+    """The station (or podcast, score group or the news) as it stands in the pack index."""
+    if "news_items" in st:
+        return {"name": name, "items": _plain(st["news_items"])}
     if st.get("score"):
         return {"name": SCORE_NAMES[st["score"]], "group": st["score"], "logo": "",
                 "pieces": [{"k": "s_" + x["id"], "g": x["sub"], "t": x["title"], "s": x["sec"]} for x in st["pieces"]]}
@@ -202,12 +229,15 @@ def station_entry(name, st, has_logo):
     if st.get("podcast"):
         return {"name": name, "logo": logo, "episodes": [
             dict({"k": track_key(e), "s": e["sec"]}, **({"t": e["name"]} if e.get("name") else {})) for e in st["songs"]]}
-    entry = {"name": name, "logo": logo,
-             "songs": [dict({"k": track_key(s), "t": s["title"], "a": s["artist"], "s": s["sec"]}, **({"m": s["m"]} if s.get("m") else {}))
-                       for s in st["songs"]],
-             "jingles": [{"k": track_key(j), "s": j["sec"]} for j in st["jingles"]]}
+    entry = {"name": name, "logo": logo, "songs": _songs(st["songs"]), "jingles": _plain(st["jingles"])}
     if st.get("ads"):
         entry["ads"] = [{"k": track_key(a), "t": a["title"], "s": a["sec"]} for a in st["ads"]]
+    if st.get("talk"):
+        entry["talk"] = _plain(st["talk"], titles=True)
+    if st.get("news"):
+        entry["news"] = True
+    if st.get("rules"):
+        entry["rules"] = st["rules"]
     lines = dj.station_lines(st)
     if lines:
         key = lambda x: "%s_%s" % (x[0], x[1])  # noqa: E731
@@ -215,9 +245,10 @@ def station_entry(name, st, has_logo):
         for song, own in zip(entry["songs"], st["songs"]):
             if own.get("dj"):
                 song["dj"] = {w: [v[0], v[1], [key(x) for x in v[2]]] for w, v in own["dj"].items()}
-        if st.get("toads"):
-            entry["toads"] = [key(x) for x in st["toads"]]
-    if any(s.get("parts") and not s.get("set") for s in st["songs"]):      # talk radio, not a club's DJ set
+        for kind in ("toads", "tonews"):
+            if st.get(kind):
+                entry[kind] = [key(x) for x in st[kind]]
+    if st.get("rules", {}).get("talkradio") or any(s.get("parts") and not s.get("set") for s in st["songs"]):
         entry["kind"] = "talk"
     return entry
 
@@ -227,14 +258,23 @@ def signature(name, st, index):
     if st.get("score"):                                       # a piece's ID already says which stems it mixes
         what = [VERSION, SCORE_MIX, station_entry(name, st, False)]
         return hashlib.sha1(json.dumps(what, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
-    logo = _logo(name)
-    sources = [[(index["items"].get(str(base)) or {}).get("length"), base, i]
-               for tr in st["songs"] + st["jingles"] + st.get("ads", []) + dj.station_lines(st)
+    logo = b"" if "news_items" in st else _logo(name)
+    sources = [[(index["items"].get(str(base)) or {}).get("length"), base, i] for tr in all_tracks(st)
                for base, i in tr.get("parts") or [(tr["base"], tr["idx"])]]
     h = hashlib.sha1(json.dumps([VERSION, station_entry(name, st, bool(logo)), sources], sort_keys=True,
                                 ensure_ascii=False).encode("utf-8"))
     h.update(logo)
     return h.hexdigest()
+
+
+def all_tracks(st):
+    """Every recording that goes into the pack of a station, podcast or the news."""
+    return st["news_items"] if "news_items" in st else gamedata.tracks_of(st) + dj.station_lines(st)
+
+
+def entry_items(entry):
+    """The {"k": ..} of every file an entry of a pack index names."""
+    return [x for key in ("songs", "jingles", "ads", "talk", "episodes", "pieces", "voices", "items") for x in entry.get(key, [])]
 
 
 def read_signature(path):
@@ -249,9 +289,9 @@ def read_signature(path):
                 return ""
             f.seek(off)
             meta = json.loads(f.read(length).decode("utf-8"))
-            for st in meta.get("stations", []) + meta.get("podcasts", []) + meta.get("scores", []):  # all must be in it
-                for item in (st.get("songs", []) + st.get("jingles", []) + st.get("ads", []) + st.get("episodes", [])
-                             + st.get("pieces", []) + st.get("voices", [])):
+            for st in (meta.get("stations", []) + meta.get("podcasts", []) + meta.get("scores", [])
+                       + meta.get("news", [])):                                              # all must be in it
+                for item in entry_items(st):
                     if "t/" + item["k"] not in meta["files"]:
                         return ""
             return str(meta.get("sig", ""))
@@ -438,8 +478,7 @@ def export_packs(stations, index, rpf, folder, progress=None, cancel=None, cache
     if shutil.disk_usage(folder).free < need + 50_000_000:
         raise ExportError(t("err_space", s=human(need)))
     jobs = {n: {x["id"]: x for x in stations[n]["pieces"]} if stations[n].get("score") else
-            {track_key(tr): tr for tr in stations[n]["songs"] + stations[n]["jingles"] + stations[n].get("ads", [])
-             + dj.station_lines(stations[n])} for n in write}
+            {track_key(tr): tr for tr in all_tracks(stations[n])} for n in write}
     total, done = sum(len(j) for j in jobs.values()), [0]
     work = os.path.join(folder, ".awc_pack_work")
     shutil.rmtree(work, ignore_errors=True)
@@ -467,7 +506,7 @@ def export_packs(stations, index, rpf, folder, progress=None, cancel=None, cache
                                                cancel, step)
                     else:
                         _write_tracks(writer, jobs[name], index, rpf, work, pool, workers, cache_dirs, cancel, step)
-                    logo = b"" if score else _logo(name)
+                    logo = b"" if score or "news_items" in stations[name] else _logo(name)
                     entry = station_entry(name, stations[name], bool(logo))
                     if score:                                 # the pieces that are in it, with their real length
                         entry["pieces"] = [dict(x, s=lengths[x["k"]]) for x in entry["pieces"] if x["k"] in lengths]
@@ -477,6 +516,8 @@ def export_packs(stations, index, rpf, folder, progress=None, cancel=None, cache
                             "sig": sig, "stations": [entry]}
                     if stations[name].get("podcast"):
                         meta.update(stations=[], podcasts=[entry])
+                    if "news_items" in stations[name]:
+                        meta.update(stations=[], news=[entry])
                     if score:
                         meta.update(stations=[], scores=[entry])
                     writer.finish(meta)
@@ -580,8 +621,9 @@ def open_dialog(app):
         lb.delete(0, "end")
         for nm in names:
             st = sources[nm]
-            line = "%s%s   –   %s   (%d)" % ("Podcast: " if st.get("podcast") else "", nm,
-                                             human(estimate_bytes({nm: st})), len(st.get("songs", st.get("pieces", []))))
+            count = len(st.get("news_items") or st.get("songs", st.get("pieces", [])))
+            line = "%s%s   –   %s   (%d)" % ("Podcast: " if st.get("podcast") else "", t("news") if "news_items" in st else nm,
+                                             human(estimate_bytes({nm: st})), count)
             if nm in state:
                 line += "   ·   %s" % t(state[nm])
             lb.insert("end", line)

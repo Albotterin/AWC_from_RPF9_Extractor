@@ -52,7 +52,7 @@ def main():
     names = sys.argv[3:] or [os.path.basename(s)[:-5] for s in sources if s.endswith("Test.java")]
     opts = ["-Drobolectric.offline=true", "-Drobolectric.dependency.dir=" + LIBS, "-Djava.io.tmpdir=" + tmp,
             "-Duser.home=" + tmp, "-Drobolectric.logging.enabled=false", "-Drobolectric.pixelCopyRenderMode=hardware", "-Dawc.packs=" + packs, "-Dawc.shots=" + shots,
-            "--add-opens=java.base/java.lang=ALL-UNNAMED", "--add-opens=java.base/java.util=ALL-UNNAMED",
+            "--add-opens=java.base/java.lang=ALL-UNNAMED", "--add-opens=java.base/java.util=ALL-UNNAMED", "--add-opens=java.base/java.io=ALL-UNNAMED",
             "--add-exports=java.base/jdk.internal.access=ALL-UNNAMED"]
     r = subprocess.run(["java"] + opts + ["-cp", cp, "org.junit.runner.JUnitCore"] + ["org.awctool.radio." + n for n in names])
     print("screenshots in", shots)

@@ -32,6 +32,7 @@ __pycache__/
 *.radiopak
 *.podpak
 *.scorepak
+*.newspak
 *.apk
 *.idsig
 *.p12

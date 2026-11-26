@@ -59,7 +59,7 @@ final class Logos {
 
     /** A group of the score: the bars of a level meter on an evening sky in the group's hue. */
     private static Bitmap scoreCover(String group, int size) {
-        float hue = "openworld".equals(group) ? 165 : "mission".equals(group) ? 225 : "compound".equals(group) ? 12 : 285;
+        float hue = "openworld".equals(group) ? 165 : "mission".equals(group) ? 225 : "compound".equals(group) ? 12 : "places".equals(group) ? 48 : 285;
         Bitmap bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
         Canvas c = new Canvas(bmp);
         Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);

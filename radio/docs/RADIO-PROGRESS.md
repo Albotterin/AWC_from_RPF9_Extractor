@@ -27,7 +27,7 @@ Since v2.4.0 the playlists come straight from the game's audio config. Many stat
 | 🟢 Emotion 98.3 | 35 / 35 | 100.0 % | 35 |
 | 🟢 Flash FM | 80 / 80 | 100.0 % | 83 |
 | 🟢 Gloriana Blues Radio | 23 / 23 | 100.0 % | 23 |
-| 🟢 Honey FM | 52 / 52 | 100.0 % | 54 |
+| 🟢 Honey FM | 52 / 52 | 100.0 % | 56 |
 | 🟢 Kaleidoscope FM | 18 / 18 | 100.0 % | 18 |
 | 🟢 Leonida Jazz Radio | 36 / 36 | 100.0 % | 36 |
 | 🟢 Radio La Ola | 25 / 25 | 100.0 % | 25 |
@@ -47,7 +47,7 @@ Since v2.4.0 the playlists come straight from the game's audio config. Many stat
 
 ## Talk radio
 
-The credits list speakers here, not songs. All shows named there are found; the parts of an episode play as one piece.
+The credits list speakers here, not songs. All shows named there are found; AWC Radio plays their parts in the order the game's programme rules give.
 
 | Station | Show | Episodes | Length |
 |---|---|---:|---:|
@@ -92,50 +92,50 @@ The five podcasts of the credits list, all found: 20 episodes, 3 h 36 min togeth
 
 - **Bodega The DJ** and **DJ Stevie J** are DJ sets in clubs. The missing titles have no single file assigned to them there: 6 of them play on Vice City Rap Radio and Dirty South Classics, 8 were found nowhere.
 - **Worldwide FM**: one listed title (a jingle) was found nowhere. **Radio On-U**: one title has no named file; it is part of the Radio On-U mix (from 6:28), and the station's "Unknown track" is very probably the same one.
-- **Honey FM - Liquid City** (8 original songs, not counted above) is in none of the station lists.
+- **Honey FM - Liquid City**: the night show is played on Honey FM after dark. Whether its 8 original songs (not counted above) are inside its recordings is not verified; no file of their own carries their names.
 - Long DJ mixes are also played as "(Mix)" stations: Radio On-U (16 of 24), The Sniper Of La Perle (22 of 22), Worldwide FM (40 of 41), The Vault (25 of 25). The numbers are the parts that have a title. One further long club mix, which no place can be assigned to, plays as "Clubmixes".
 - The titles of the podcast episodes and of the mix parts are in the game's own table (`data.rpf`); without that file the episodes are numbered.
 
 ## All stations
 
-As of the current version: **34 stations**, about 69.7 hours of programme (without jingles).
+As of the current version: **34 stations**, about 69.9 hours of programme (without jingles, spoken items and adverts). Spoken items, adverts and news are only heard with the switch **Adverts, news & talk**; on talk radio the show parts are the content itself.
 
-| Station | Content | Jingles | Adverts | Length |
-|---|---|---:|---:|---:|
-| Afrobank FM | 31 songs | 35 | 38 | 123 min |
-| Back Country Radio | 24 songs | 63 | 47 | 74 min |
-| Bodega The DJ | 36 songs | 0 | – | 104 min |
-| The Chamber 106.6 | 22 songs | 47 | 28 | 97 min |
-| Circoloco Records Radio | 27 songs | 74 | 44 | 98 min |
-| Cocoteo FM | 30 songs | 56 | 70 | 92 min |
-| Dirty South Classics | 39 songs | 50 | 65 | 149 min |
-| DJ Stevie J | 19 songs | 0 | – | 53 min |
-| Emotion 98.3 | 35 songs | 34 | 41 | 149 min |
-| Flash FM | 83 songs | 78 | 70 | 286 min |
-| Gloriana Blues Radio | 23 songs | 49 | 23 | 72 min |
-| Honey FM | 54 songs | 62 | 68 | 224 min |
-| Jack of Hearts | 1 DJ set | 0 | – | 100 min |
-| Kaleidoscope FM | 18 songs | 35 | 21 | 73 min |
-| Leonida Jazz Radio | 36 songs | 36 | 22 | 159 min |
-| Radio La Ola | 25 songs | 44 | 35 | 117 min |
-| Radio On-U | 16 songs | 0 | – | 57 min |
-| Radio On-U (Mix) | 1 mix | 0 | – | 50 min |
-| The Sniper Of La Perle | 22 songs | 0 | – | 100 min |
-| The Sniper Of La Perle (Mix) | 1 mix | 0 | – | 40 min |
-| Stockyard FM | 37 songs | 44 | 52 | 137 min |
-| Symphony FM | 16 songs | 29 | 25 | 130 min |
-| Thrillbilly Mud Club | 20 songs | 0 | – | 84 min |
-| V-Rock | 70 songs | 36 | 55 | 269 min |
-| The Vault (Club) | 1 DJ set | 0 | – | 84 min |
-| The Vault Radio | 1 mix | 0 | – | 84 min |
-| Vice City FM | 72 songs | 56 | 62 | 309 min |
-| Vice City Rap Radio | 82 songs | 48 | 54 | 226 min |
-| VYB | 1 DJ set | 0 | – | 45 min |
-| The Wipe Talk Radio | 11 shows | 54 | – | 155 min |
-| WKTT Talk Radio | 4 shows | 37 | – | 72 min |
-| Worldwide FM | 40 songs | 37 | – | 189 min |
-| Worldwide FM (Mix) | 1 mix | 0 | – | 121 min |
-| Clubmixes | 1 club mix | 0 | – | 61 min |
+| Station | Content | Jingles | Spoken | Adverts | News | Length |
+|---|---|---:|---:|---:|:---:|---:|
+| Afrobank FM | 31 songs | 35 | 10 | 38 | yes | 123 min |
+| Back Country Radio | 24 songs | 57 | 9 | 47 | yes | 74 min |
+| Bodega The DJ | 36 songs | 0 | – | – | – | 104 min |
+| The Chamber 106.6 | 22 songs | 43 | – | 28 | yes | 97 min |
+| Circoloco Records Radio | 27 songs | 73 | 8 | 44 | yes | 98 min |
+| Cocoteo FM | 30 songs | 56 | 4 | 70 | yes | 92 min |
+| Dirty South Classics | 39 songs | 49 | 25 | 65 | yes | 149 min |
+| DJ Stevie J | 19 songs | 0 | – | – | – | 53 min |
+| Emotion 98.3 | 35 songs | 33 | 17 | 41 | yes | 149 min |
+| Flash FM | 83 songs | 78 | 4 | 70 | yes | 286 min |
+| Gloriana Blues Radio | 23 songs | 49 | 13 | 23 | yes | 72 min |
+| Honey FM | 56 songs | 44 | 50 | 68 | yes | 233 min |
+| Jack of Hearts | 1 DJ set | 0 | – | – | – | 100 min |
+| Kaleidoscope FM | 18 songs | 35 | 19 | 21 | yes | 73 min |
+| Leonida Jazz Radio | 36 songs | 36 | 6 | 22 | yes | 159 min |
+| Radio La Ola | 25 songs | 41 | 9 | 35 | yes | 117 min |
+| Radio On-U | 16 songs | 0 | – | – | – | 57 min |
+| Radio On-U (Mix) | 1 mix | 0 | – | – | – | 50 min |
+| The Sniper Of La Perle | 22 songs | 0 | – | – | – | 100 min |
+| The Sniper Of La Perle (Mix) | 1 mix | 0 | – | – | – | 40 min |
+| Stockyard FM | 37 songs | 44 | – | 52 | yes | 137 min |
+| Symphony FM | 16 songs | 29 | 1 | 25 | yes | 130 min |
+| Thrillbilly Mud Club | 20 songs | 0 | – | – | – | 84 min |
+| V-Rock | 70 songs | 35 | 18 | 55 | yes | 269 min |
+| The Vault (Club) | 1 DJ set | 0 | – | – | – | 84 min |
+| The Vault Radio | 1 mix | 0 | – | – | – | 84 min |
+| Vice City FM | 72 songs | 55 | 11 | 62 | yes | 309 min |
+| Vice City Rap Radio | 82 songs | 48 | 45 | 54 | yes | 226 min |
+| VYB | 1 DJ set | 0 | – | – | – | 45 min |
+| The Wipe Talk Radio | 28 show parts | 54 | – | 114 | – | 155 min |
+| WKTT Talk Radio | 20 show parts | 37 | – | 81 | – | 73 min |
+| Worldwide FM | 40 songs | 37 | – | – | – | 189 min |
+| Worldwide FM (Mix) | 1 mix | 0 | – | – | – | 121 min |
+| Clubmixes | 1 club mix | 0 | – | – | – | 61 min |
 
 ## How it is measured
 

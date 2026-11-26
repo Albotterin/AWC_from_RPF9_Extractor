@@ -279,7 +279,7 @@ final class PlayerScreen extends LinearLayout {
 
     /** Shows what the radio is doing; `st` is the station on air, or the one that "play" would start. */
     void show(Library.Station st, RadioService radio) {
-        boolean has = st != null && !st.ads.isEmpty(), want = has && RadioService.adverts(getContext());
+        boolean has = st != null && st.hasMore(), want = has && RadioService.adverts(getContext());
         showing = true;                            // touch the switch only on a change: every call starts its animation
         if (adverts.isChecked() != want) adverts.setChecked(want);
         if (adverts.isEnabled() != has) adverts.setEnabled(has);

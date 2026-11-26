@@ -110,9 +110,10 @@ def table(res):
     return out
 
 
-def track_titles(data, wanted):
+def track_titles(data, wanted, shows=None):
     """{track number: (title, artist)} for the numbers in `wanted`, from the table of `data` that names the most of them
-    (of equal ones the first, which is the English one)."""
+    (of equal ones the first, which is the English one). A dictionary `shows` collects {number: name} of those that have
+    no title, only a name in the artist column (a radio show)."""
     keys = {}
     for tid in wanted:
         if 0 < tid < MAX_TID:
@@ -128,10 +129,13 @@ def track_titles(data, wanted):
         titled = sum(1 for v in found.values() if v[0])
         if titled > count:
             best, count = {tid: tuple(v) for tid, v in found.items() if v[0]}, titled
+            if shows is not None:
+                shows.clear()
+                shows.update({tid: v[1] for tid, v in found.items() if v[1] and not v[0]})
     return best
 
 
-def read_titles(audio_rpf, wanted):
+def read_titles(audio_rpf, wanted, shows=None):
     """track_titles() for the data.rpf next to `audio_rpf`; {} when there is no such file or it cannot be read."""
     path = data_file(audio_rpf)
     if not path or os.path.getsize(path) > MAX_FILE:
@@ -139,7 +143,7 @@ def read_titles(audio_rpf, wanted):
     try:
         with open(path, "rb") as f:
             data = f.read()
-        return track_titles(data, wanted)
+        return track_titles(data, wanted, shows)
     except (OSError, MemoryError, struct.error, ValueError):
         return {}
 

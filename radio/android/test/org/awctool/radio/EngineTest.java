@@ -152,7 +152,7 @@ public class EngineTest {
         List<Schedule.Track> s = new ArrayList<>(), j = new ArrayList<>();
         for (int i = 0; i < songs; i++) s.add(new Schedule.Track((1000 + i) + "_0", "s" + i, "a", 120 + r.nextInt(200) + r.nextDouble()));
         for (int i = 0; i < jingles; i++) j.add(new Schedule.Track((9000 + i) + "_0", "", "", 2 + r.nextInt(20) + r.nextDouble()));
-        return new Schedule(name, s, j, new ArrayList<>(), fade, talk);
+        return new Schedule(name, s, j, fade, talk);
     }
 
     /** Crossfades only from song to song, as long as asked for; everything else follows back to back. */

@@ -96,15 +96,16 @@ public class ScoreTest {
     public void browseAndPlay() throws Exception {
         open();
         List<Library.Station> groups = PackStore.get(a).scores;
-        Assert.assertEquals(4, groups.size());
+        Assert.assertEquals(5, groups.size());
         Assert.assertEquals("score:openworld", groups.get(0).name);
         Assert.assertEquals(MISSIONS, groups.get(1).name);
         Assert.assertEquals("score:compound", groups.get(2).name);
         Assert.assertEquals("score:activity", groups.get(3).name);
+        Assert.assertEquals("score:places", groups.get(4).name);
         Assert.assertEquals("the score is no station", -1, Catalog.indexOf(PackStore.get(a).stations, MISSIONS));
         Assert.assertEquals("and no podcast", 5, PackStore.get(a).podcasts.size());
         Assert.assertTrue(tap("Score"));
-        for (String name : new String[]{"Offene Welt", "Missionen", "Stützpunkte", "Aktivitäten"}) {
+        for (String name : new String[]{"Offene Welt", "Missionen", "Stützpunkte", "Aktivitäten", "Musik an Orten"}) {
             Assert.assertTrue(name, visible(name));
         }
         Assert.assertFalse("no small player of the radio under Score", visible("Zum Einschalten"));
@@ -193,8 +194,9 @@ public class ScoreTest {
         List<MediaBrowser.MediaItem> root = radio.children("awc_root");
         Assert.assertEquals("awc_score", root.get(root.size() - 1).getMediaId());
         List<MediaBrowser.MediaItem> groups = radio.children("awc_score");
-        Assert.assertEquals(4, groups.size());
+        Assert.assertEquals(5, groups.size());
         Assert.assertEquals("Offene Welt", groups.get(0).getDescription().getTitle().toString());
+        Assert.assertEquals("Musik an Orten", groups.get(4).getDescription().getTitle().toString());
         List<MediaBrowser.MediaItem> subs = radio.children(groups.get(1).getMediaId());
         Assert.assertTrue(subs.size() > 20);
         List<MediaBrowser.MediaItem> pieces = radio.children(subs.get(3).getMediaId());

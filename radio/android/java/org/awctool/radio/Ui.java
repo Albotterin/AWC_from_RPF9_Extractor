@@ -389,7 +389,8 @@ final class Ui {
         if (st == null) return "";
         if (st.score == null) return st.name;
         return c.getString("openworld".equals(st.score) ? R.string.score_openworld : "mission".equals(st.score) ? R.string.score_mission
-                : "compound".equals(st.score) ? R.string.score_compound : R.string.score_activity);
+                : "compound".equals(st.score) ? R.string.score_compound : "places".equals(st.score) ? R.string.score_places
+                : R.string.score_activity);
     }
 
     static String fmt(double sec) {

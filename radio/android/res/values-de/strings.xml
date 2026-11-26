@@ -4,16 +4,16 @@
 
     <string name="choose_folder">Ordner wählen …</string>
     <string name="setup_title">Willkommen</string>
-    <string name="setup_hint">Kopiere deine Sender-Packs (.radiopak, für die Podcasts .podpak, für den Score .scorepak) in einen Ordner auf diesem Handy, zum Beispiel „AWC-Radio“, und wähle diesen Ordner aus. Später hinzugefügte Packs erscheinen von selbst. AWC Radio am PC erzeugt sie (Knopf „Android-Packs …“).</string>
+    <string name="setup_hint">Kopiere deine Sender-Packs (.radiopak, für die Nachrichten .newspak, für die Podcasts .podpak, für den Score .scorepak) in einen Ordner auf diesem Handy, zum Beispiel „AWC-Radio“, und wähle diesen Ordner aus. Später hinzugefügte Packs erscheinen von selbst. AWC Radio am PC erzeugt sie (Knopf „Android-Packs …“).</string>
     <string name="folder_error">Der Ordner konnte nicht gelesen werden: %1$s</string>
     <string name="folder_empty_title">Noch keine Sender</string>
-    <string name="folder_empty">Im Ordner „%1$s“ liegt kein lesbares Pack (.radiopak, .podpak, .scorepak). Packs hineinkopieren und neu laden, oder einen anderen Ordner wählen.</string>
+    <string name="folder_empty">Im Ordner „%1$s“ liegt kein lesbares Pack (.radiopak, .newspak, .podpak, .scorepak). Packs hineinkopieren und neu laden, oder einen anderen Ordner wählen.</string>
     <string name="loading">Lade …</string>
     <string name="up_next">Als Nächstes: %1$s</string>
     <string name="jingle">Jingle</string>
     <string name="live">LIVE</string>
     <string name="songs_count">%1$d Songs</string>
-    <string name="shows_count">%1$d Sendungen</string>
+    <string name="shows_count">%1$d Beiträge</string>
 
     <string name="menu_sleep">Einschlaftimer</string>
     <string name="menu_reload">Sender neu laden</string>
@@ -115,10 +115,10 @@
     <string name="notif_alarm_info">Schlummernde und verpasste Wecker</string>
 
     <string name="advert">Werbung</string>
-    <string name="adverts_switch">Werbung</string>
-    <string name="adverts_none">Dieser Sender hat keine Werbung</string>
-    <string name="adverts_on">Werbung an: Pausen zwischen den Songs</string>
-    <string name="adverts_off">Werbung aus</string>
+    <string name="adverts_switch">Werbung, News &amp; Talk</string>
+    <string name="adverts_none">Dieser Sender hat nur Musik und Jingles</string>
+    <string name="adverts_on">An: Werbung, Nachrichten und Talk zwischen den Songs</string>
+    <string name="adverts_off">Aus: nur Songs und Jingles</string>
     <string name="tab_podcasts">Podcasts</string>
     <string name="podcast">Podcast</string>
     <string name="episode_n">Folge %1$d</string>
@@ -149,7 +149,10 @@
     <string name="crossfade_length">Dauer</string>
     <string name="seconds_short">%1$d s</string>
     <string name="crossfade_sync">Handy und PC spielen nur mit derselben Überblendung zur selben Zeit denselben Song (Standard: %1$d s).</string>
-    <string name="adverts_what">Werbeblöcke bei den Sendern, die Werbung haben</string>
+    <string name="adverts_what">Werbeblöcke, Nachrichten, Talk und die Nachtshow bei den Sendern, die das haben</string>
+    <string name="news">Nachrichten</string>
+    <string name="talk">Talk</string>
+    <string name="score_places">Musik an Orten</string>
     <string name="settings_packs">Packs</string>
     <string name="settings_folder">Pack-Ordner</string>
     <string name="settings_no_folder">nicht gewählt</string>

@@ -36,9 +36,14 @@ CATEGORIES = {joaat("radio_track_category_" + k): k for k in (
     "music", "advert", "ident", "dj_banter", "dj_banter_night", "dj_banter_to_ads", "dj_banter_from_ads", "dj_banter_from_news",
     "dj_banter_story", "music_bed", "music_night", "music_dj2", "music_b", "showintro", "showintro_night", "showintro_dj2", "showoutro",
     "showoutro_night", "showoutro_dj2", "ident_night", "ident_b", "talk", "talk_night", "news")}
+# categories without a known name: spoken segments over music (Dirty South Classics, Vice City Rap Radio) and the list
+# with the last songs of a night show. Any other unknown category is called by its number.
+CATEGORIES.update({0xF8BF94E8: "segment", 0x20E2BCB0: "segment", 0x35224942: "music_night2"})
+NEWS = joaat("radio_track_category_news")
+SONG_CATEGORIES = ("music", "music_night", "music_night2", "music_dj2")
+TALK_CATEGORIES = ("talk", "talk_night", "showintro", "showintro_night", "showoutro_night", "segment")
 AD_MIN = 3.0
 SONG_MIN = 45.0                             # seconds
-PART_MIN = 60.0                             # a talk station's own streams of this length are parts of a show
 JINGLE_MIN, JINGLE_MAX = 2.0, 25.0
 
 # station object (hash of its internal name) -> name on the credits page (the logos are found under these names)
@@ -196,7 +201,9 @@ def _tracks(game, sounds, ref, music, seen, out, kind=""):
         for k in range(_u32(d, 8)):
             _tracks(game, sounds, _u32(d, 12 + 4 * k), music, seen, out, kind)
     elif d[0] == TYPE_TRACKLIST:
-        kind = CATEGORIES.get(game.hash_at(_u32(d, 8)), kind)
+        category = game.hash_at(_u32(d, 8))
+        if category:
+            kind = CATEGORIES.get(category) or "%08X" % category
         if _u32(d, 68) != NONE:
             _tracks(game, sounds, _u32(d, 68), music, seen, out, kind)
         for k in range(_u32(d, 72)):
@@ -619,15 +626,280 @@ def advert_keys(items, game):
     return out
 
 
-def build(items, game, songs, found, cfg_names):
-    """-> {station: {"songs": [track], "jingles": [track], "ads": [track]}} for the stations the config defines.
+def parse_news(files):
+    """-> [(bank hash, stream hash)] of the news bulletins. They lie in lists of their own that belong to no station."""
+    metas, game = _game_file(files)
+    if game is None:
+        return []
+    lists = [h for h in game.index if len(game.get(h)) >= 76 and game.get(h)[0] == TYPE_TRACKLIST
+             and game.hash_at(_u32(game.get(h), 8)) == NEWS]
+    heard, seen = [], set()
+
+    def walk(name_hash):
+        d = None if name_hash is None else game.get(name_hash)
+        if not d or name_hash in seen:
+            return
+        seen.add(name_hash)
+        if d[0] == TYPE_TRACK and len(d) >= 16:
+            heard.append(game.hash_at(_u32(d, 12)))
+        elif d[0] == TYPE_LIST_OF_LISTS:
+            for k in range(_u32(d, 8)):
+                walk(game.hash_at(_u32(d, 12 + 4 * k)))
+        elif d[0] == TYPE_TRACKLIST:
+            if _u32(d, 68) != NONE:
+                walk(game.hash_at(_u32(d, 68)))
+            for k in range(_u32(d, 72)):
+                walk(game.hash_at(_u32(d, 76 + 4 * k)))
+    for h in sorted(lists):
+        walk(h)
+    if not heard:
+        return []
+    sounds = max(metas, key=lambda m: sum(1 for h in heard if h in m.index))
+    waves = [w for w in (_wave(sounds, h) for h in heard) if w]
+    return list(dict.fromkeys(waves))
+
+
+def read_news(path):
+    """parse_news() for the archive at `path`. Raises OSError / ValueError."""
+    try:
+        return parse_news(config_files(path))
+    except (struct.error, IndexError, zlib.error) as e:
+        raise ValueError("audio config not understood: %s" % e) from e
+
+
+def read_places(path):
+    """parse_places() for the archive at `path`. Raises OSError / ValueError."""
+    try:
+        return parse_places(config_files(path))
+    except (struct.error, IndexError, zlib.error) as e:
+        raise ValueError("audio config not understood: %s" % e) from e
+
+
+def build_news(items, waves):
+    """The bulletins among the scanned banks, as tracks."""
+    by_id = {}
+    for it in items:
+        if not it.get("cues"):
+            for s in it["streams"]:
+                by_id.setdefault(s["id"] & STREAM_ID_MASK, (it, s))
+    out = {}
+    for wave in waves:
+        hit = by_id.get(wave[1] & STREAM_ID_MASK)
+        if hit and hit[1]["sec"] >= AD_MIN:
+            out.setdefault((hit[0]["base"], hit[1]["i"]), _track(*hit))
+    return [out[k] for k in sorted(out)]
+
+
+# ------------------------------------------------------------------------------------------------ programme rules
+# A station names (at offset 24) a "rules root": the rules for the beginning and, per category, those for what may
+# follow an item of it. A rule is a list of (next category, factors); the weight of a category is the product of its
+# factors. A factor is a number, a switch on a game variable, or a curve over the seconds since a category was last
+# heard, the number of its items in a row, or the hour of the day. The curves lie in a file of their own.
+T_ROOT, T_RULES = 30, 31
+F_BRANCH, F_CONST, F_COUNT, F_SINCE, F_CONST2, F_HOUR, F_CHOICE = 5, 33, 35, 36, 38, 39, 49
+CURVE_POINTS, CURVE_TABLE = 4, 6
+
+
+def _objects(data):
+    """{name hash: bytes} of a metadata file, read from its index alone (the curve file has no reference table)."""
+    length = _u32(data, 4)
+    p = 8 + length
+    for _ in range(2):
+        p += 4 + _u32(data, p)
+    count = _u32(data, p)
+    if p + 4 + 8 * count > len(data):
+        raise ValueError("index outside the file")
+    entries = [struct.unpack_from("<II", data, p + 4 + 8 * k) for k in range(count)]
+    offsets = sorted({o for _h, o in entries}) + [length]
+    end = dict(zip(offsets, offsets[1:]))
+    return {h: data[8 + o:8 + end.get(o, o)] for h, o in entries}
+
+
+def _curve(d):
+    """A curve as the rules carry it: [[x, y], ...] (straight lines between the points) or [value, ...] (a table by the
+    number of items in a row), or None."""
+    if not d or len(d) < 20 or d[0] not in (CURVE_POINTS, CURVE_TABLE):
+        return None
+    n = _u32(d, 16)
+    width = 2 if d[0] == CURVE_POINTS else 1
+    if not 1 <= n <= 256 or 20 + 4 * width * n > len(d):
+        return None
+    values = struct.unpack_from("<%df" % (width * n), d, 20)
+    return [[values[2 * k], values[2 * k + 1]] for k in range(n)] if width == 2 else list(values)
+
+
+def parse_rules(files):
+    """-> {station hash: {"table": {category after which, or "": [[next category, [factor, ...]], ...]},
+    "history": {category: how many of its items do not come back}, "sequence": [categories played in their order]}}.
+
+    A factor is a number or ["s" since | "c" count | "h" hour, category ("" for the hour), curve]."""
+    metas, game = _game_file(files)
+    if game is None:
+        return {}
+    wanted = set()
+    for h in game.index:
+        d = game.get(h)
+        if len(d) == 16 and d[0] in (F_COUNT, F_SINCE):
+            wanted.add(game.hash_at(_u32(d, 12)))
+        elif len(d) == 12 and d[0] == F_HOUR:
+            wanted.add(game.hash_at(_u32(d, 8)))
+    curves = {}
+    for data in files:
+        try:
+            if len(data) < 12 or _u32(data, 8) != MAGIC:
+                continue
+            found = _objects(data)
+        except (ValueError, struct.error):
+            continue
+        if sum(h in found for h in wanted) > sum(h in curves for h in wanted):
+            curves = found
+
+    def category(ref):
+        h = game.hash_at(ref)
+        return CATEGORIES.get(h) or "%08X" % (h or 0)
+
+    def factor(ref, depth=0):
+        d = game.follow(ref) if ref != NONE else None
+        if not d or depth > 8:
+            return 1.0
+        t = d[0]
+        if t in (F_COUNT, F_SINCE) and len(d) >= 16:
+            curve = _curve(curves.get(game.hash_at(_u32(d, 12))))
+            return 1.0 if curve is None else ["c" if t == F_COUNT else "s", category(_u32(d, 8)), curve]
+        if t == F_HOUR and len(d) >= 12:
+            curve = _curve(curves.get(game.hash_at(_u32(d, 8))))
+            return 1.0 if curve is None else ["h", "", curve]
+        if t in (F_CONST, F_CONST2) and len(d) >= 12:
+            return struct.unpack_from("<f", d, 8)[0]
+        if t == F_BRANCH and len(d) >= 20:                      # the branch for a game that has set no variable
+            return factor(_u32(d, 16), depth + 1)
+        if t == F_CHOICE and len(d) >= 20:                      # depends on the story: either, half as likely each
+            return 0.5 * sum(struct.unpack_from("<ff", d, 12))
+        return 1.0
+
+    def rows(ref):
+        d = game.follow(ref) if ref != NONE else None
+        out, o = [], 8
+        while d and d[0] == T_RULES and o + 8 <= len(d):
+            follower, n = category(_u32(d, o)), _u32(d, o + 4)
+            if n > 16 or o + 8 + 4 * n > len(d):
+                break
+            out.append([follower, [factor(_u32(d, o + 8 + 4 * k)) for k in range(n)]])
+            o += 8 + 4 * n
+        return out
+
+    out = {}
+    for h in game.index:
+        d = game.get(h)
+        if len(d) < 68 or d[0] != TYPE_STATION:
+            continue
+        root = game.follow(_u32(d, 24))
+        if not root or root[0] != T_ROOT or len(root) < 16:
+            continue
+        table = {"": rows(_u32(root, 8))}
+        for k in range(min(_u32(root, 12), (len(root) - 16) // 8)):
+            table[category(_u32(root, 16 + 8 * k))] = rows(_u32(root, 20 + 8 * k))
+        history, sequence = {}, []
+        p = 64 + 12 * _u32(d, 60)                               # behind the lists: settings per category, then histories
+        if p + 4 <= len(d):
+            p += 4 + 8 * _u32(d, p)
+        if p + 4 <= len(d):
+            for k in range(min(_u32(d, p), (len(d) - p - 4) // 12)):
+                ref, n, mode = struct.unpack_from("<III", d, p + 4 + 12 * k)
+                if mode == 2:
+                    history[category(ref)] = n
+                elif mode == 1:
+                    sequence.append(category(ref))
+        out[h] = {"table": table, "history": history, "sequence": sequence}
+    return out
+
+
+def read_rules(path):
+    """parse_rules() for the archive at `path`. Raises OSError / ValueError."""
+    try:
+        return parse_rules(config_files(path))
+    except (struct.error, IndexError, zlib.error) as e:
+        raise ValueError("audio config not understood: %s" % e) from e
+
+
+def tracks_of(st):
+    """Every recording a station can put on air (not the DJ's lines, see awc_dj.station_lines)."""
+    return st.get("songs", []) + st.get("jingles", []) + st.get("talk", []) + st.get("ads", [])
+
+
+def has_programme(rules):
+    """True when a station's rules know more than songs: then its programme follows them."""
+    return bool(rules) and any(follower not in SONG_CATEGORIES for rows in rules["table"].values() for follower, _f in rows)
+
+
+def _ruled_station(h, lists, banks, adverts, station, songs, found, cfg_names, spelling, rules):
+    """A station whose programme follows the game's rules: its recordings by category (rules["pools"]), and sorted into
+    songs, jingles (short), talk (longer spoken items) and adverts."""
+    talk_radio = h in TALK_STATIONS
+    names = show_parts() if talk_radio else {}
+    used = {follower for rows in rules["table"].values() for follower, _f in rows}
+    st = {"songs": [], "jingles": [], "talk": [], "ads": []}
+    pools, kept, flagged = {}, {}, []                      # kept: recording -> its key in the lists
+    for lst in lists:
+        for tr in lst:
+            category = tr.kind
+            if category not in used or category == "news":        # what no rule ever asks for is never heard
+                continue
+            hit = banks.find(h, tr.wave)
+            if not hit:
+                continue
+            item, s = hit
+            song = category in SONG_CATEGORIES
+            if s["sec"] < (SONG_MIN if song else AD_MIN if category == "advert" else JINGLE_MIN):
+                continue
+            key = "%s_%s" % (item["base"], s["i"])
+            if key not in kept:
+                advert = category == "advert" or (not song and tr.wave in adverts)
+                if song:
+                    entry = _track(item, s, *_song_name(tr, station, s["id"] & STREAM_ID_MASK, songs, found, cfg_names, spelling))
+                    same = next((x for x in st["songs"] if (x["title"], x["artist"]) == (entry["title"], entry["artist"])
+                                 and abs(x["sec"] - entry["sec"]) < 1.0), None)
+                    if same and category == "music":              # the same recording twice (a variant of the track)
+                        kept[key] = "%s_%s" % (same["base"], same["idx"])
+                    else:
+                        st["songs"].append(entry)
+                        kept[key] = key
+                else:
+                    entry = _track(item, s, advert_name(s["id"]) if advert else "")
+                    name = names.get(s["id"] & STREAM_ID_MASK)
+                    if name and not advert:
+                        entry["title"], entry["artist"] = name[0], "Episode %d" % name[1]
+                    short = s["sec"] <= JINGLE_MAX and category not in TALK_CATEGORIES
+                    st["ads" if advert else "jingles" if short else "talk"].append(entry)
+                    if advert and category != "advert":
+                        flagged.append(key)
+                    kept[key] = key
+            pool = pools.setdefault(category, [])
+            if kept[key] not in pool:
+                pool.append(kept[key])
+    if talk_radio:                                         # its songs are what it says
+        st["songs"], st["talk"] = st["talk"], []
+    rules = dict(rules, pools=pools)
+    if flagged:
+        rules["ads"] = flagged
+    if talk_radio:
+        rules["talkradio"] = True
+    st = {k: v for k, v in st.items() if v or k in ("songs", "jingles")}
+    st["rules"] = rules
+    if "news" in used:
+        st["news"] = True
+    return st
+
+
+def build(items, game, songs, found, cfg_names, rules=None):
+    """-> {station: {"songs": [track], "jingles": [track], ...}} for the stations the config defines.
 
     items      scan items            game       result of read()
     songs      credits list          found      {stream id: (title, artist, station)} matched with it
-    cfg_names  {stream id: name} from the config strings
-    Songs: tracks of the music lists and tracks with a title. Jingles: short streams only this station uses (idents
-    and DJ talk). Talk radio: every track list with long own streams is one show, its streams are the parts.
-    Adverts (the lists the config marks so) are kept apart: "ads" is only played when the listener wants them."""
+    cfg_names  {stream id: name} from the config strings                rules: from parse_rules()
+    A station with programme rules gets its recordings by category (see _ruled_station), also "talk", "ads", "rules"
+    and "news": True where it plays the bulletins. The others are songs (tracks of the music lists and tracks with a
+    title) with jingles: short streams only that station uses."""
     banks = _Banks(items, game)
     adverts = advert_waves(game)
     spelling = credits.artist_names(songs)
@@ -635,57 +907,96 @@ def build(items, game, songs, found, cfg_names):
     for h, lists in game.items():
         talk = TALK_STATIONS.get(h)
         station = talk[0] if talk else MUSIC_STATIONS[h]
-        names = _show_names(talk[1], talk[2]) if talk else {}
-        st = {"songs": [], "jingles": []}
-        used, episodes = set(), []
-        for lst in lists:                                   # songs / shows first, so they never become jingles
-            parts, name = [], None
-            for tr in lst:
-                hit = banks.find(h, tr.wave)
-                if not hit:
-                    continue
-                item, s = hit
-                key = (item["base"], s["i"])
-                if key in used:
-                    continue
-                if talk:
-                    if tr.wave in banks.own and s["sec"] >= PART_MIN:
-                        used.add(key)
-                        parts.append((item, s))
-                        name = name or names.get(s["id"] & STREAM_ID_MASK)
-                elif (tr.title or tr.music) and s["sec"] >= SONG_MIN:
+        own = (rules or {}).get(h)
+        if has_programme(own):
+            st = _ruled_station(h, lists, banks, adverts, station, songs, found, cfg_names, spelling, own)
+        elif talk:
+            continue
+        else:
+            st = {"songs": [], "jingles": []}
+            used = set()
+            for lst in lists:                               # songs first, so they never become jingles
+                for tr in lst:
+                    hit = banks.find(h, tr.wave)
+                    if not hit or not (tr.title or tr.music) or hit[1]["sec"] < SONG_MIN:
+                        continue
+                    item, s = hit
+                    key = (item["base"], s["i"])
+                    if key in used:
+                        continue
                     used.add(key)
                     song = _track(item, s, *_song_name(tr, station, s["id"] & STREAM_ID_MASK, songs, found, cfg_names, spelling))
                     if not any((x["title"], x["artist"]) == (song["title"], song["artist"]) and abs(x["sec"] - song["sec"]) < 1.0
-                               for x in st["songs"]):             # the same recording twice (a variant of the track)
+                               for x in st["songs"]):
                         st["songs"].append(song)
-            if parts:
-                ep = _track(*parts[0])
-                ep["sec"] = round(sum(s["sec"] for _i, s in parts), 2)
-                ep["parts"] = [[i["base"], s["i"]] for i, s in parts]
-                episodes.append([name, ep])
-        if episodes:
-            episodes.sort(key=lambda e: e[1]["base"])
-            _name_episodes(episodes, station)
-            st["songs"] = [e[1] for e in episodes]
-        for lst in lists:
-            for tr in lst:
-                hit = banks.find(h, tr.wave)
-                if hit and tr.wave in banks.own and tr.wave not in adverts and not tr.title and JINGLE_MIN <= hit[1]["sec"] <= JINGLE_MAX:
-                    key = (hit[0]["base"], hit[1]["i"])
-                    if key not in used:
-                        used.add(key)
-                        st["jingles"].append(_track(*hit))
-        ads = {}
-        for lst in lists:
-            for tr in lst:
-                hit = banks.find(h, tr.wave) if tr.kind == "advert" else None
-                if hit and hit[1]["sec"] >= AD_MIN:
-                    ads.setdefault((hit[0]["base"], hit[1]["i"]), _track(*hit, advert_name(hit[1]["id"])))
-        if ads:
-            st["ads"] = [ads[k] for k in sorted(ads)]
+            for lst in lists:
+                for tr in lst:
+                    hit = banks.find(h, tr.wave)
+                    if hit and tr.wave in banks.own and tr.wave not in adverts and not tr.title and JINGLE_MIN <= hit[1]["sec"] <= JINGLE_MAX:
+                        key = (hit[0]["base"], hit[1]["i"])
+                        if key not in used:
+                            used.add(key)
+                            st["jingles"].append(_track(*hit))
         if st["songs"]:
             out[station] = st
+    return out
+
+
+# ------------------------------------------------------------------------------------------------ places with music
+# station objects of places that play music of their own (named as far as the names are known)
+PLACE_NAMES = {joaat("hidden_radio_" + k): v for k, v in (
+    ("muzak", "Muzak"), ("muzak_backbeat", "Muzak Backbeat"), ("muzak_country", "Muzak Country"),
+    ("muzak_latin_classic", "Muzak Latin Classic"), ("muzak_latin_modern", "Muzak Latin Modern"),
+    ("muzak_soft_rock", "Muzak Soft Rock"), ("hotel_lobby_generic", "Hotel Lobby"), ("minigolf", "Minigolf"),
+    ("cellerica", "Cellerica"), ("clb_evi_dungeon", "Club EVI Dungeon"), ("kolt", "Kolt"), ("vcrr", "VCRR"))}
+PLACE_NAMES[0xC74B75F4] = "Bear Collector"
+
+
+def parse_places(files):
+    """-> [(object hash, name or "", [(bank hash, stream hash)])] of the station objects that are no radio station: the
+    music of shops, lobbies, lifts and other places. Recordings the radio or a podcast plays are left out. Named objects
+    come first."""
+    metas, game = _game_file(files)
+    if game is None:
+        return []
+    radio = set(MUSIC_STATIONS) | set(TALK_STATIONS) | {joaat(k) for k, _n in VIEW_OBJECTS} | {joaat(k) for k, _n in VENUE_PLAYLISTS}
+    objects = {}
+    heard = []
+    for h in game.index:
+        d = game.get(h)
+        if len(d) < 64 or d[0] != TYPE_STATION:
+            continue
+        sound_hashes, seen = [], set()
+        todo = [game.hash_at(_u32(d, 64 + 12 * k)) for k in range(min(_u32(d, 60), (len(d) - 64) // 12))][::-1]
+        while todo:
+            x = todo.pop()
+            o = None if x is None else game.get(x)
+            if not o or x in seen:
+                continue
+            seen.add(x)
+            if o[0] == TYPE_TRACK and len(o) >= 16:
+                sound_hashes.append(game.hash_at(_u32(o, 12)))
+            elif o[0] == TYPE_LIST_OF_LISTS:
+                todo += [game.hash_at(_u32(o, 12 + 4 * k)) for k in range(_u32(o, 8))][::-1]
+            elif o[0] == TYPE_TRACKLIST:
+                inner = [game.hash_at(_u32(o, 76 + 4 * k)) for k in range(_u32(o, 72))]
+                if _u32(o, 68) != NONE:
+                    inner.insert(0, game.hash_at(_u32(o, 68)))
+                todo += inner[::-1]
+        objects[h] = sound_hashes
+        heard += sound_hashes
+    if not heard:
+        return []
+    sounds = max(metas, key=lambda m: sum(1 for h in set(heard) if h in m.index))
+    waves = {h: [w for w in (_wave(sounds, x) for x in xs) if w] for h, xs in objects.items()}
+    played = {w for h in radio for w in waves.get(h, ())}
+    played |= {t.wave for tracks in catalog(files).values() for t in tracks}
+    played |= set(parse_news(files))
+    out = []
+    for h in sorted((h for h in waves if h not in radio), key=lambda h: (h not in PLACE_NAMES, h)):
+        own = [w for w in dict.fromkeys(waves[h]) if w not in played]
+        if own:
+            out.append((h, PLACE_NAMES.get(h, ""), own))
     return out
 
 

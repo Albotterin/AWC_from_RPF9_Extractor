@@ -601,7 +601,7 @@ class App(tk.Tk):
             return "bed"
         if kind.startswith("music"):
             return "music"
-        for start, cat in (("dj_banter", "banter"), ("ident", "ident"), ("show", "show"), ("talk", "talk"), ("news", "talk")):
+        for start, cat in (("dj_banter", "banter"), ("ident", "ident"), ("show", "show"), ("talk", "talk"), ("news", "talk"), ("segment", "talk")):
             if kind.startswith(start):
                 return cat
         return kind if kind in ("advert", "set", "podcast") else "other"

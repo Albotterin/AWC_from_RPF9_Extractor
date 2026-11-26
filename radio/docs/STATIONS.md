@@ -36,7 +36,7 @@ Objects refer to each other by their **position in the reference table**; the ha
 The stream hash, cut to 29 bits, is the stream ID in the AWC. The same ID can exist in several banks (every station has
 its own DJ links); the banks of one station lie together in the archive, so the nearest one is taken. Track lists of the
 category with name hash `0x2BE42A81` hold the music; short streams that only one station uses are idents and DJ talk.
-The talk stations have one track list per show episode with its parts in order; the stream names follow the pattern
+The talk stations have track lists with the parts of their shows in order; the stream names follow the pattern
 `<station>_<show>_ep<n>_pt<m>`.
 
 ## Track list categories
@@ -46,6 +46,43 @@ The category of a track list (`+8`) is `joaat("radio_track_category_<kind>")` wi
 `_from_ads`, `_from_news`, `_story`), `showintro` and `showoutro` (also `_night`, `_dj2`), `talk` (also `_night`) and
 `news`. Some stations and the talk shows use further categories whose names are not known. The extractor groups a
 station's streams by these.
+
+## Programme rules
+
+A station object names, at `+24`, the root of its programme rules. Nothing of this is encrypted; the curves are part of the
+same audio config. The meanings were inferred from the data (`awc_gamedata.parse_rules`).
+
+| Type | Content |
+|---:|---|
+| 30 | rules root: `+8` the rule for the beginning, `+12` count, then `(category, rule)` pairs from `+16`: what may follow an item of that category |
+| 31 | rule: from `+8`, per possible follower: `category, u32 n, n x factor`. The weight of a follower is the product of its factors |
+| 33, 38 | factor: the `f32` at `+8` |
+| 35 | factor by the number of items of a category in a row: `+8` category, `+12` curve |
+| 36 | factor by the seconds since a category was last heard: `+8` category, `+12` curve |
+| 39 | factor by the hour of the day (0-24): `+8` curve |
+| 5 | switch on a game variable: `+8` condition, `+12` / `+16` the two factors. Taken: the second (variable not set) |
+| 49 | choice depending on a game variable: `f32` at `+12` and `+16`. Taken: half their sum |
+
+**Curves** lie in a metadata file of their own whose index is read directly: type 4 is a polyline (`u32` n at `+16`, then
+n x `(f32 x, f32 y)` from `+20`), type 6 a table (`u32` n at `+16`, then n x `f32`), read here as the weights for the 1st,
+2nd, ... item in a row.
+
+Behind a station's track lists come pairs `(category, mixing rule)` and then `(category, n, mode)`: with mode 2 the last n
+items of that category do not come back, with mode 1 the category is played in its order.
+
+AWC Radio uses the rules of 20 stations (18 music stations and the two talk stations). The mixing rules (how items overlap
+in the game) are not used.
+
+## News
+
+The news bulletins lie in track lists of the category `news` that belong to no station (a list of lists with 46 and 84
+entries in the sample archive). A station plays them when its rules name the category.
+
+## Places with music
+
+Station objects that are no radio station give lifts, lobbies, a minigolf course and other places their music. Their
+recordings without a track number are the group **Music in places** of the score (113 recordings in the sample archive);
+the names known from the objects' name hashes (`hidden_radio_muzak`, ...) are used as sub groups, the others are numbered.
 
 ## Adverts
 
@@ -60,7 +97,7 @@ In the sample archive 18 stations list adverts, 239 different ones, each station
   stations. That fits two language versions of one spot - listeners report the exclusive ones as Spanish. The programs
   do not recognise languages.
 
-AWC Radio plays the adverts of a station only in its programme "with adverts".
+AWC Radio plays the adverts of a station only with the switch **Adverts, news & talk**.
 
 ## Podcasts
 

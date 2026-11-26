@@ -239,6 +239,10 @@ A piece starts at a section without the `FA_` prefix and follows the actions unt
 event is needed. The mix lets a one-shot ring until a later section gives its layer something new, and cuts silence at
 the end.
 
+The group of the **places** is not interactive: its pieces are finished recordings of music AWCs, played by station
+objects that are no radio station (see the [station notes](../../radio/docs/STATIONS.md#places-with-music)). They are
+copied as they are.
+
 ## 10. Titles (text tables in `data.rpf`)
 
 The texts of the game lie in `data.rpf`, next to the audio archive, as ordinary zlib streams (nothing is decrypted; the

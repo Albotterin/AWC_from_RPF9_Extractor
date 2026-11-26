@@ -200,7 +200,7 @@ class ScoreWindow(tk.Toplevel):
                 subs[key] = self.tree.insert(groups[g], "end", text=p["sub"], open=bool(self.search.get()))
                 self.nodes[subs[key]] = []
             row = self.tree.insert(subs[key], "end", text=p["title"],
-                                   values=(clock(p["sec"]), "%g" % p["bpm"], len(p["parts"]), p["name"]))
+                                   values=(clock(p["sec"]), "%g" % p["bpm"] if p["bpm"] else "", len(p["parts"]) or "", p["name"]))
             self.nodes[row] = [p]
             self.nodes[groups[g]].append(p)
             self.nodes[subs[key]].append(p)
