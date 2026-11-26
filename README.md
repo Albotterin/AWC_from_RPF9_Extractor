@@ -164,8 +164,8 @@ Details for every station: [radio progress](radio/docs/RADIO-PROGRESS.md).
 - [ ] The 8 original songs of "Honey FM – Liquid City": the show itself is played, and music can be measured inside some of
       its recordings (the same first seconds in all nine openings, a passage that two openings share, steady beats in
       some talk parts). Which songs these are is not verified: no file carries their names and no previews were found
-- [ ] The programme and the mixing by the game's data are not compared with the game by ear; the low-pass sweeps of some
-      mixing rules and rules that depend on the state of the game are not taken over
+- [x] The programme and the mixing by the game's data are compared with the game by ear; the low-pass sweeps of some
+      mixing rules and rules that depend on the state of the game stay left out
 - [x] How the items overlap in the game (its mixing rules) and the music under the DJ's talk are taken over
 - [x] Radio On-U's formerly unnamed track is *Ras Menilik Congo (Harp)* by Augustus Pablo
 - [x] The podcast episodes carry their titles from the game

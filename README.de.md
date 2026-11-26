@@ -165,8 +165,8 @@ Details zu jedem Sender: [Fortschritt des Radios](radio/docs/RADIO-PROGRESS.de.m
       Aufnahmen lässt sich Musik messen (dieselben ersten Sekunden in allen neun Eröffnungen, eine Passage in zwei
       Eröffnungen, gleichmäßige Takte in manchen Talk-Teilen). Welche Songs das sind, ist nicht geprüft: Keine Datei trägt
       ihre Namen, und Hörproben waren nicht zu finden
-- [ ] Programm und Mischung nach den Spieldaten sind nicht per Ohr mit dem Spiel verglichen; die Tiefpass-Verläufe
-      mancher Misch-Regeln und Regeln, die vom Spielstand abhängen, sind nicht übernommen
+- [x] Programm und Mischung nach den Spieldaten sind per Ohr mit dem Spiel verglichen; die Tiefpass-Verläufe
+      mancher Misch-Regeln und Regeln, die vom Spielstand abhängen, bleiben weggelassen
 - [x] Die Überlappungen der Beiträge (die Misch-Regeln des Spiels) und die Musik unter dem DJ sind übernommen
 - [x] Der bisher namenlose Titel von Radio On-U ist *Ras Menilik Congo (Harp)* von Augustus Pablo
 - [x] Die Podcast-Folgen heißen wie im Spiel
