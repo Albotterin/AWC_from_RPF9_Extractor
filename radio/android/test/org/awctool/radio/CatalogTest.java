@@ -181,7 +181,7 @@ public final class CatalogTest {
             djWindows += talked;
             Schedule plain = s.programme(false, Schedule.FADE);
             check(plain == s.programme(false, Schedule.FADE) && (s.programme(true, Schedule.FADE) == plain) == s.ads.isEmpty()
-                    && s.programme(false, 0) != plain, "programmes of " + s.name);
+                    && (s.programme(false, 0) == plain) == s.mixedAsInGame(), "programmes of " + s.name);
             for (Schedule.Track t : all) {
                 Pack.Entry e = s.pack.entry("t/" + t.key);
                 check(e != null && e.length > 500, s.name + ": file of " + t.key);

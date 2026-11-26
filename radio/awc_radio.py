@@ -25,6 +25,7 @@ from tkinter import filedialog, messagebox, ttk
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path[:0] = [HERE, os.path.join(os.path.dirname(HERE), "extractor")]   # the shared modules live with the extractor
+import awc_album  # noqa: E402
 import awc_config as gamecfg  # noqa: E402
 import awc_core as core  # noqa: E402
 import awc_credits as credits  # noqa: E402
@@ -38,7 +39,7 @@ NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 SONG_MIN, SONG_MAX = 60.0, 1500.0          # seconds: shorter is not a song, longer is a mix
 JINGLE_MIN, JINGLE_MAX = 2.0, 25.0         # unnamed short streams of a station are used as jingles
 MIN_SONGS = 5                              # a station needs at least this many songs to be listed
-INDEX_VERSION = 12
+INDEX_VERSION = 14
 
 BG, PANEL, CARD, CARD_SEL, FG, DIM, ACCENT = "#14161c", "#1c1f27", "#232733", "#2f3550", "#eceef4", "#8b91a3", "#ff5a36"
 
@@ -50,7 +51,7 @@ STR = {
         "lbl_rpf": "audio.rpf", "lbl_pool": "Texture file (ttdb_ui.ttpf)", "btn_browse": "Browse…", "btn_start": "Start radio",
         "btn_settings": "Files…", "btn_rescan": "Re-read", "btn_android": "Android packs…", "st_scan": "Reading the archive … (the first time takes several minutes)",
         "st_credits": "Loading the song list …", "st_names": "Reading names from the game config …",
-        "st_build": "Building the stations …", "st_titles": "Reading the titles from data.rpf …", "st_icons": "Reading the station logos …", "st_ready": "{n} stations",
+        "st_build": "Building the stations …", "st_beds": "Listening into the DJ recordings …", "st_titles": "Reading the titles from data.rpf …", "st_icons": "Reading the station logos …", "st_ready": "{n} stations",
         "err_rpf": "Please choose an existing audio.rpf.", "err_scan": "No music streams found in that file.",
         "err_ffplay": "ffplay was not found. Put ffplay.exe next to the program or into your PATH.",
         "err_credits": "The credits page could not be downloaded:\n{e}\n\nPick the page saved from your browser instead?",
@@ -58,7 +59,7 @@ STR = {
         "kind_song": "SONG", "kind_jingle": "JINGLE", "kind_ad": "ADVERT", "advert": "Advert", "chk_ads": "Adverts, news & talk", "chk_dj": "DJ",
         "kind_news": "NEWS", "news": "News", "kind_talk": "TALK", "talk": "Talk",
         "dj_needs_ffmpeg": "The DJ needs FFmpeg (ffmpeg.exe) next to the program or in your PATH.",
-        "lbl_fade": "Crossfade", "fade_off": "Off", "fade_s": "{n} s",
+        "lbl_fade": "Crossfade (clubs, mixes)", "fade_off": "Off", "fade_s": "{n} s",
         "st_fade_note": "The programme now differs from devices with another crossfade setting (standard: 3 s).", "btn_play": "▶ Play (live)", "btn_pause": "⏸ Pause",
         "sync_hint": "Live: the stations run by the clock, everyone with the same time and time zone hears the same.", "lbl_volume": "Volume", "n_songs": "{n} songs", "n_shows": "{n} shows", "n_segments": "{n} segments", "kind_show": "SHOW", "st_loading": "Loading …",
         "lbl_next": "Up next:", "tune": "Tune in to a station on the left", "no_logo_hint": "",
@@ -73,7 +74,7 @@ STR = {
         "lbl_rpf": "audio.rpf", "lbl_pool": "Textur-Datei (ttdb_ui.ttpf)", "btn_browse": "Durchsuchen…", "btn_start": "Radio starten",
         "btn_settings": "Dateien…", "btn_rescan": "Neu einlesen", "btn_android": "Android-Packs…", "st_scan": "Lese das Archiv … (beim ersten Mal dauert das mehrere Minuten)",
         "st_credits": "Lade die Songliste …", "st_names": "Lese Namen aus der Spiel-Konfiguration …",
-        "st_build": "Baue die Sender …", "st_titles": "Lese die Titel aus data.rpf …", "st_icons": "Lese die Sender-Logos …", "st_ready": "{n} Sender",
+        "st_build": "Baue die Sender …", "st_beds": "Höre in die DJ-Aufnahmen hinein …", "st_titles": "Lese die Titel aus data.rpf …", "st_icons": "Lese die Sender-Logos …", "st_ready": "{n} Sender",
         "err_rpf": "Bitte eine vorhandene audio.rpf wählen.", "err_scan": "In dieser Datei wurden keine Musik-Streams gefunden.",
         "err_ffplay": "ffplay wurde nicht gefunden. ffplay.exe neben das Programm legen oder in den PATH aufnehmen.",
         "err_credits": "Die Credits-Seite konnte nicht geladen werden:\n{e}\n\nStattdessen die im Browser gespeicherte Seite wählen?",
@@ -81,7 +82,7 @@ STR = {
         "kind_song": "SONG", "kind_jingle": "JINGLE", "kind_ad": "WERBUNG", "advert": "Werbung", "chk_ads": "Werbung, News & Talk", "chk_dj": "DJ",
         "kind_news": "NACHRICHTEN", "news": "Nachrichten", "kind_talk": "TALK", "talk": "Talk",
         "dj_needs_ffmpeg": "Für den DJ wird FFmpeg (ffmpeg.exe) neben dem Programm oder im PATH gebraucht.",
-        "lbl_fade": "Überblenden", "fade_off": "Aus", "fade_s": "{n} s",
+        "lbl_fade": "Überblenden (Clubs, Mixe)", "fade_off": "Aus", "fade_s": "{n} s",
         "st_fade_note": "Das Programm weicht jetzt von Geräten mit anderer Überblendung ab (Standard: 3 s).", "btn_play": "▶ Abspielen (live)", "btn_pause": "⏸ Pause",
         "sync_hint": "Live: Die Sender laufen nach der Uhr, alle mit derselben Zeit und Zeitzone hören dasselbe.", "lbl_volume": "Lautstärke", "n_songs": "{n} Songs", "n_shows": "{n} Sendungen", "n_segments": "{n} Beiträge", "kind_show": "SENDUNG", "st_loading": "Lade …",
         "lbl_next": "Als Nächstes:", "tune": "Links einen Sender wählen", "no_logo_hint": "",
@@ -173,14 +174,46 @@ def load_index(rpf, pool):
 
 
 def extract_track(index, rpf, tr_, dst):
-    """Cut one item of a station out of the archive (a talk show: all its parts into one file)."""
+    """Cut one item of a station out of the archive (a talk show: all its parts into one file; a recording of several
+    layers mixed together, a part of a mix cut out - both with FFmpeg)."""
     def ref(base):
         return core.AwcRef(dict(index["items"][str(base)], path=rpf))
     parts = tr_.get("parts")
-    if parts:
+    if tr_.get("stems") or tr_.get("cut"):
+        _render(ref(tr_["base"]), tr_, dst)
+    elif parts:
         core.join_streams([(ref(b).open(), i) for b, i in parts], dst)
     else:
         ref(tr_["base"]).extract({tr_["idx"]: dst})
+
+
+def _render(ref, tr_, dst):
+    """extract_track() for a recording that FFmpeg makes: the layers tr_["stems"] added up, or the seconds tr_["cut"]
+    of a mix. Raises OSError."""
+    ffmpeg = find_tool("ffmpeg")
+    if not ffmpeg:
+        raise OSError(t("dj_needs_ffmpeg"))
+    wanted = tr_.get("stems") or [tr_["idx"]]
+    parts = {i: "%s.%d.opus" % (dst, i) for i in wanted}
+    try:
+        ref.extract(parts)
+        cmd = [ffmpeg, "-v", "error", "-y"]
+        if tr_.get("cut"):
+            cmd += ["-ss", "%.2f" % tr_["cut"][0], "-t", "%.2f" % (tr_["cut"][1] - tr_["cut"][0])]
+        for path in parts.values():
+            cmd += ["-i", path]
+        if len(parts) > 1:
+            cmd += ["-filter_complex", "amix=inputs=%d:duration=longest:normalize=0,alimiter=limit=0.89:level=disabled" % len(parts)]
+        r = subprocess.run(cmd + ["-c:a", "libopus", "-b:a", "160k", "-f", "ogg", dst], capture_output=True,
+                           stdin=subprocess.DEVNULL, creationflags=NO_WINDOW, timeout=600)
+        if r.returncode != 0 or not os.path.isfile(dst):
+            raise OSError("ffmpeg: " + r.stderr.decode("utf-8", "replace")[-300:])
+    finally:
+        for path in parts.values():
+            try:
+                os.remove(path)
+            except OSError:
+                pass
 
 
 # ------------------------------------------------------------------------------------------------ model
@@ -452,6 +485,13 @@ def make_index(rpf, pool, get_songs, status=None, progress=None):
     except (OSError, ValueError, struct.error):
         spoken = {}
     try:
+        awc_dj.cues(rpf, stations)                               # where every song is cued in
+    except (OSError, ValueError, struct.error):
+        pass
+    if status:
+        status(t("st_beds"), 0.9)
+    awc_dj.beds(rpf, stations, {it["base"]: it for it in items}, find_tool("ffmpeg"))
+    try:
         podcasts = gamedata.build_podcasts(items, gamedata.read_podcasts(rpf))     # for the app: played on demand
     except (OSError, ValueError):
         podcasts = {}
@@ -463,10 +503,12 @@ def make_index(rpf, pool, get_songs, status=None, progress=None):
     shows = {}
     titles = texts.read_titles(rpf, wanted, shows)
     apply_titles(stations, podcasts, items, titles, songs, shows)
+    awc_album.name_known(stations)                               # recognised by their sound
+    album = awc_album.find(items, stations)                      # the soundtrack, for a playlist
     if not any(st.get("news") for st in stations.values()):
         news = []
     used = {}
-    for tr_ in [x for st in list(stations.values()) + list(podcasts.values()) for x in gamedata.tracks_of(st)] + news:
+    for tr_ in [x for st in list(stations.values()) + list(podcasts.values()) for x in gamedata.tracks_of(st)] + news + album:
         for base, _idx in tr_.get("parts") or [(tr_["base"], tr_["idx"])]:
             used[base] = None
     by_base = {it["base"]: it for it in items}
@@ -474,7 +516,7 @@ def make_index(rpf, pool, get_songs, status=None, progress=None):
     for st in stations.values():
         for line in awc_dj.station_lines(st):
             used[line["base"]] = None
-    idx = {"fp": fingerprint(rpf, pool), "stations": stations, "podcasts": podcasts, "news": news,
+    idx = {"fp": fingerprint(rpf, pool), "stations": stations, "podcasts": podcasts, "news": news, "album": album,
            "items": {str(b): by_base[b] for b in used}}
     with open(index_path(), "w", encoding="utf-8") as f:
         json.dump(idx, f)
@@ -546,6 +588,7 @@ DAY = 86400.0
 FADE = 3.0                                 # standard seconds of crossfade between two songs
 FADE_MAX = 12
 LEAD = 0.4                                 # ffplay needs about this long to start; its start position is moved on by it
+SHAPES = ("tri", "qsin")                   # the shapes of a fade as FFmpeg names them: straight, equal power
 TAIL = 0.3                                 # an item that is not faded out may play this much longer than scheduled
 AD_AFTER = (540, 361)                      # with adverts: a break after 9 to 15 minutes of programme (540 + 0..360 s)
 DJ_INTRO, DJ_OUTRO, DJ_BEFORE_ADS = 50, 35, 70      # per cent: how often the DJ talks over an intro, an outro, into a break
@@ -587,6 +630,10 @@ def segment_at(tr_, pos):
 def _tkey(tr_):
     """Identifies an item; the same as awc_android.track_key (the programme hashes it)."""
     parts = tr_.get("parts")
+    if tr_.get("cut"):
+        return "%s_%sc%d" % (tr_["base"], tr_["idx"], int(tr_["cut"][0]))
+    if tr_.get("stems"):
+        return "%s_%ss%d" % (tr_["base"], tr_["idx"], len(tr_["stems"]))
     return "%s_%s" % (tr_["base"], tr_["idx"]) + ("x%d" % len(parts) if parts else "")
 
 
@@ -607,9 +654,15 @@ class Schedule:
     choice is a hash of station, day and place), so everybody with the same game files and the same clock hears the same
     item at the same second. The item that would cross midnight UTC is cut there.
 
-    Two songs that follow each other overlap by `fade` seconds (a crossfade like on a real radio): the next one starts
-    while the previous one fades out. Nothing else is faded: it follows back to back. The overlap is part of the
-    timetable, so listeners hear the same only with the same crossfade (standard: FADE).
+    How one item hands over to the next is part of the timetable. A station with the game's rules is mixed as they say
+    (rules["mix"]): by the category of the item that ends and of the one that follows, the first may end a little early
+    and fade out, the second starts before that end and may fade in; a song is placed so that its cue-in point
+    (track["cue"]) lands there. Where the rules say nothing, items follow back to back.
+
+    Without them two songs that follow each other overlap by `fade` seconds (a crossfade like on a real radio) and
+    nothing else does; listeners then hear the same only with the same crossfade (standard: FADE).
+
+    Under the DJ's talk a station with music beds (station["beds"]) plays one of them, see bed_of().
 
     A station that brings the game's programme rules (station["rules"]) follows them: after an item of one category the
     rules weigh which categories may follow, by the seconds since each was last heard, the number of its items in a row
@@ -629,6 +682,8 @@ class Schedule:
         self.songs = sorted(station["songs"], key=_tkey)
         self.jingles = sorted(station["jingles"], key=_tkey)
         self.rules = station.get("rules")
+        self.mix = self.rules.get("mix") if self.rules else None      # the game's mixing; None: the plain crossfade
+        self.beds = sorted(station.get("beds", []), key=_tkey)
         self.extras = bool(ads)
         self.toads = station.get("toads", [])                          # the DJ's lines into an advert break
         self.tonews = station.get("tonews", [])                        # ... and into the news
@@ -662,7 +717,9 @@ class Schedule:
             self.hosted = {k for c in ("music_night", "music_night2") for k in self.rules["pools"].get(c, ())}
 
     def _day(self, d):
-        """-> ([start offsets], [[kind, track, fade_in, fade_out]]) of UTC day number d."""
+        """-> ([start offsets], [[kind, track, fade_in, fade_out, seconds on air]]) of UTC day number d.
+
+        A fade is None or (second in the item at which it starts, its length, its shape)."""
         if d not in self.days:
             made = self._ruled_day(d) if self.rules else self._plain_day(d)
             if len(self.days) > 4:
@@ -670,21 +727,54 @@ class Schedule:
             self.days[d] = made
         return self.days[d]
 
-    def _add(self, starts, entries, kind, tr_):
+    def _mixing(self, d, step, before, after):
+        """[weight, move, fade, shape, start, fade, shape] as the rules mix the end of a `before` item with an `after`
+        item (milliseconds, see gamedata.parse_rules), or None."""
+        by = self.mix.get(before, {})
+        found = by.get(after) or by.get("")
+        if not found:
+            return None
+        at = _h(self.name, d, "mix", step) % sum(v[0] for v in found)
+        for values in found:
+            at -= values[0]
+            if at < 0:
+                break
+        return values
+
+    def _add(self, starts, entries, kind, tr_, d=0, before_category="", category=""):
         """Put an item behind the last one; False when it would start after the day."""
         sec = max(1.0, tr_["sec"])
-        ov, start = 0.0, 0.0
+        start, fade_in = 0.0, None
         if entries:
             last = entries[-1]
-            before = max(1.0, last[1]["sec"])
-            if kind == "song" and last[0] == "song" and not self.talk:        # crossfade only from song to song
-                ov = min(self.fade, 0.25 * before, 0.25 * sec)
-            start = starts[-1] + before - ov
+            before = last[4]
+            began = starts[-1]
+            start, play, fade_out = began + before, before, None
+            if self.mix is not None:
+                values = self._mixing(d, len(entries), before_category, category)
+                if values:
+                    _w, move, out_ms, out_shape, start_ms, in_ms, in_shape = values
+                    end = began + max(0.5 * before, before + move / 1000.0)
+                    cue = tr_.get("cue", 0.0)
+                    # never more than half of either item over the other, and never before the one that ends has begun
+                    lead = max(start_ms / 1000.0, -0.5 * sec)
+                    start = max(end + lead - cue, began + max(1.0, 0.5 * before))
+                    play = end - began
+                    if out_ms > 0:
+                        length = min(out_ms / 1000.0, play)
+                        fade_out = (play - length, length, out_shape)
+                    if in_ms > 0:
+                        fade_in = (cue, min(in_ms / 1000.0, 0.5 * sec), in_shape)
+            elif kind == "song" and last[0] == "song" and not self.talk:        # crossfade only from song to song
+                overlap = min(self.fade, 0.25 * before, 0.25 * sec)
+                if overlap > 0:
+                    start = began + before - overlap
+                    fade_out, fade_in = (before - overlap, overlap, 1), (0.0, overlap, 1)
             if start >= DAY:
                 return False
-            last[3] = ov
+            last[3], last[4] = fade_out, play
         starts.append(start)
-        entries.append([kind, tr_, ov, 0.0])
+        entries.append([kind, tr_, fade_in, None, sec])
         return True
 
     def _plain_day(self, d):
@@ -764,6 +854,7 @@ class Schedule:
         starts, entries = [], []
         recent, place = {}, {}                                 # category -> keys just heard / the next in its order
         current, run, previous = "", 0, ""
+        aired = ""                                             # the category of the last item that went on air
         now, step, passed = 0.0, 0, 0
         while self.pools:
             category = self._next_category(d, step, current, run, heard, now, hour_of(d * DAY + now))
@@ -788,10 +879,10 @@ class Schedule:
                 passed += 1
             else:
                 passed = 0
-                if not self._add(starts, entries, kind, tr_):
+                if not self._add(starts, entries, kind, tr_, d, aired, category):
                     break
                 now = starts[-1] + max(1.0, tr_["sec"])
-                previous = _tkey(tr_)
+                previous, aired = _tkey(tr_), category
                 if now >= DAY:
                     break
             run = run + 1 if category == current else 1
@@ -813,7 +904,7 @@ class Schedule:
         window = dj.get("i")
         if window and h % 100 < DJ_INTRO:
             line = window[2][(h >> 8) % len(window[2])]
-            if window[0] >= fin and window[0] + line[2] <= length:
+            if window[0] >= (fin[0] + fin[1] if fin else 0.0) and window[0] + line[2] <= length:
                 out.append((window[0], line))
         window = dj.get("o")
         if window:
@@ -831,10 +922,17 @@ class Schedule:
                     out.append((window[0], line))
         return out
 
+    def bed_of(self, item):
+        """The music bed under an item of items_from(), or None. The same for everybody at the same second."""
+        start, _end, kind, tr_, _fin, _fout = item
+        if not self.beds or not tr_.get("bed") or kind not in ("talk", "jingle"):
+            return None
+        return self.beds[_h(self.name, "bed", int(start), _tkey(tr_)) % len(self.beds)]
+
     def items_from(self, now, n):
         """The item that started last at UNIX time `now` and the n-1 after it:
         [(start, end, kind, track, fade_in, fade_out)]. end is when its audio ends (the item that crosses midnight
-        UTC ends there); the next item starts fade_out seconds before that."""
+        UTC ends there). The next item may start before that end (they overlap) or a little after it."""
         import bisect
         d = int(now // DAY)
         starts, entries = self._day(d)
@@ -844,8 +942,8 @@ class Schedule:
             if i >= len(entries):
                 d, i = d + 1, 0
                 starts, entries = self._day(d)
-            kind, tr_, fin, fout = entries[i]
-            end = min(starts[i] + max(1.0, tr_["sec"]), DAY)
+            kind, tr_, fin, fout, play = entries[i]
+            end = min(starts[i] + play, DAY)
             out.append((d * DAY + starts[i], d * DAY + end, kind, tr_, fin, fout))
             i += 1
         return out
@@ -1312,6 +1410,7 @@ class RadioApp(tk.Tk):
         self.upcoming = []
         self.fail_count = 0
         self.sched = self._programme(name)
+        self.box_fade.config(state="disabled" if self.sched.mix is not None else "readonly")      # mixed as in the game
         self.cur = None
         self._mark_selected()
         self._see_card(name)
@@ -1328,7 +1427,8 @@ class RadioApp(tk.Tk):
 
     def _ready_text(self):
         """The status line; with another crossfade than the standard one it says what that means."""
-        return t("st_fade_note") if self._fade() != int(FADE) else t("st_ready", n=len(self.stations))
+        ruled = self.sched is not None and self.sched.mix is not None
+        return t("st_fade_note") if self._fade() != int(FADE) and not ruled else t("st_ready", n=len(self.stations))
 
     def _programme(self, name):
         return Schedule(name, self.stations[name], self.var_ads.get(), self._fade(), self.index.get("news", []))
@@ -1355,10 +1455,16 @@ class RadioApp(tk.Tk):
     def _voices(self, item):
         return self.sched.voices(item) if self.sched is not None and self.var_dj.get() else []
 
+    def _bed(self, item):
+        return self.sched.bed_of(item) if self.sched is not None and self.ffmpeg else None
+
     def _key(self, item):
-        """The name of the file that plays an item: the track, or the track with what the DJ says over it."""
-        voices = self._voices(item)
+        """The name of the file that plays an item: the track, or the track with what is mixed to it (what the DJ says
+        over a song, the music bed under the DJ's talk)."""
+        voices, bed = self._voices(item), self._bed(item)
         key = _tkey(item[3])
+        if bed:
+            return key + "bed" + _tkey(bed)
         return key if not voices else key + "dj" + "-".join("%d_%d@%d" % (v[1][0], v[1][1], int(v[0] * 10)) for v in voices)
 
     def _fade_chosen(self, _e=None):
@@ -1416,7 +1522,7 @@ class RadioApp(tk.Tk):
         for item in [self.cur_item] + self.upcoming:             # extract in playing order
             key = self._key(item)
             if key not in self.ready:
-                self.want.put((key, item[3], self._voices(item)))
+                self.want.put((key, item[3], self._voices(item), self._bed(item)))
 
     def _sync(self, skip_current=False):
         """Jump to whatever the station has on air right now (the same for everybody with the same clock).
@@ -1437,21 +1543,20 @@ class RadioApp(tk.Tk):
 
     def _spawn(self, item):
         """Start ffplay for `item` at the position the station has reached by now, with its crossfade in/out."""
-        start, end, _kind, tr_, fin, fout = item
+        start, _end, _kind, _tr, fin, fout = item
         path = self.ready.get(self._key(item))
         if not path or not os.path.isfile(path):
             return None
         pos = max(0.0, time.time() + LEAD - start)               # where the station is by the time ffplay is up
         pos = pos if pos > 0.5 else 0.0
-        sec = max(1.0, tr_["sec"])
         cmd = [self.ffplay, "-nodisp", "-autoexit", "-loglevel", "quiet", "-volume", str(int(self.vol.get()))]
         if pos:
             cmd += ["-ss", "%.2f" % pos]
         fades = []
-        if fin > 0 and pos < fin:
-            fades.append("afade=t=in:st=0:d=%.3f:curve=qsin" % fin)
-        if fout > 0:
-            fades.append("afade=t=out:st=%.3f:d=%.3f:curve=qsin" % (max(0.0, sec - fout), fout))
+        if fin and pos < fin[0] + fin[1]:
+            fades.append("afade=t=in:st=%.3f:d=%.3f:curve=%s" % (fin[0], fin[1], SHAPES[fin[2]]))
+        if fout:
+            fades.append("afade=t=out:st=%.3f:d=%.3f:curve=%s" % (fout[0], fout[1], SHAPES[fout[2]]))
         if fades:                                                # asetpts: the filters see the position within the track
             cmd += ["-af", ",".join(["asetpts=N/SR/TB+%.3f/TB" % pos] + fades)]
         cmd.append(path)
@@ -1535,11 +1640,20 @@ class RadioApp(tk.Tk):
         """Background thread: cut the tracks out of the archive into small Opus files that ffplay can play, and mix the
         DJ into those he talks over."""
         while True:
-            key, tr_, voices = self.want.get()
+            key, tr_, voices, bed = self.want.get()
             if key in self.ready:
                 continue
             try:
                 path = self._cut(tr_)
+                if bed:
+                    mixed = os.path.join(cache_dir(), "b_%s.opus" % hashlib.sha1(key.encode()).hexdigest()[:20])
+                    if not (os.path.isfile(mixed) and os.path.getsize(mixed) > 0):
+                        try:
+                            awc_dj.lay_bed(path, self._cut(bed), tr_["sec"], mixed + ".part", self.ffmpeg)
+                            os.replace(mixed + ".part", mixed)
+                        except Exception:  # noqa: BLE001   (the talk alone rather than silence)
+                            mixed = path
+                    path = mixed
                 if voices:
                     mixed = os.path.join(cache_dir(), "d_%s.opus" % hashlib.sha1(key.encode()).hexdigest()[:20])
                     if not (os.path.isfile(mixed) and os.path.getsize(mixed) > 0):
@@ -1559,7 +1673,7 @@ class RadioApp(tk.Tk):
             now = time.time()
             if self.state == "loading" and self.cur:
                 key = self._key(self.cur_item)
-                if now >= self.cur_end:           # extraction took so long that the item is over: catch up
+                if self._over(now, 0.0):          # extraction took so long that the item is over: catch up
                     self._sync()
                 elif key in self.ready:
                     if self.ready[key]:
@@ -1580,7 +1694,7 @@ class RadioApp(tk.Tk):
                         proc = self._spawn(nxt)
                         if proc is not None:
                             if self.proc is not None:
-                                faded = self.cur_item[5] > 0            # (still the item that is ending)
+                                faded = bool(self.cur_item[5])          # (still the item that is ending)
                                 self.old.append((self.proc, self.cur_end + (0.0 if faded else TAIL)))
                             self.proc, self.started, self.fail_count = proc, now, 0
                             self._set_cur(nxt)
@@ -1589,13 +1703,19 @@ class RadioApp(tk.Tk):
                             self._show_next()
                     elif key in self.ready:       # extraction failed
                         self._sync()
-                if self.state == "playing" and now >= self.cur_end:
+                if self.state == "playing" and self._over(now, 1.0):
                     self._sync()                  # nothing followed (next file not ready): wait for it
                 elif self.state == "playing" and self.proc is not None and self.proc.poll() is not None \
                         and now - self.started < 2.0 and self.cur_end - now > 3.0:
                     self._count_failure()         # ended right away: probably broken
         finally:
             self.after(100, self._tick)
+
+    def _over(self, now, patience):
+        """The current item has ended and the next one is not just about to start."""
+        if now < self.cur_end:
+            return False
+        return not self.upcoming or now >= self.upcoming[0][0] + patience
 
     def _count_failure(self):
         self.fail_count += 1

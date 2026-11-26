@@ -9,11 +9,12 @@ import java.util.List;
  * fake players (see android/test/EngineTest.java).
  *
  * Every tick it looks at the programme (Schedule) for "now": items that are about to start are opened ahead of time
- * (PRELOAD), started when their time comes at the position the station has reached by then, and faded in and out with an
- * equal-power crossfade where the programme overlaps two songs (else one follows the other). A player that fails is opened
- * again a few times; a clock jump or a dropped audio focus is handled with resync().
+ * (PRELOAD), started when their time comes at the position the station has reached by then, and faded in and out as the
+ * programme says (two items may overlap). A player that fails is opened again a few times; a clock jump or a dropped
+ * audio focus is handled with resync().
  *
  * With the DJ switched on (setDj) a second player says his lines over a song (Schedule.voices) while the song steps back.
+ * Under talk of the DJ that has a music bed (Schedule.bedOf) another player repeats that music quietly.
  */
 final class Engine {
     interface Clock {
@@ -32,6 +33,8 @@ final class Engine {
 
         void setVolume(float volume);
 
+        void loop();                              // start again at the end, for a music bed
+
         void release();
     }
 
@@ -43,7 +46,8 @@ final class Engine {
     static final double START_COMPENSATION = 0.08;  // start() needs a moment, start that much early
     static final int MAX_TRIES = 3;
     static final double TAIL = 0.25;              // an item that is not faded out may end this much after its time
-    static final float DUCK = 0.25f;              // how loud the music stays while the DJ talks (awc_dj.py: the same)
+    static final float DUCK = 0.25f;              // how loud the music stays while the DJ talks, and how loud a music bed
+                                                  // is under his talk (awc_dj.py: the same)
     static final double RAMP = 0.35;              // seconds the music takes to step back and forward again
     static final double VOICE_PRELOAD = 10.0;     // open a line this many seconds before it is said
 
@@ -65,9 +69,13 @@ final class Engine {
         int tries = 1;
         double retryAt;
         List<Line> lines;                         // what the DJ says over it; null: not looked up
+        final Schedule.Track bed;                 // the music under it, or null
+        Player under;
+        boolean underStarted, underOver;
 
-        Slot(Schedule.Item item) {
+        Slot(Schedule.Item item, Schedule.Track bed) {
             this.item = item;
+            this.bed = bed;
         }
     }
 
@@ -130,6 +138,13 @@ final class Engine {
     int openLines() {
         int n = 0;
         for (Slot s : slots) if (s.lines != null) for (Line l : s.lines) if (l.player != null) n++;
+        return n;
+    }
+
+    /** Number of players of music beds that exist right now (for tests and diagnostics). */
+    int openBeds() {
+        int n = 0;
+        for (Slot s : slots) if (s.under != null) n++;
         return n;
     }
 
@@ -240,9 +255,59 @@ final class Engine {
         return (float) (1 - (1 - DUCK) * most);
     }
 
+    private static void releaseBed(Slot s) {
+        if (s.under != null) {
+            try {
+                s.under.release();
+            } catch (RuntimeException ignored) {
+            }
+            s.under = null;
+        }
+        s.underStarted = false;
+    }
+
+    /** How loud the music bed of an item is: quiet, faded with the item, and brought in and out with its talk. */
+    static float bedVolume(Schedule.Item it, double now, float duck) {
+        double t = now - it.start;
+        double in = Math.min(1, Math.max(0, t / RAMP));
+        double out = Math.min(1, Math.max(0, (it.track.sec - t) / RAMP));
+        return (float) (DUCK * in * out) * volume(it, now, duck);
+    }
+
+    /** Starts the music bed of an item with it and keeps its volume; true while that volume is on the move. */
+    private boolean underlay(Slot s, double now) {
+        if (s.bed == null || s.underOver) return false;
+        if (s.under == null) {
+            s.under = open(s.bed);
+            if (s.under == null) {
+                s.underOver = true;                       // the talk goes on without it
+                return false;
+            }
+        }
+        if (s.under.isFailed()) {
+            failures++;
+            releaseBed(s);
+            s.underOver = true;
+            return false;
+        }
+        double t = now - s.item.start;
+        if (!s.underStarted) {
+            if (s.under.isPrepared() && s.started && now + START_COMPENSATION >= s.item.start) {
+                s.under.loop();
+                s.under.startAt(Math.max(0.0, now + START_COMPENSATION - s.item.start) % Math.max(1.0, s.bed.sec),
+                        bedVolume(s.item, now, duck));
+                s.underStarted = true;
+            }
+        } else {
+            s.under.setVolume(bedVolume(s.item, now, duck));
+        }
+        return t < RAMP + 0.2 || t > s.item.track.sec - RAMP - 0.2;
+    }
+
     private void kill(Slot s) {
         s.dead = true;
         silence(s);
+        releaseBed(s);
         if (s.player != null) {
             try {
                 s.player.release();
@@ -252,21 +317,21 @@ final class Engine {
         }
     }
 
-    private Player open(Schedule.Item it) {
+    private Player open(Schedule.Track track) {
         try {
-            return factory.open(it.track);
+            return factory.open(track);
         } catch (RuntimeException e) {
             return null;
         }
     }
 
-    /** Equal-power crossfade: the next item fades in while the previous one fades out. */
+    /** The loudness of an item at `now`: as its fades say, times `duck`. */
     static float volume(Schedule.Item it, double now, float duck) {
         double v = 1.0;
         double t = now - it.start;
-        if (it.fadeIn > 0 && t < it.fadeIn) v *= Math.sin(Math.PI / 2 * Math.max(0, t) / it.fadeIn);
-        double tt = now - (it.end - it.fadeOut);
-        if (it.fadeOut > 0 && tt > 0) v *= Math.cos(Math.PI / 2 * Math.min(1.0, tt / it.fadeOut));
+        Schedule.Fade in = it.fadeIn, out = it.fadeOut;
+        if (in != null && t < in.at + in.len) v *= in.gain(Math.max(0, Math.min(1.0, (t - in.at) / in.len)));
+        if (out != null && t > out.at) v *= out.gain(1.0 - Math.min(1.0, (t - out.at) / out.len));
         return (float) (v * duck);
     }
 
@@ -283,8 +348,8 @@ final class Engine {
             if (it.start - now > PRELOAD) break;
             if (now >= it.end) continue;
             if (find(it) == null) {
-                Slot s = new Slot(it);
-                s.player = open(it);
+                Slot s = new Slot(it, schedule.bedOf(it));
+                s.player = open(it.track);
                 if (s.player == null) {
                     s.dead = true;
                     s.retryAt = now + 1.0;
@@ -300,7 +365,7 @@ final class Engine {
             Schedule.Item it = s.item;
             // a faded item is silent at its end; one that is not faded gets a moment for its last words (a player starts
             // a little late), unless midnight UTC cuts it: then it ends exactly on time
-            double grace = it.fadeOut > 0 ? 0.1 : it.end - it.start > it.track.sec - 0.01 ? TAIL : 0.0;
+            double grace = it.fadeOut != null ? 0.1 : it.end - it.start > it.track.sec - 0.01 ? TAIL : 0.0;
             if (now >= it.end + grace) {
                 kill(s);
                 iter.remove();
@@ -311,7 +376,7 @@ final class Engine {
                     s.tries++;
                     s.started = false;
                     s.dead = false;
-                    s.player = open(it);
+                    s.player = open(it.track);
                     if (s.player == null) {
                         s.dead = true;
                         s.retryAt = now + 1.0;
@@ -344,8 +409,11 @@ final class Engine {
                 }
             } else {
                 p.setVolume(volume(it, now, duck) * behindDj(s, now));
-                if (now - it.start < it.fadeIn + 0.2 || now > it.end - it.fadeOut - 0.2) busy = true;
+                double in = it.fadeIn == null ? 0.0 : it.fadeIn.at + it.fadeIn.len;
+                double goes = it.fadeOut == null ? it.end : it.start + it.fadeOut.at;
+                if (now - it.start < in + 0.2 || now > goes - 0.2) busy = true;
             }
+            if (underlay(s, now)) busy = true;
             if (s.started && (cur == null || it.start > cur.item.start)) cur = s;
         }
         if (cur != null && cur.item != current) {

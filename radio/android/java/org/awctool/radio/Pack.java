@@ -29,8 +29,11 @@ import java.util.Map;
  *                jingles:[{k,s}]}],"files":{"t/<key>":[offset,length],"logos/<name>.png":[offset,length]}}
  *        A podcast pack (.podpak, same layout) has "stations": [] and "podcasts":[{name,logo,episodes:[{k,s}]}].
  *        A score pack (.scorepak) has "stations": [] and "scores":[{name,group,pieces:[{k,g,t,s}]}].
+ *        A playlist pack (.playlistpak) has "stations": [] and "playlists":[{name,logo,songs:[{k,t,a,s}]}].
  *        A station may also have "ads", "talk", "news": true and "rules" (the game's programme rules, see
  *        awc_android.py); the news pack (.newspak) has "stations": [] and "news":[{name,items:[{k,s}]}].
+ *        With the game's mixing a song may have "c" (cue-in second), talk "b" (gets a music bed) and the station
+ *        "beds":[{k,s}] (the music for it).
  *
  * The songs are played straight out of this file (MediaPlayer with file descriptor, offset and length), nothing is
  * copied or unpacked on the phone.
@@ -56,6 +59,7 @@ final class Pack {
     private final List<Library.Station> podcasts = new ArrayList<>();
     private final List<Library.Station> scores = new ArrayList<>();
     private final List<Schedule.Track> news = new ArrayList<>();
+    private final List<Library.Station> playlists = new ArrayList<>();
     final String created;
 
     /** @param owner closed together with the pack (the ParcelFileDescriptor on Android), may be null */
@@ -100,6 +104,9 @@ final class Pack {
             for (Library.Station g : scores) g.pack = this;
             JSONArray bulletins = root.optJSONArray("news");
             if (bulletins != null) Library.parseNews(bulletins, news);
+            JSONArray lists = root.optJSONArray("playlists");
+            if (lists != null) Library.parsePlaylists(lists, playlists);
+            for (Library.Station p : playlists) p.pack = this;
         } catch (IOException e) {
             close();
             throw e;
@@ -127,6 +134,10 @@ final class Pack {
 
     List<Library.Station> scores() {
         return scores;
+    }
+
+    List<Library.Station> playlists() {
+        return playlists;
     }
 
     /** The bulletins, if this is a news pack; else empty. */

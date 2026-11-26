@@ -387,10 +387,19 @@ final class Ui {
 
     static String nameOf(Context c, Library.Station st) {
         if (st == null) return "";
+        if (st.music) return queueName(c, Music.listOf(st.name));
         if (st.score == null) return st.name;
         return c.getString("openworld".equals(st.score) ? R.string.score_openworld : "mission".equals(st.score) ? R.string.score_mission
                 : "compound".equals(st.score) ? R.string.score_compound : "places".equals(st.score) ? R.string.score_places
                 : R.string.score_activity);
+    }
+
+    /** What a queue of songs is called: its playlist or artist, "All songs", or what was searched for. */
+    static String queueName(Context c, String list) {
+        if (list.startsWith(Music.LIST)) return list.substring(Music.LIST.length());
+        if (list.startsWith(Music.ARTIST)) return list.substring(Music.ARTIST.length());
+        if (list.startsWith(Music.SEARCH)) return c.getString(R.string.search_of, list.substring(Music.SEARCH.length()));
+        return c.getString(R.string.all_songs);
     }
 
     static String fmt(double sec) {

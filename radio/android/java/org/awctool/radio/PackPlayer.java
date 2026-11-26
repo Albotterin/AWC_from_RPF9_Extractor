@@ -78,6 +78,16 @@ final class PackPlayer implements Engine.Player, Episodes.Player {
     }
 
     @Override
+    public void loop() {
+        if (mp == null) return;
+        try {
+            mp.setLooping(true);
+        } catch (RuntimeException e) {
+            AppLog.d("looping failed in " + name + ": " + e);
+        }
+    }
+
+    @Override
     public void startAt(double posSec, float volume) {
         if (mp == null) return;
         try {

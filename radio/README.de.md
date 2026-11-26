@@ -14,12 +14,13 @@
 2. [Woher die Sender kommen](#woher-die-sender-kommen)
 3. [Hören](#hören)
 4. [Podcasts](#podcasts)
-5. [Sender und Fortschritt](#sender-und-fortschritt)
-6. [AWC Radio für Android](#awc-radio-für-android)
-7. [Selbst bauen](#selbst-bauen)
-8. [Projektaufbau](#projektaufbau)
-9. [Rechtlicher Hinweis](#rechtlicher-hinweis)
-10. [Credits und Lizenz](#credits-und-lizenz)
+5. [On-Demand](#on-demand)
+6. [Sender und Fortschritt](#sender-und-fortschritt)
+7. [AWC Radio für Android](#awc-radio-für-android)
+8. [Selbst bauen](#selbst-bauen)
+9. [Projektaufbau](#projektaufbau)
+10. [Rechtlicher Hinweis](#rechtlicher-hinweis)
+11. [Credits und Lizenz](#credits-und-lizenz)
 
 ## Start
 
@@ -51,8 +52,7 @@ Playlist mit 20 Songs. Siehe [docs/STATIONS.md](docs/STATIONS.md) (englisch).
 
 Ein Klick auf einen Sender schaltet ihn ein. Das Programm wird aus der **Uhrzeit** berechnet (jeden UTC-Tag eine neue
 Reihenfolge), jeder Sender „läuft“ also im Hintergrund weiter: Wer zu einem anderen Sender und zurück wechselt, landet
-dort, wo der erste Sender inzwischen ist. Alle mit denselben Spieldateien, derselben Uhrzeit und Zeitzone und derselben
-Überblend-Einstellung hören dasselbe zur selben Sekunde (auf etwa eine Sekunde genau; was über Mitternacht UTC laufen
+dort, wo der erste Sender inzwischen ist. Alle mit denselben Spieldateien, derselben Uhrzeit und Zeitzone hören dasselbe zur selben Sekunde (auf etwa eine Sekunde genau; was über Mitternacht UTC laufen
 würde, wird abgeschnitten). Es gibt keinen Überspringen-Knopf – wie bei einem echten Radio; nach einer Pause geht es live
 weiter. Spätere Starts gehen sofort. Braucht wie der Extractor `ffplay`.
 
@@ -86,10 +86,20 @@ Senderkennungen und kurze DJ-Ansagen, ausgewählt nach denselben Regeln; an läu
 DJ-Beiträge, Talk und die gesprochenen Teile der Nachtshow. Talk-Radio ist in beiden Fällen Talk; dort betrifft der
 Schalter nur die Werbung.
 
-**Überblenden.** Überblendet wird nur von einem **Song in den nächsten** (Standard: 3 Sekunden). Alles andere folgt direkt
-aufeinander. Die Überblendung lässt sich ausschalten oder auf 1–12 Sekunden stellen – am PC mit **Überblenden** oben im
-Fenster, in der App auf der Einstellungsseite. Sie ist Teil des Zeitplans: PC und Handy laufen nur mit derselben
-Einstellung gleich.
+**Übergänge wie im Spiel.** Die Audio-Konfiguration sagt auch, wie ein Beitrag an den nächsten übergibt, abhängig
+davon, was endet und was folgt: wie viel früher der nächste beginnt (meist 0,5 bis 3 Sekunden), ob einer von beiden
+blendet, in welcher Form, und wo ein Song eingestartet wird ([wie das gespeichert ist](docs/STATIONS.md#mixing),
+englisch). AWC Radio folgt diesen Regeln auf den 18 Musiksendern; die Talk-Sender haben keine, ihre Teile folgen direkt
+aufeinander. Unter dem DJ läuft auf 16 Sendern eine der **Hintergrundmusiken** des Senders, wo die Aufnahme selbst
+zwischen den Worten leise ist.
+
+Wie die Zeiten gelesen werden, ist eine Auslegung: Sie zählen vom Ende einer Aufnahme (die Songs markieren auch einen
+„Outro“-Punkt ein paar Sekunden davor), welche Aufnahmen eine Hintergrundmusik bekommen und wie laut sie ist, entscheidet
+dieses Programm, und die Tiefpass-Verläufe mancher Regeln fehlen.
+
+**Überblenden.** Für die Clubs und Mixe, die keine solchen Regeln haben: ein Song in den nächsten (Standard: 3
+Sekunden), aus oder 1–12 Sekunden – am PC mit **Überblenden** oben im Fenster, in der App auf der Einstellungsseite. Die
+Überblendung ist Teil des Zeitplans: PC und Handy laufen nur mit derselben Einstellung gleich.
 
 **Der DJ.** Am PC **DJ** anhaken oder in den Einstellungen der App einschalten (von Haus aus aus). Die Songdateien
 markieren, wo der DJ über Anfang und Ende sprechen darf; die Sprach-Container des Senders halten Ansagen für diese Stellen,
@@ -108,9 +118,24 @@ in jeder Folge wird gemerkt. Die Titel der Folgen stammen aus der Tabelle des Sp
 
 ![Podcasts in der App](docs/screenshots/08-app-podcasts.png)
 
+## On-Demand
+
+In der App arbeitet der Reiter **On-Demand** wie eine Musik-App über den Songs aller Packs: eine **Suche** nach Songs und
+Interpreten, **alle Songs**, die **Interpreten** und eine **Playlist für jeden Sender** mit dessen Logo. Ein angetippter
+Song spielt, und seine Liste läuft von dort weiter; **Zufall** und **Wiederholen** stehen im Player, und Android Auto zeigt
+die Playlisten. Gelistet sind nur echte Songs: kein Talk, keine Werbung, kein Score und keine DJ-Mixe.
+
+Die **Soundtrack-Playlist** enthält die Titel von *Grand Theft Auto VI: The Album (Deluxe Edition)*, die in deinen eigenen
+Spieldateien liegen, 54 von 57, in der Reihenfolge des Albums. Die meisten laufen auf den Sendern; einige liegen ohne
+Sender und ohne Namen im Archiv (welche Aufnahme was ist, wurde durch Klangvergleich mit den öffentlichen Hörproben des
+Albums ermittelt, die nicht zum Projekt gehören), einer nur im Mix von The Vault. **Android-Packs…** schreibt sie als
+`.playlistpak`; das Cover wird dabei von der Webseite des Herausgebers geladen und ist nicht Teil dieses Repositorys.
+
+![On-Demand in der App](docs/screenshots/11-app-ondemand-de.png)
+
 ## Sender und Fortschritt
 
-793 von 809 Songs, die die Credits für die Musiksender nennen (98,0 %), sind gefunden, dazu alle
+794 von 809 Songs, die die Credits für die Musiksender nennen (98,1 %), sind gefunden, dazu alle
 Talk-Sendungen; alle Sender in [Fortschritt der Sender](docs/RADIO-PROGRESS.de.md).
 Lange DJ-Mixe laufen auch als Sender: **The Vault Radio**, zusätzliche „(Mix)“-Sender für Radio On-U, Worldwide FM und The Sniper Of La Perle sowie **Clubmixes** (der eine Club-Mix, der keinem Ort zugeordnet werden kann). Während ein Mix läuft, wird der Titel des aktuellen Abschnitts angezeigt (aus den Markern im Mix, benannt über die Titeltabelle des Spiels in `data.rpf`; ohne diese Datei nur die Abschnitte, die es auch als einzelnen Song gibt).
 
@@ -121,14 +146,15 @@ Die aktuelle Liste aller Sender mit Inhalt und Länge: [alle Sender](docs/RADIO-
 ## AWC Radio für Android
 
 Die Handy-App spielt dasselbe Live-Programm wie der PC: gleiche Uhr und Zeitzone, gleiche Reihenfolge, gleiche
-Überblendungen.
+Übergänge.
 Dazu hat sie einen eigenen Bereich für die [Podcasts](#podcasts). Zur App gehören die Packs:
 
-* **`AWC-Radio.apk`** - die App (Version 1.14), für alle dieselbe Datei, ohne Spieldaten. Android 7.0 oder neuer, Deutsch und
+* **`AWC-Radio.apk`** - die App (Version 1.16), für alle dieselbe Datei, ohne Spieldaten. Android 7.0 oder neuer, Deutsch und
   Englisch. Senderraster, kleiner Player und großer Player in der Farbe des Senderlogos; Wiedergabe im Hintergrund mit
   Medien-Benachrichtigung, Sperrbildschirm- und Kopfhörertasten; Einschlaftimer; Schalter **Werbung, News & Talk** (von Haus aus aus); **Android Auto** (vorher in dessen
   Entwicklereinstellungen „Unbekannte Quellen“ aktivieren, weil die App nicht aus dem Play Store kommt).
-* **Einstellungsseite** - Überblenden ein/aus und Dauer, Werbung, News & Talk, DJ, Pack-Ordner und neu
+* **On-Demand-Reiter** – Suche, Interpreten und Playlisten über die Songs aller Packs, siehe [On-Demand](#on-demand).
+* **Einstellungsseite** - Überblenden ein/aus und Dauer (Clubs und Mixe), Werbung, News & Talk, DJ, Pack-Ordner und neu
   laden, Akku-Einstellungen, Info und Protokoll; zu öffnen über das Drei-Punkte-Menü.
 * **Score-Reiter** – der Score des Spiels aus den `.scorepak`-Dateien: fünf Gruppen (die fünfte, **Musik an Orten**,
   enthält die fertigen Aufnahmen von Fahrstühlen, Hotellobbys, einer Minigolfanlage und anderen Orten),
@@ -139,14 +165,14 @@ Dazu hat sie einen eigenen Bereich für die [Podcasts](#podcasts). Zur App gehö
   mit der Weckerlautstärke des Handys und zeigt einen Bildschirm über dem Sperrbildschirm. Ist vom Radio nach 10 Sekunden
   nichts zu hören (Pack fehlt, Player-Fehler, Handy nach einem Neustart noch nicht entsperrt), klingelt der Weckton des
   Handys. Nach 30 Minuten hört er von selbst auf.
-* **Packs** - eine Datei je Sender (`.radiopak`), je Podcast (`.podpak`), eine mit den Nachrichten (`news.newspak`) und
-  eine je Score-Gruppe (`.scorepak`), am PC erzeugt: in AWC Radio auf **Android-Packs…** klicken, einen
+* **Packs** - eine Datei je Sender (`.radiopak`), je Podcast (`.podpak`), eine mit den Nachrichten (`news.newspak`), eine für
+  das Soundtrack-Album (`.playlistpak`) und eine je Score-Gruppe (`.scorepak`), am PC erzeugt: in AWC Radio auf **Android-Packs…** klicken, einen
   Ordner wählen und schreiben. Ein Sender-Pack enthält die Songs des Senders in der Originalqualität des Spiels (ca. 128 kbit/s, nicht
   neu kodiert), sein Logo und die Programmdaten; etwa 5,2 GB für alle 34 Sender (mit den DJ-Ansagen) und 0,2 GB für die
   Nachrichten. Ein Podcast-Pack enthält die Folgen und das Cover (zusammen 0,2 GB); die fünf Score-Packs mit den Stücken ab
   30 Sekunden werden am PC gemischt (1,8 GB, braucht FFmpeg). Alle in denselben Ordner auf dem Handy kopieren und diesen in
-  der App wählen. Neue oder geänderte Packs werden von selbst übernommen. Das Programm nach den Spielregeln braucht
-  Sender-Packs, die Version 2.10.0 geschrieben hat.
+  der App wählen. Neue oder geänderte Packs werden von selbst übernommen. Programm und Übergänge wie im Spiel brauchen
+  Sender-Packs, die Version 2.11.0 geschrieben hat.
 
 Die Packs enthalten Spiel-Audio und Bilder: nur für den eigenen Gebrauch, bitte nicht weitergeben. Ohne Pack ist die App leer.
 `python awc_radio.py --export-pack <Ordner> [--stations "Name" ...]` schreibt Packs ohne Fenster.
@@ -166,6 +192,7 @@ Skript). `python android\test\run_robo.py <Pack-Ordner>` führt Bildschirme und 
 ```
 radio/
   awc_radio.py          Das Radio-Programm (Fenster, Programmplan, Wiedergabe)
+  awc_album.py          Das Soundtrack-Album: welche Aufnahmen seine Titel enthalten, und sein Cover
   awc_android.py        Schreibt die Packs für die Android-App (Sender, Podcasts, Nachrichten, Score), samt Dialog
   android/              Die Android-App: Java-Quelltext, Ressourcen, build_apk.py, make_logo.py, Tests
   Start AWC-Radio.bat   Starter
@@ -195,7 +222,8 @@ Das Layout der Audio-Konfiguration folgt den Notizen des Projekts **Leonida** (I
 auch geholfen, den Pool mit den Sender-Logos zu verstehen (`awc_logos.py`).
 Dass sich die Programmregeln des Spiels aus der Audio-Konfiguration lesen lassen, zeigte das Projekt
 [SixFM](https://github.com/jaylikesbunda/SixFM) (jaylikesbunda); der Leser hier ist unabhängig geschrieben und nutzt weder
-dessen Code noch dessen Daten. Das Startbild-Symbol der Android-App wurde mit der
+dessen Code noch dessen Daten. Welche Aufnahmen die Soundtrack-Titel ohne Sender enthalten, wurde mit den öffentlichen 30-Sekunden-Hörproben des
+Albums ermittelt. Das Startbild-Symbol der Android-App wurde mit der
 Fan-Schrift *GTA Art Deco* gezeichnet (nicht Teil dieses Repositorys). Überschriften und Uhrzeiten in der App nutzen
 [Poiret One](https://github.com/alexeiva/poiretone) (SIL Open Font License, Text in `android/assets/`). Die Wiedergabe übernimmt
 [FFmpeg](https://ffmpeg.org/).

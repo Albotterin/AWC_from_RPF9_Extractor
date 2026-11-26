@@ -17,12 +17,16 @@ final class Library {
         final boolean podcast;             // played on demand: songs are its episodes, there is no programme
         final String score;                // a group of the game's score ("mission", ...): on demand, songs are its pieces
         Pack pack;                         // the file the station comes from
+        boolean music;                     // a queue of songs played on demand (see Music); songs are its songs
+        List<Music.Song> entries;          // ... and where each of them comes from
+        private java.util.Map<String, Pack> packs;                 // ... and the file each one lies in
         final List<Schedule.Track> songs = new ArrayList<>();
         final List<Schedule.Track> jingles = new ArrayList<>();
         final List<Schedule.Track> ads = new ArrayList<>();
         final List<Schedule.Track> toads = new ArrayList<>();      // the DJ's lines into an advert break
         final List<Schedule.Track> tonews = new ArrayList<>();     // ... and into the news
         final List<Schedule.Track> says = new ArrayList<>();       // what is said on it (longer spoken items)
+        final List<Schedule.Track> beds = new ArrayList<>();       // the music under the DJ's talk
         Schedule.Rules rules;                                      // the game's programme rules, or null
         boolean playsNews;
         private List<Schedule.Track> news = java.util.Collections.emptyList();   // the bulletins of the news pack
@@ -42,14 +46,42 @@ final class Library {
             return rules != null && (!ads.isEmpty() || !news.isEmpty() || (!rules.talkRadio && !says.isEmpty()));
         }
 
-        /** The file a recording of this station lies in: its own pack, or for a bulletin the news pack. */
+        /** The file a recording of this station lies in: its own pack, or for a bulletin the news pack; a song of a queue
+         *  lies in the pack of where it comes from. */
         synchronized Pack packOf(Schedule.Track t) {
+            Pack own = packs == null ? null : packs.get(t.key);
+            if (own != null) return own;
             return newsPack != null && pack.entry("t/" + t.key) == null ? newsPack : pack;
+        }
+
+        /** Whose picture the i-th recording wears: in a queue the station or playlist it comes from. */
+        Station coverOf(int i) {
+            return entries != null && i >= 0 && i < entries.size() ? entries.get(i).from : this;
+        }
+
+        /** A queue of songs from several packs, played like a podcast. */
+        static Station ofQueue(String name, List<Music.Song> order) {
+            Station q = new Station(name, "", false, true);
+            q.music = true;
+            q.entries = order;
+            q.packs = new java.util.HashMap<>();
+            for (Music.Song s : order) {
+                q.songs.add(s.track);
+                q.packs.put(s.track.key, s.from.pack);
+            }
+            q.pack = order.get(0).from.pack;
+            return q;
+        }
+
+        /** Whether the station is mixed as the game says; the crossfade setting does not count for it then. */
+        boolean mixedAsInGame() {
+            return rules != null && rules.mix != null;
         }
 
         /** The station's programme: with adverts, news and talk if wanted and the station has any, and with this crossfade. */
         synchronized Schedule programme(boolean extras, double fade) {
             boolean with = extras && hasMore();
+            if (mixedAsInGame()) fade = Schedule.FADE;             // one programme, whatever the setting says
             String key = with + " " + fade;
             Schedule s = programmes.get(key);
             if (s == null) {
@@ -61,6 +93,7 @@ final class Library {
                     }
                     s.setRules(rules, tracks, news, with);
                 }
+                s.setBeds(beds);
                 s.setLinesIntoAds(toads);
                 s.setLinesIntoNews(tonews);
                 programmes.put(key, s);
@@ -104,6 +137,16 @@ final class Library {
         }
     }
 
+    /** The playlists of a pack: [{"name", "logo", "songs": [{"k", "t", "a", "s"}]}], the songs in their order. */
+    static void parsePlaylists(JSONArray arr, List<Station> out) throws Exception {
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject o = arr.getJSONObject(i);
+            Station list = new Station(o.getString("name"), o.optString("logo", ""), false, true);
+            tracks(o.getJSONArray("songs"), list.songs);
+            if (!list.songs.isEmpty()) out.add(list);
+        }
+    }
+
     /** The score of a pack: [{"name", "group", "pieces": [{"k", "g", "t", "s"}]}], the pieces in their order. */
     static void parseScores(JSONArray arr, List<Station> out) throws Exception {
         for (int i = 0; i < arr.length(); i++) {
@@ -137,11 +180,13 @@ final class Library {
         }
     }
 
-    /** Recordings that are no songs: [{"k", "s", "t"?, "a"?}]. */
+    /** Recordings that are no songs: [{"k", "s", "t"?, "a"?, "b"?}]; "b": gets a music bed. */
     private static void tracks(JSONArray arr, List<Schedule.Track> out) throws Exception {
         for (int i = 0; arr != null && i < arr.length(); i++) {
             JSONObject s = arr.getJSONObject(i);
-            out.add(new Schedule.Track(s.getString("k"), s.optString("t", ""), s.optString("a", ""), s.getDouble("s")));
+            Schedule.Track t = new Schedule.Track(s.getString("k"), s.optString("t", ""), s.optString("a", ""), s.getDouble("s"));
+            t.bed = s.optInt("b", 0) != 0;
+            out.add(t);
         }
     }
 
@@ -199,10 +244,29 @@ final class Library {
         r.sequence.addAll(texts(o.optJSONArray("sequence")));
         r.ads.addAll(texts(o.optJSONArray("ads")));
         r.talkRadio = o.optBoolean("talkradio", false);
+        JSONObject mix = o.optJSONObject("mix");                 // packs written before 2.11 have none
+        if (mix != null) {
+            r.mix = new java.util.HashMap<>();
+            for (java.util.Iterator<String> it = mix.keys(); it.hasNext(); ) {
+                String before = it.next();
+                JSONObject by = mix.getJSONObject(before);
+                java.util.Map<String, long[][]> own = new java.util.HashMap<>();
+                for (java.util.Iterator<String> next = by.keys(); next.hasNext(); ) {
+                    String after = next.next();
+                    JSONArray rows = by.getJSONArray(after);
+                    long[][] out = new long[rows.length()][7];
+                    for (int i = 0; i < out.length; i++) {
+                        for (int k = 0; k < 7; k++) out[i][k] = rows.getJSONArray(i).getLong(k);
+                    }
+                    own.put(after, out);
+                }
+                r.mix.put(before, own);
+            }
+        }
         return r;
     }
 
-    /** Songs: [{"k", "t", "a", "s", "m"?, "dj"?}]. */
+    /** Songs: [{"k", "t", "a", "s", "m"?, "c"?, "dj"?}]; "c": the second at which it is cued in. */
     private static void songs(JSONArray songs, java.util.Map<String, Schedule.Track> lines, List<Schedule.Track> out)
             throws Exception {
         for (int j = 0; songs != null && j < songs.length(); j++) {
@@ -221,6 +285,7 @@ final class Library {
             } else {
                 out.add(new Schedule.Track(s.getString("k"), s.optString("t", ""), s.optString("a", ""), s.getDouble("s")));
             }
+            out.get(out.size() - 1).cue = s.optDouble("c", 0.0);
             JSONObject dj = s.optJSONObject("dj");
             if (dj != null) {
                 Schedule.Track song = out.get(out.size() - 1);
@@ -254,6 +319,7 @@ final class Library {
             tracks(o.optJSONArray("jingles"), st.jingles);
             tracks(o.optJSONArray("ads"), st.ads);
             tracks(o.optJSONArray("talk"), st.says);
+            tracks(o.optJSONArray("beds"), st.beds);
             st.playsNews = o.optBoolean("news", false);
             JSONObject programme = o.optJSONObject("rules");
             if (programme != null) st.rules = rules(programme);

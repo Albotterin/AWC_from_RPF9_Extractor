@@ -4,7 +4,9 @@ import java.util.List;
 
 /**
  * A podcast played on demand: unlike the radio it waits for the listener. One episode after the other, with pause,
- * seeking and a remembered position in every episode. Pure Java (tested on the PC); RadioService drives it with tick().
+ * seeking and a remembered position in every episode. The score and queues of songs are played the same way; songs can
+ * also be repeated (setRepeat) and their order changed while one plays (reorder). Pure Java (tested on the PC);
+ * RadioService drives it with tick().
  */
 final class Episodes {
     /** What it needs from a player (PackPlayer). */
@@ -43,10 +45,12 @@ final class Episodes {
         void remember(String key, double position, boolean heard);
     }
 
+    static final int REPEAT_OFF = 0, REPEAT_ALL = 1, REPEAT_ONE = 2;
     static final double END_ZONE = 15;           // an episode left this close to its end counts as heard
     private static final double SAVE_EVERY = 5;
 
-    private final List<Schedule.Track> list;
+    private List<Schedule.Track> list;
+    private int repeat;
     private final Factory factory;
     private final Memory memory;
     private Player player;
@@ -138,8 +142,12 @@ final class Episodes {
         }
         if (player.isFinished()) {
             memory.remember(current().key, 0, true);
-            if (index + 1 < list.size()) {
-                load(index + 1, wanted);
+            if (repeat == REPEAT_ONE) {
+                load(index, wanted);
+                return true;
+            }
+            if (index + 1 < list.size() || repeat == REPEAT_ALL) {
+                load((index + 1) % list.size(), wanted);
                 return true;
             }
             ended = true;
@@ -181,22 +189,32 @@ final class Episodes {
         seekTo(position() + seconds);
     }
 
-    /** The next episode; false at the last one. */
+    /** The next episode; false at the last one (unless everything repeats). */
     boolean next() {
-        if (index < 0 || index + 1 >= list.size()) return false;
-        open(index + 1, wanted);
+        if (index < 0 || (index + 1 >= list.size() && repeat != REPEAT_ALL)) return false;
+        open((index + 1) % list.size(), wanted);
         return true;
     }
 
     /** Back to the start of this episode, or from its first seconds to the one before; true if the episode changed. */
     boolean previous() {
         if (index < 0) return false;
-        if (position() > 3 || index == 0) {
+        if (position() > 3 || (index == 0 && repeat != REPEAT_ALL)) {
             seekTo(0);
             return false;
         }
-        open(index - 1, wanted);
+        open((index + list.size() - 1) % list.size(), wanted);
         return true;
+    }
+
+    void setRepeat(int how) {
+        repeat = how;
+    }
+
+    /** The same entry that is on now at another place of another order: it plays on. */
+    void reorder(List<Schedule.Track> order, int at) {
+        list = order;
+        index = at;
     }
 
     void setVolume(float v) {

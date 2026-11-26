@@ -97,9 +97,9 @@ def main():
     srcs = sources("Schedule.java", "Engine.java", "Episodes.java") + [tests("EngineTest.java"), tests("EpisodesTest.java")]
     catalog = os.path.isfile(json_jar)
     if catalog:
-        srcs += sources("Library.java", "Pack.java", "Catalog.java", "Alarm.java", "StationColor.java")
+        srcs += sources("Library.java", "Pack.java", "Catalog.java", "Music.java", "Alarm.java", "StationColor.java")
         srcs += [tests("ProgramDump.java")]
-        srcs += [tests("CatalogTest.java"), tests("AlarmTest.java")]
+        srcs += [tests("CatalogTest.java"), tests("AlarmTest.java"), tests("MusicTest.java")]
     cp = OUT + (os.pathsep + json_jar if catalog else "")
     r = subprocess.run(["javac", "-encoding", "UTF-8", "-cp", cp, "-d", OUT] + srcs)
     if r.returncode:
@@ -121,6 +121,9 @@ def main():
         if r.returncode:
             sys.exit(r.returncode)
     for folder in sys.argv[1:]:
+        r = subprocess.run(["java", "-cp", cp, "org.awctool.radio.MusicTest", folder])
+        if r.returncode:
+            sys.exit(r.returncode)
         compare_programmes(cp, folder)
 
 
@@ -146,6 +149,10 @@ def compare_programmes(cp, folder):
         base, rest = entry["k"].split("_", 1)
         idx, _x, parts = rest.partition("x")
         tr = {"base": int(base), "idx": int(idx), "sec": entry["s"], "title": entry.get("t", "")}
+        if entry.get("c"):
+            tr["cue"] = entry["c"]
+        if entry.get("b"):
+            tr["bed"] = True
         if parts:
             tr["parts"] = [0] * int(parts)
             tr["set"] = not talk                       # made of parts: a talk show, or a club's DJ set
@@ -161,6 +168,9 @@ def compare_programmes(cp, folder):
     for name in sorted(f for f in os.listdir(folder) if f.endswith(".newspak")):
         news = [track(x) for x in index_of(name)["news"][0]["items"]]
 
+    def fade_text(fade):
+        return "%.6f,%.6f,%d" % fade if fade else "-"
+
     want = []
     spoken_radio = set()                          # talk radio: talk is what it plays, with or without the switch
     for name in sorted(f for f in os.listdir(folder) if f.endswith(".radiopak")):
@@ -172,7 +182,7 @@ def compare_programmes(cp, folder):
         if st.get("rules", {}).get("talkradio"):
             spoken_radio.add(st["name"])
         station = {"songs": [track(x) for x in st["songs"]], "jingles": [track(x) for x in st["jingles"]]}
-        for key in ("ads", "talk"):
+        for key in ("ads", "talk", "beds"):
             station[key] = [track(x) for x in st.get(key, [])]
         station["news"] = st.get("news", False)
         if "rules" in st:
@@ -189,7 +199,11 @@ def compare_programmes(cp, folder):
         for i, now in enumerate(moments):
             for tag, schedule in programmes:
                 for start, end, kind, tr, fin, fout in schedule.items_from(now, 40):
-                    want.append("%s|%d|%s|%s|%s|%.6f|%.6f|%.6f|%.6f" % (st["name"], i, tag, kind, radio._tkey(tr), start, end, fin, fout))
+                    want.append("%s|%d|%s|%s|%s|%.6f|%.6f|%s|%s" % (st["name"], i, tag, kind, radio._tkey(tr), start, end,
+                                                                     fade_text(fin), fade_text(fout)))
+                    bed = schedule.bed_of((start, end, kind, tr, fin, fout))
+                    if bed:
+                        want.append("%s|%d|%s|bed|%s|%.6f" % (st["name"], i, tag, radio._tkey(bed), start))
                     for at, line in schedule.voices((start, end, kind, tr, fin, fout)):
                         want.append("%s|%d|%s|voice|%s_%s|%.6f|%.6f" % (st["name"], i, tag, line[0], line[1], start, at))
     with open(out, encoding="utf-8") as f:
@@ -199,6 +213,7 @@ def compare_programmes(cp, folder):
     ads = sum(1 for x in want if "|ad|" in x)
     kinds = {k: sum(1 for x in want if "|%s|" % k in x) for k in ("news", "talk")}
     said = sum(1 for x in want if "|voice|" in x)
+    under = sum(1 for x in want if "|bed|" in x)
     bad = [(a, b) for a, b in zip(got, want) if a != b]
     if len(got) != len(want) or bad:
         print("programme differs: %d lines from the app, %d from the PC; first: %s" % (len(got), len(want), bad[:3]))
@@ -208,8 +223,8 @@ def compare_programmes(cp, folder):
     if leaked or not ads:
         print("adverts: %d in the full programme, %d adverts/news/talk in the plain one" % (ads, leaked))
         sys.exit(1)
-    print("Programme: app and PC identical (%d lines compared: %d adverts, %d news, %d talk, %d DJ lines; none of the first "
-          "three in the plain programme)" % (len(want), ads, kinds["news"], kinds["talk"], said))
+    print("Programme: app and PC identical (%d lines compared: %d adverts, %d news, %d talk, %d DJ lines, %d music beds; none "
+          "of the first three in the plain programme)" % (len(want), ads, kinds["news"], kinds["talk"], said, under))
 
 
 if __name__ == "__main__":

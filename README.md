@@ -67,26 +67,31 @@ python radio/awc_radio.py        # the radio
 * A live programme by the clock: every station keeps running, everybody with the same time and time zone hears the same.
 * **The game's own programme rules**, read from your audio config: how often adverts, news, DJ links and idents come, what
   changes at night, how the talk stations string their shows together.
-* Jingles, DJ links and crossfades between the songs; long DJ mixes show the title of the current part.
+* **Transitions as in the game**: jingles, adverts, songs and talk overlap and fade as the game's mixing rules say, and
+  the DJ's talk gets the station's own music underneath.
+* Long DJ mixes show the title of the current part.
 * **The DJ**, if you switch him on: intros and outros spoken over the songs, in the windows the song files mark for them
   (default: off).
 * **Adverts, news & talk on demand** (default: off): advert breaks, the news bulletins, spoken segments and **Honey FM**'s
   night show **Liquid City**.
 * **Podcasts**: the game's 5 podcasts with their 20 episodes and titles, playable in the Android app and on the PC.
+* **On-Demand** (app): search songs and artists like in a music app, with a playlist for every station and one for the
+  game's soundtrack album.
 * An [**Android app**](#-awc-radio-app-for-android) plays the same programme on the phone and in the car, and wakes you with it.
 
 ➡️ [**Radio guide**](radio/README.md)
 
 ## 📱 AWC Radio app for Android
 
-The radio for your pocket, your car and your bedside. **`AWC-Radio.apk`** (version 1.14; version 1.11 is tested on a real
+The radio for your pocket, your car and your bedside. **`AWC-Radio.apk`** (version 1.16; version 1.11 is tested on a real
 Android phone) plays the same live programme as
-the PC: same clock, same order, same crossfades – with station packs from the same version, phone and PC play the same
+the PC: same clock, same order, same transitions – with station packs from the same version, phone and PC play the same
 at the same time.
 
 | | |
 |---|---|
 | 🎧 **Listening** | Station logos as a grid, a mini player and a large player in the colour of the station; swipe over the logo to change the station. Keeps playing in the background with a media notification, lock screen, headset and Bluetooth buttons |
+| 🔎 **On-Demand** | A tab like a music app: search for songs and artists, all songs, the artists, a playlist for every station and one for the soundtrack album with its cover; shuffle and repeat |
 | 🎙 **Podcasts** | An area of their own next to the radio: covers, episode list, a player with seek bar, 15 seconds back and 30 forward; the place in every episode is remembered and the next one follows by itself |
 | 🗣 **DJ** | Intros and outros over the songs, switched on in the settings; the music steps back while the DJ talks |
 | 🎼 **Score** | A tab of its own: open world, missions, compounds, activities and the music in places (lifts, lobbies, minigolf), each with sub groups and pieces |
@@ -94,8 +99,8 @@ at the same time.
 | 🚗 **Android Auto** | The stations as a grid with their logos, song and station on the player screen, voice commands such as *"play Radio On-U on AWC Radio"* |
 | 😴 **Sleep timer** | Stops the radio after the time you choose |
 | 📢 **Adverts, news & talk** | A switch in the player and on the settings page, off by default; news and adverts on 18 stations |
-| ⚙️ **Settings** | A settings page: crossfade on/off and 1-12 s (only between two songs), adverts, news & talk, DJ, pack folder, battery settings, info and log |
-| 📦 **Packs** | One file per station (`.radiopak`), per podcast (`.podpak`), one with the news (`.newspak`) and one per score group (`.scorepak`), all in one folder on the phone: add or update single ones without copying everything again |
+| ⚙️ **Settings** | A settings page: crossfade on/off and 1-12 s (clubs and mixes only; the other stations are mixed as in the game), adverts, news & talk, DJ, pack folder, battery settings, info and log |
+| 📦 **Packs** | One file per station (`.radiopak`), per podcast (`.podpak`), one with the news (`.newspak`), one for the soundtrack album (`.playlistpak`) and one per score group (`.scorepak`), all in one folder on the phone: add or update single ones without copying everything again |
 | 🔒 **Offline** | The app has no internet permission: everything comes from the packs on the phone |
 | 🌍 **Languages** | English and German |
 | 📋 **Needs** | Android 7.0 or newer |
@@ -103,8 +108,8 @@ at the same time.
 **Set it up**
 
 1. Install `AWC-Radio.apk` (from the [latest release](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/latest), or build it from [`radio/android/`](radio/README.md#awc-radio-for-android)). Allow notifications: the alarm needs them.
-2. On the PC, click **Android packs…** in AWC Radio, choose a folder and write the packs (original quality, about 5.4 GB for all 34 stations with the news and 0.2 GB for the podcasts). Later only new or changed packs are written. The score packs (about 1.8 GB) are offered there once the score has been read in AWC Tool (button **Score…**), or are written from its score window.
-3. Copy the `.radiopak`, `.newspak`, `.podpak` and `.scorepak` files into the same folder on the phone, start the app and choose that folder once.
+2. On the PC, click **Android packs…** in AWC Radio, choose a folder and write the packs (original quality, about 5.4 GB for all 34 stations with the news, 0.2 GB for the podcasts and 0.15 GB for the soundtrack album). Later only new or changed packs are written. The score packs (about 1.8 GB) are offered there once the score has been read in AWC Tool (button **Score…**), or are written from its score window.
+3. Copy the `.radiopak`, `.newspak`, `.playlistpak`, `.podpak` and `.scorepak` files into the same folder on the phone, start the app and choose that folder once.
 4. For Android Auto: in the Android Auto settings tap *Version* about ten times, open the developer settings in the three-dot menu and switch on *Unknown sources*.
 
 **Good to know**
@@ -116,14 +121,17 @@ at the same time.
 
 ## Progress
 
-Status **2026-11-26** (v2.10.0), measured with a 28.5 GB `audio.rpf`.
+Status **2026-11-26** (v2.11.0), measured with a 28.5 GB `audio.rpf`.
 
 | Area | State | |
 |---|---|---|
 | Music containers found by the scan | 3,008, with 3,116 streams (about 101 hours), all of them Opus and extractable | ✅ |
-| Songs the credits page lists for the music stations | **793 of 809** found (98.0 %) | 🟢 |
+| Songs the credits page lists for the music stations | **794 of 809** found (98.1 %) | 🟢 |
 | Talk radio | all 5 shows the credits name, played part by part in the game's order | ✅ |
 | Programme | the game's rules for 20 stations (18 music, 2 talk) | ✅ |
+| Mixing | the game's transitions on 18 music stations, its music beds under the DJ's talk on 16 | ✅ |
+| Soundtrack album | **54 of 57** tracks of the deluxe edition found, as a playlist in the app | 🟢 |
+| On-Demand (app) | every named song: a playlist per station, artists, search | ✅ |
 | News and night show | 130 bulletins on 18 stations; Liquid City on Honey FM after dark | ✅ |
 | Stations in AWC Radio | 34 (including 3 "(Mix)" stations, 4 venues and "Clubmixes") | ✅ |
 | Venues | Jack of Hearts (100 min DJ set), VYB (45 min), The Vault (Club, 84 min), Thrillbilly Mud Club (20 songs) | ✅ |
@@ -133,7 +141,7 @@ Status **2026-11-26** (v2.10.0), measured with a 28.5 GB `audio.rpf`.
 | Podcasts | all 5 the credits name, with 20 episodes and their titles (3 h 36 min), in the app and on the PC | ✅ |
 | Score | 2,543 pieces (about 33 h) and 113 recordings of places (4.8 h), a folder of their own in the extractor; 1,078 of at least 30 seconds (31 h) go into the app packs | ✅ |
 | Titles from `data.rpf` | 839 of the 865 track numbers the recordings carry have a title and artist in the game's own table | ✅ |
-| Android app | version 1.14: radio, podcasts, score, DJ, adverts, news & talk, radio alarm, Android Auto; version 1.11 runs on a real Android phone | ✅ |
+| Android app | version 1.16: radio, On-Demand, podcasts, score, DJ, adverts, news & talk, radio alarm, Android Auto; version 1.11 runs on a real Android phone | ✅ |
 | The Vault Radio | plays as one long mix; 23 of its 24 listed songs are named as parts of it | 🎚 |
 
 ![AWC Radio – station progress](radio/docs/radio-progress.svg)
@@ -142,14 +150,21 @@ Details for every station: [radio progress](radio/docs/RADIO-PROGRESS.md).
 
 ### Still open
 
-- [ ] 16 listed songs without a file of their own at that station (the club DJ sets, one each of Worldwide FM and Radio On-U):
-      6 play on Vice City Rap Radio and Dirty South Classics, 1 is part of the Radio On-U mix, 9 were found nowhere
-      (neither a stream of the archive nor the game's title table carries their names)
+- [ ] 3 tracks of the soundtrack album are not in the archive's recordings as far as searched: *Starting From Zero*
+      (Justice), *Burn This Shit Down* (Travis Scott) and *Touch & Go* (Anitta). The game's *Windsor Drop* and *Banshee*
+      are shorter than on the album
+- [ ] 15 listed songs without a file of their own at that station (the club DJ sets and one jingle of Worldwide FM):
+      6 play on Vice City Rap Radio and Dirty South Classics; 5 were found by their sound inside the club sets
+      (*O Let's Do It*, *Wipe Me Down*, *My Neck, My Back* and *B.M.F.* in Jack of Hearts, *Love Me* in VYB), without
+      marks that say where they begin; 4 are still not found (*Faneto*, *Dreams and Nightmares*, *Can't Fuck wit Me*, the
+      jingle *Yu Done Know*), nor is one track of The Vault Radio (*FTH*)
 - [ ] The 8 original songs of "Honey FM – Liquid City": the show itself is played; whether the songs are inside its
-      recordings is not verified, no file of their own carries their names
-- [ ] The programme by the game's rules is not compared with the game by ear; how the overlaps between items sound in the
-      game (its mixing rules) is not taken over
-- [ ] App 1.14 on a real phone
+      recordings is not verified, no file of their own carries their names and no previews of them were found
+- [ ] The programme and the mixing by the game's data are not compared with the game by ear; the low-pass sweeps of some
+      mixing rules and rules that depend on the state of the game are not taken over
+- [ ] App 1.16 on a real phone
+- [x] How the items overlap in the game (its mixing rules) and the music under the DJ's talk are taken over
+- [x] Radio On-U's formerly unnamed track is *Ras Menilik Congo (Harp)* by Augustus Pablo
 - [x] The podcast episodes carry their titles from the game
 - [ ] One 61-minute club mix stays in "Clubmixes": no track list and no place of the config plays it,
       and it has no track markers
@@ -180,6 +195,7 @@ Details for every station: [radio progress](radio/docs/RADIO-PROGRESS.md).
 | [v2.8.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.8.0) | 2026-11-25 | 🎼 The game's score (AWC Tool and app 1.11, `.scorepak`) · 📻 DJ intros and outros, podcasts on the PC, crossfade settings · 🎛 40 more music containers |
 | [v2.9.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.9.0) | 2026-11-26 | 🏷 Titles from the game's table: all 20 podcast episodes, the parts of the mixes, 5 corrected and 2 completed song names · 🎼 the score as groups in AWC Tool · app 1.12 |
 | [v2.10.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.10.0) | 2026-11-26 | 📻 The game's own programme rules, news, talk, the night show Liquid City, talk radio part by part · 🎼 music in places · app 1.14 |
+| [v2.11.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.11.0) | 2026-11-26 | 📻 Transitions as in the game with music under the DJ · 🔎 On-Demand with search, playlists and the soundtrack album · app 1.16 |
 
 ## Repository layout
 

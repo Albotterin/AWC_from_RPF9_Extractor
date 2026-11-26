@@ -4,7 +4,7 @@
 
 How many of the songs that the public credits page lists for each station could be found as files in the game's `audio.rpf`.
 
-**Status: 2026-11-26** · 793 / 809 (98.0 %)
+**Status: 2026-11-26** · 794 / 809 (98.1 %)
 
 Since v2.4.0 the playlists come straight from the game's audio config. Many stations therefore also play songs the credits do not list (column *In the radio*).
 
@@ -38,10 +38,10 @@ Since v2.4.0 the playlists come straight from the game's audio config. Many stat
 | 🟢 Vice City FM | 71 / 71 | 100.0 % | 72 |
 | 🟢 Vice City Rap Radio | 25 / 25 | 100.0 % | 82 |
 | 🟢 Worldwide FM | 40 / 41 | 97.6 % | 40 |
-| 🟢 Radio On-U | 15 / 16 | 93.8 % | 16 |
+| 🟢 Radio On-U | 16 / 16 | 100.0 % | 16 |
 | 🟡 Bodega The DJ | 36 / 45 | 80.0 % | 36 |
 | 🟡 DJ Stevie J | 19 / 24 | 79.2 % | 19 |
-| **Total** | **793 / 809** | **98.0 %** | **857** |
+| **Total** | **794 / 809** | **98.1 %** | **857** |
 
 </details>
 
@@ -90,11 +90,22 @@ The five podcasts of the credits list, all found: 20 episodes, 3 h 36 min togeth
 
 ## Reading the gaps
 
-- **Bodega The DJ** and **DJ Stevie J** are DJ sets in clubs. The missing titles have no single file assigned to them there: 6 of them play on Vice City Rap Radio and Dirty South Classics, 8 were found nowhere.
-- **Worldwide FM**: one listed title (a jingle) was found nowhere. **Radio On-U**: one title has no named file; it is part of the Radio On-U mix (from 6:28), and the station's "Unknown track" is very probably the same one.
+- **Bodega The DJ** and **DJ Stevie J** are DJ sets in clubs. The missing titles have no single file assigned to them there: 6 of them play on Vice City Rap Radio and Dirty South Classics. 5 were found by their sound inside the club sets (*O Let's Do It*, *Wipe Me Down*, *My Neck, My Back*, *B.M.F.* in Jack of Hearts, *Love Me* in VYB), without marks that say where they begin. 3 are still not found: *Faneto*, *Dreams and Nightmares*, *Can't Fuck wit Me*.
+- **Worldwide FM**: one listed title (the jingle *Yu Done Know*) was found nowhere. **Radio On-U**: the station's formerly unnamed track is *Ras Menilik Congo (Harp)* by Augustus Pablo, recognised by its sound.
 - **Honey FM - Liquid City**: the night show is played on Honey FM after dark. Whether its 8 original songs (not counted above) are inside its recordings is not verified; no file of their own carries their names.
 - Long DJ mixes are also played as "(Mix)" stations: Radio On-U (16 of 24), The Sniper Of La Perle (22 of 22), Worldwide FM (40 of 41), The Vault (25 of 25). The numbers are the parts that have a title. One further long club mix, which no place can be assigned to, plays as "Clubmixes".
 - The titles of the podcast episodes and of the mix parts are in the game's own table (`data.rpf`); without that file the episodes are numbered.
+
+## Soundtrack album
+
+*Grand Theft Auto VI: The Album (Deluxe Edition)*: **54 of 57** tracks lie in the game's files and form a playlist in the app.
+
+| Where | Tracks |
+|---|---:|
+| on the stations | 48 |
+| in the archive without a station, recognised by their sound (Overmono: *Granforma*, *Windsor Drop*, *Eighty Eight Comet*, *Banshee*, *Welcome to Leonida*) | 5 |
+| only in the mix of The Vault (*Don't Play Around*) | 1 |
+| not found: *Starting From Zero*, *Burn This Shit Down*, *Touch & Go* | 3 |
 
 ## All stations
 

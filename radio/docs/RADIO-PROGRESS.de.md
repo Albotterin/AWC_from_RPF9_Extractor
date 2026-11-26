@@ -4,7 +4,7 @@
 
 Wie viele der Songs, die die öffentliche Credits-Seite für jeden Sender aufführt, als Dateien in der `audio.rpf` des Spiels gefunden wurden.
 
-**Stand: 2026-11-26** · 793 / 809 (98.0 %)
+**Stand: 2026-11-26** · 794 / 809 (98.1 %)
 
 Seit v2.4.0 kommen die Playlists direkt aus der Audio-Konfiguration des Spiels. Viele Sender spielen deshalb auch Songs, die die Credits nicht nennen (Spalte *Im Radio*).
 
@@ -38,10 +38,10 @@ Seit v2.4.0 kommen die Playlists direkt aus der Audio-Konfiguration des Spiels. 
 | 🟢 Vice City FM | 71 / 71 | 100.0 % | 72 |
 | 🟢 Vice City Rap Radio | 25 / 25 | 100.0 % | 82 |
 | 🟢 Worldwide FM | 40 / 41 | 97.6 % | 40 |
-| 🟢 Radio On-U | 15 / 16 | 93.8 % | 16 |
+| 🟢 Radio On-U | 16 / 16 | 100.0 % | 16 |
 | 🟡 Bodega The DJ | 36 / 45 | 80.0 % | 36 |
 | 🟡 DJ Stevie J | 19 / 24 | 79.2 % | 19 |
-| **Gesamt** | **793 / 809** | **98.0 %** | **857** |
+| **Gesamt** | **794 / 809** | **98.1 %** | **857** |
 
 </details>
 
@@ -90,11 +90,22 @@ Die fünf Podcasts der Credits-Liste, alle gefunden: 20 Folgen, zusammen 3 Std. 
 
 ## Die Lücken
 
-- **Bodega The DJ** und **DJ Stevie J** sind DJ-Sets in Clubs. Die fehlenden Titel haben dort keine zugeordnete Einzeldatei: 6 davon laufen auf Vice City Rap Radio und Dirty South Classics, 8 wurden nirgends gefunden.
-- **Worldwide FM**: ein gelisteter Titel (ein Jingle) wurde nirgends gefunden. **Radio On-U**: ein Titel hat keine benannte Datei; er steckt im Radio-On-U-Mix (ab 6:28), und der „Unknown track“ des Senders ist sehr wahrscheinlich derselbe.
+- **Bodega The DJ** und **DJ Stevie J** sind DJ-Sets in Clubs. Die fehlenden Titel haben dort keine zugeordnete Einzeldatei: 6 davon laufen auf Vice City Rap Radio und Dirty South Classics. 5 wurden am Klang in den Club-Sets gefunden (*O Let's Do It*, *Wipe Me Down*, *My Neck, My Back*, *B.M.F.* bei Jack of Hearts, *Love Me* bei VYB), ohne Marken, die ihren Beginn nennen. 3 fehlen weiterhin: *Faneto*, *Dreams and Nightmares*, *Can't Fuck wit Me*.
+- **Worldwide FM**: ein gelisteter Titel (der Jingle *Yu Done Know*) wurde nirgends gefunden. **Radio On-U**: der bisher namenlose Titel des Senders ist *Ras Menilik Congo (Harp)* von Augustus Pablo, am Klang erkannt.
 - **Honey FM - Liquid City**: Die Nachtshow läuft abends auf Honey FM. Ob ihre 8 eigens geschriebenen Songs (nicht oben mitgezählt) in ihren Aufnahmen stecken, ist nicht geprüft; keine eigene Datei trägt ihre Namen.
 - Lange DJ-Mixe laufen zusätzlich als „(Mix)“-Sender: Radio On-U (16 von 24), The Sniper Of La Perle (22 von 22), Worldwide FM (40 von 41), The Vault (25 von 25). Die Zahlen nennen die Abschnitte mit Titel. Ein weiterer langer Club-Mix, dem sich kein Ort zuordnen lässt, läuft als „Clubmixes“.
 - Die Titel der Podcast-Folgen und der Mix-Abschnitte stehen in der Tabelle des Spiels (`data.rpf`); ohne diese Datei sind die Folgen nummeriert.
+
+## Soundtrack-Album
+
+*Grand Theft Auto VI: The Album (Deluxe Edition)*: **54 von 57** Titeln liegen in den Dateien des Spiels und bilden in der App eine Playlist.
+
+| Woher | Titel |
+|---|---:|
+| auf den Sendern | 48 |
+| im Archiv ohne Sender, am Klang erkannt (Overmono: *Granforma*, *Windsor Drop*, *Eighty Eight Comet*, *Banshee*, *Welcome to Leonida*) | 5 |
+| nur im Mix von The Vault (*Don't Play Around*) | 1 |
+| nicht gefunden: *Starting From Zero*, *Burn This Shit Down*, *Touch & Go* | 3 |
 
 ## Alle Sender
 

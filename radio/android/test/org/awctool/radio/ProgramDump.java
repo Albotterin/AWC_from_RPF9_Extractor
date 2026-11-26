@@ -11,6 +11,10 @@ import java.io.PrintStream;
  *   java ProgramDump <pack folder> <output file> <unix time> [<unix time> ...]
  */
 public final class ProgramDump {
+    private static String fade(Schedule.Fade f) {
+        return f == null ? "-" : String.format(java.util.Locale.ROOT, "%.6f,%.6f,%d", f.at, f.len, f.shape);
+    }
+
     public static void main(String[] args) throws Exception {
         File[] files = new File(args[0]).listFiles((d, n) -> n.endsWith(".radiopak"));
         java.util.Arrays.sort(files);
@@ -30,9 +34,14 @@ public final class ProgramDump {
                         for (boolean adverts : new boolean[]{false, true}) {
                             for (int fade : new int[]{0, 3, 8}) {
                                 for (Schedule.Item it : s.programme(adverts, fade).itemsFrom(now, 40)) {
-                                    out.printf(java.util.Locale.ROOT, "%s|%d|%s%d|%s|%s|%.6f|%.6f|%.6f|%.6f%n", s.name, a - 2,
+                                    out.printf(java.util.Locale.ROOT, "%s|%d|%s%d|%s|%s|%.6f|%.6f|%s|%s%n", s.name, a - 2,
                                             adverts ? "ads" : "no", fade, it.kind, it.track.key,
-                                            it.start, it.end, it.fadeIn, it.fadeOut);
+                                            it.start, it.end, fade(it.fadeIn), fade(it.fadeOut));
+                                    Schedule.Track bed = s.programme(adverts, fade).bedOf(it);
+                                    if (bed != null) {
+                                        out.printf(java.util.Locale.ROOT, "%s|%d|%s%d|bed|%s|%.6f%n", s.name, a - 2,
+                                                adverts ? "ads" : "no", fade, bed.key, it.start);
+                                    }
                                     for (Schedule.Voice v : s.programme(adverts, fade).voices(it)) {
                                         out.printf(java.util.Locale.ROOT, "%s|%d|%s%d|voice|%s|%.6f|%.6f%n", s.name, a - 2,
                                                 adverts ? "ads" : "no", fade, v.line.key, it.start, v.at);

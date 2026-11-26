@@ -16,7 +16,8 @@ import android.widget.TextView;
 /**
  * The large player of what is played on demand. A podcast: the cover, the place in the episode (it can be dragged), back
  * and forward, the episode before and after, the sleep timer and the way to the list of episodes. A group of the score
- * is shown the same way, with the piece's name and without the jumps back and forward.
+ * is shown the same way, with the piece's name and without the jumps back and forward; so is a queue of songs, with the
+ * picture of where the song comes from and the switches for shuffle and repeat.
  */
 final class EpisodeScreen extends LinearLayout {
     interface Actions {
@@ -33,13 +34,19 @@ final class EpisodeScreen extends LinearLayout {
         void sleep();
 
         void episodes(String podcast);
+
+        void shuffle();
+
+        void repeat();
     }
 
     private static final int SOFT = 0xCCFFFFFF;
 
     private final Activity activity;
     private final Ui.SquareImage cover;
-    private final TextView kind, name, title, position, left, sleep, next, list;
+    private final TextView kind, name, title, position, left, sleep, next, list, shuffle, repeat;
+    private final LinearLayout order;                      // shuffle and repeat: only for songs
+    private Library.Station coverShown;
     private final SeekBar bar;
     private final ImageButton toggle, before, after;
     private final FrameLayout back, forward;
@@ -174,6 +181,21 @@ final class EpisodeScreen extends LinearLayout {
         r.leftMargin = dp(6);
         extras.addView(sleep, l);
         extras.addView(list, r);
+
+        order = new LinearLayout(a);
+        order.setPadding(dp(6), dp(wide || small ? 6 : 16), dp(6), 0);
+        shuffle = extra("", small);
+        shuffle.setOnClickListener(v -> actions.shuffle());
+        repeat = extra("", small);
+        repeat.setOnClickListener(v -> actions.repeat());
+        LayoutParams ol = new LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
+        ol.rightMargin = dp(6);
+        LayoutParams or = new LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
+        or.leftMargin = dp(6);
+        order.addView(shuffle, ol);
+        order.addView(repeat, or);
+        order.setVisibility(GONE);
+        col.addView(order);
         col.addView(extras);
 
         next = Ui.oneLine(Ui.text(a, "", 13, SOFT));
@@ -233,40 +255,62 @@ final class EpisodeScreen extends LinearLayout {
         set(left, "-" + Ui.fmt(Math.max(0, length - at)));
     }
 
-    /** The words and buttons of a podcast or of the score. */
-    private void kindOf(boolean score) {
+    /** The words and buttons of a podcast, of the score or of songs. */
+    private void kindOf(boolean score, boolean music) {
         Context c = getContext();
-        set(kind, c.getString(score ? R.string.tab_score : R.string.podcast));
-        back.setVisibility(score ? GONE : VISIBLE);
-        forward.setVisibility(score ? GONE : VISIBLE);
-        before.setContentDescription(c.getString(score ? R.string.act_prev_piece : R.string.act_prev_episode));
-        after.setContentDescription(c.getString(score ? R.string.act_next_piece : R.string.act_next_episode));
-        bar.setContentDescription(c.getString(score ? R.string.act_seek_piece : R.string.act_seek));
-        set(list, c.getString(score ? R.string.score_all_pieces : R.string.all_episodes));
+        boolean plain = score || music;                    // music has no jumps
+        set(kind, c.getString(music ? R.string.tab_music : score ? R.string.tab_score : R.string.podcast));
+        back.setVisibility(plain ? GONE : VISIBLE);
+        forward.setVisibility(plain ? GONE : VISIBLE);
+        order.setVisibility(music ? VISIBLE : GONE);
+        before.setContentDescription(c.getString(music ? R.string.act_prev_song : score ? R.string.act_prev_piece
+                : R.string.act_prev_episode));
+        after.setContentDescription(c.getString(music ? R.string.act_next_song : score ? R.string.act_next_piece
+                : R.string.act_next_episode));
+        bar.setContentDescription(c.getString(plain ? R.string.act_seek_piece : R.string.act_seek));
+        set(list, c.getString(music ? R.string.show_list : score ? R.string.score_all_pieces : R.string.all_episodes));
     }
 
-    /** Shows the podcast or score group that the radio service is playing. */
+    /** Shows the podcast, score group or queue of songs that the radio service is playing. */
     void show(Library.Station podcast, RadioService radio) {
-        boolean score = podcast.score != null;
+        boolean score = podcast.score != null, music = podcast.music;
         if (podcast != shown) {
             shown = podcast;
-            cover.setImageBitmap(Logos.get(podcast, 256));
-            cover.setContentDescription(Ui.nameOf(getContext(), podcast));
-            paint(Logos.color(podcast).tint);
-            kindOf(score);
-            if (!score) set(name, podcast.name);
+            coverShown = null;
+            kindOf(score, music);
+            if (!score && !music) set(name, podcast.name);
         }
-        if (score) set(name, radio.title);
+        Library.Station art = podcast.coverOf(radio.episodeIndex());
+        if (art != coverShown) {
+            coverShown = art;
+            cover.setImageBitmap(Logos.get(art, 256));
+            cover.setContentDescription(Ui.nameOf(getContext(), art));
+            paint(Logos.color(art).tint);
+        }
+        if (score || music) set(name, radio.title);
+        if (music) {
+            Context c = getContext();
+            boolean mixed = Music.isShuffled(podcast.name);
+            int how = radio.repeatMode();
+            set(shuffle, c.getString(mixed ? R.string.shuffle_on : R.string.shuffle_off));
+            shuffle.setSelected(mixed);
+            shuffle.setTextColor(mixed ? Ui.SUN : Color.WHITE);
+            set(repeat, c.getString(how == Episodes.REPEAT_ONE ? R.string.repeat_one : how == Episodes.REPEAT_ALL
+                    ? R.string.repeat_all : R.string.repeat_off));
+            repeat.setSelected(how != Episodes.REPEAT_OFF);
+            repeat.setTextColor(how != Episodes.REPEAT_OFF ? Ui.SUN : Color.WHITE);
+        }
         boolean playing = radio.state == RadioService.PLAYING;
         toggle.setImageResource(playing ? R.drawable.ic_pause : R.drawable.ic_play);
         toggle.setContentDescription(getContext().getString(playing ? R.string.act_pause : R.string.act_resume));
         int i = radio.episodeIndex();
-        boolean failed = radio.title.equals(getContext().getString(score ? R.string.piece_error : R.string.episode_error));
+        boolean failed = radio.title.equals(getContext().getString(score || music ? R.string.piece_error : R.string.episode_error));
         // an episode with a title: the title below the podcast's name, "Episode 2 of 3" at the top
-        boolean named = !score && i >= 0 && !podcast.songs.get(i).title.isEmpty();
-        String place = score ? "" : getContext().getString(R.string.episode_of, i + 1, podcast.songs.size());
-        if (!score) set(kind, named ? place : getContext().getString(R.string.podcast));
-        set(title, score ? radio.artist + " • " + Ui.nameOf(getContext(), podcast)
+        boolean named = !score && !music && i >= 0 && !podcast.songs.get(i).title.isEmpty();
+        String place = score || music ? "" : getContext().getString(R.string.episode_of, i + 1, podcast.songs.size());
+        if (!score && !music) set(kind, named ? place : getContext().getString(R.string.podcast));
+        if (music) set(kind, Ui.nameOf(getContext(), podcast));
+        set(title, music ? radio.artist : score ? radio.artist + " • " + Ui.nameOf(getContext(), podcast)
                 : failed || named ? radio.title : place);
         length = radio.duration();
         if (!dragging) {

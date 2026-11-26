@@ -24,12 +24,15 @@ Pack layout (little endian), read by android/java/org/awctool/radio/Pack.java:
                  [line keys]]} (over its intro, its outro), the station "voices": [{"k","s"}] (the lines) and
                  "toads": [line keys] (said over a song before an advert break)
                  "talk": [{"k","t","s","a"?}] what is said on it, "news": true (it plays the news of the news pack),
-                 "tonews": [line keys] (said over a song before the news), "rules": the game's programme rules -
+                 "tonews": [line keys] (said over a song before the news), "beds": [{k, s}] (music under the DJ's talk,
+                 for talk items with "b": 1; a song may have "c": its cue-in second), "rules": the game's programme rules -
                  {"table": {category: [[next, [factor]]]}, "pools": {category: [keys]}, "history", "sequence", "ads",
-                 "talkradio"}, a factor being a number or ["s" | "c" | "h", category, curve]
+                 "talkradio", "mix"}, a factor being a number or ["s" | "c" | "h", category, curve]
                  the news pack (.newspak, same layout) has "stations": [] and "news": [{"name","items":[{"k","s"}]}]
                  a podcast pack (.podpak, same layout) has "stations": [] and
                  "podcasts": [{"name","logo","episodes":[{"k","s","t"?}]}] (in their order; "t": the title)
+                 a playlist pack (.playlistpak, same layout) has "stations": [] and
+                 "playlists": [{"name","logo","songs":[{"k","t","a","s"}]}] (the soundtrack, see awc_album)
                  a score pack (.scorepak, same layout) has "stations": [] and
                  "scores": [{"name","group","pieces":[{"k","g": sub group,"t": title,"s"}]}] (in their order)
 "sig" is a fingerprint of the content: it tells whether an existing file is still up to date.
@@ -50,6 +53,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path[:0] = [HERE, os.path.join(os.path.dirname(HERE), "extractor")]   # the shared modules live with the extractor
+import awc_album  # noqa: E402
 import awc_dj as dj  # noqa: E402
 import awc_gamedata as gamedata  # noqa: E402
 import awc_i18n  # noqa: E402
@@ -63,6 +67,7 @@ EXTENSION = ".radiopak"
 PODCAST_EXTENSION = ".podpak"
 SCORE_EXTENSION = ".scorepak"
 NEWS_EXTENSION = ".newspak"
+PLAYLIST_EXTENSION = ".playlistpak"
 NEWS_NAME = "News"
 SCORE_NAMES = {"openworld": "Open World", "mission": "Missions", "compound": "Compounds", "activity": "Activities",
                "places": "Places"}
@@ -153,6 +158,10 @@ def find_ffmpeg():
 
 def track_key(tr):
     """The same as awc_radio._tkey: the programme of the app hashes it."""
+    if tr.get("cut"):
+        return "%s_%sc%d" % (tr["base"], tr["idx"], int(tr["cut"][0]))
+    if tr.get("stems"):
+        return "%s_%ss%d" % (tr["base"], tr["idx"], len(tr["stems"]))
     parts = tr.get("parts")
     return "%s_%s" % (tr["base"], tr["idx"]) + ("x%d" % len(parts) if parts else "")
 
@@ -185,23 +194,28 @@ def pack_sources(index, rpf="", min_sec=SCORE_MIN):
     """Everything that gets a pack of its own: the stations and podcasts of the radio index, its news and, with the path
     of the archive, the groups of its score: {name: entry}."""
     news = {NEWS_NAME: {"news_items": index["news"]}} if index.get("news") else {}
-    return dict(dict(index["stations"], **index.get("podcasts", {})), **news, **score_sources(rpf, min_sec))
+    songs = index.get("album") or []
+    if not find_ffmpeg():                                    # some of the album's songs are made with it
+        songs = [x for x in songs if not x.get("stems") and not x.get("cut")]
+    album = {awc_album.NAME: {"playlist": True, "songs": songs}} if songs else {}
+    return dict(dict(index["stations"], **index.get("podcasts", {})), **album, **news, **score_sources(rpf, min_sec))
 
 
-def pack_file(name, podcast=False, score="", news=False):
+def pack_file(name, podcast=False, score="", news=False, playlist=False):
     """File name of a pack: 'The Chamber 106.6' -> 'the_chamber_106_6.radiopak', 'Final Act' -> 'final_act.podpak',
     the score's open world -> 'score_open_world.scorepak'."""
     if score:
         return "score_" + icons.slug(SCORE_NAMES[score]) + SCORE_EXTENSION
-    return icons.slug(name) + (NEWS_EXTENSION if news else PODCAST_EXTENSION if podcast else EXTENSION)
+    return icons.slug(name) + (NEWS_EXTENSION if news else PODCAST_EXTENSION if podcast else PLAYLIST_EXTENSION if playlist
+                               else EXTENSION)
 
 
 def file_for(name, entry):
-    return pack_file(name, entry.get("podcast", False), entry.get("score", ""), "news_items" in entry)
+    return pack_file(name, entry.get("podcast", False), entry.get("score", ""), "news_items" in entry, entry.get("playlist", False))
 
 
 def _logo(name):
-    p = icons.icon_path(name)
+    p = awc_album.cover() if name == awc_album.NAME else icons.icon_path(name)
     if p and os.path.isfile(p):
         with open(p, "rb") as fh:
             return fh.read()
@@ -209,13 +223,14 @@ def _logo(name):
 
 
 def _songs(tracks):
-    return [dict({"k": track_key(s), "t": s["title"], "a": s["artist"], "s": s["sec"]}, **({"m": s["m"]} if s.get("m") else {}))
-            for s in tracks]
+    return [dict({"k": track_key(s), "t": s["title"], "a": s["artist"], "s": s["sec"]},
+                 **{short: s[key] for short, key in (("m", "m"), ("c", "cue")) if s.get(key)}) for s in tracks]
 
 
 def _plain(tracks, titles=False):
-    return [dict({"k": track_key(x), "s": x["sec"]}, **({k: x[f] for k, f in (("t", "title"), ("a", "artist"))
-                                                          if titles and x.get(f)})) for x in tracks]
+    return [dict({"k": track_key(x), "s": x["sec"]},
+                 **{k: x[f] for k, f in (("t", "title"), ("a", "artist")) if titles and x.get(f)},
+                 **({"b": 1} if x.get("bed") else {})) for x in tracks]
 
 
 def station_entry(name, st, has_logo):
@@ -226,6 +241,8 @@ def station_entry(name, st, has_logo):
         return {"name": SCORE_NAMES[st["score"]], "group": st["score"], "logo": "",
                 "pieces": [{"k": "s_" + x["id"], "g": x["sub"], "t": x["title"], "s": x["sec"]} for x in st["pieces"]]}
     logo = "logos/%s.png" % icons.slug(name) if has_logo else ""
+    if st.get("playlist"):
+        return {"name": name, "logo": logo, "songs": _songs(st["songs"])}
     if st.get("podcast"):
         return {"name": name, "logo": logo, "episodes": [
             dict({"k": track_key(e), "s": e["sec"]}, **({"t": e["name"]} if e.get("name") else {})) for e in st["songs"]]}
@@ -236,6 +253,8 @@ def station_entry(name, st, has_logo):
         entry["talk"] = _plain(st["talk"], titles=True)
     if st.get("news"):
         entry["news"] = True
+    if st.get("beds"):
+        entry["beds"] = _plain(st["beds"])
     if st.get("rules"):
         entry["rules"] = st["rules"]
     lines = dj.station_lines(st)
@@ -274,7 +293,8 @@ def all_tracks(st):
 
 def entry_items(entry):
     """The {"k": ..} of every file an entry of a pack index names."""
-    return [x for key in ("songs", "jingles", "ads", "talk", "episodes", "pieces", "voices", "items") for x in entry.get(key, [])]
+    return [x for key in ("songs", "jingles", "ads", "talk", "beds", "episodes", "pieces", "voices", "items")
+            for x in entry.get(key, [])]
 
 
 def read_signature(path):
@@ -290,7 +310,7 @@ def read_signature(path):
             f.seek(off)
             meta = json.loads(f.read(length).decode("utf-8"))
             for st in (meta.get("stations", []) + meta.get("podcasts", []) + meta.get("scores", [])
-                       + meta.get("news", [])):                                              # all must be in it
+                       + meta.get("news", []) + meta.get("playlists", [])):                  # all must be in it
                 for item in entry_items(st):
                     if "t/" + item["k"] not in meta["files"]:
                         return ""
@@ -516,6 +536,8 @@ def export_packs(stations, index, rpf, folder, progress=None, cancel=None, cache
                             "sig": sig, "stations": [entry]}
                     if stations[name].get("podcast"):
                         meta.update(stations=[], podcasts=[entry])
+                    if stations[name].get("playlist"):
+                        meta.update(stations=[], playlists=[entry])
                     if "news_items" in stations[name]:
                         meta.update(stations=[], news=[entry])
                     if score:

@@ -145,10 +145,10 @@
     <string name="settings">Einstellungen</string>
     <string name="settings_playback">Wiedergabe</string>
     <string name="crossfade">Überblenden</string>
-    <string name="crossfade_what">Nur von einem Song in den nächsten</string>
+    <string name="crossfade_what">Für Clubs und Mixe. Sender mit Spielregeln werden wie im Spiel gemischt.</string>
     <string name="crossfade_length">Dauer</string>
     <string name="seconds_short">%1$d s</string>
-    <string name="crossfade_sync">Handy und PC spielen nur mit derselben Überblendung zur selben Zeit denselben Song (Standard: %1$d s).</string>
+    <string name="crossfade_sync">Bei Clubs und Mixen spielen Handy und PC nur mit derselben Überblendung zur selben Zeit dasselbe (Standard: %1$d s).</string>
     <string name="adverts_what">Werbeblöcke, Nachrichten, Talk und die Nachtshow bei den Sendern, die das haben</string>
     <string name="news">Nachrichten</string>
     <string name="talk">Talk</string>
@@ -184,4 +184,32 @@
     </plurals>
     <string name="dj_switch">DJ</string>
     <string name="dj_what">Ansagen über den Anfang und das Ende der Songs</string>
+    <string name="tab_music">On-Demand</string>
+    <string name="search_hint">Song oder Interpret</string>
+    <string name="search_clear">Suche leeren</string>
+    <string name="search_nothing">Nichts gefunden zu „%1$s“</string>
+    <string name="search_of">„%1$s“</string>
+    <string name="playlists">Playlisten</string>
+    <string name="all_songs">Alle Songs</string>
+    <string name="artists">Interpreten</string>
+    <string name="songs">Songs</string>
+    <string name="songs_summary">%1$s · %2$d Min.</string>
+    <string name="shuffle">Zufall</string>
+    <string name="shuffle_on">Zufall: an</string>
+    <string name="shuffle_off">Zufall: aus</string>
+    <string name="repeat_off">Wiederholen: aus</string>
+    <string name="repeat_all">Wiederholen: alle</string>
+    <string name="repeat_one">Wiederholen: dieser Song</string>
+    <string name="show_list">Zur Liste</string>
+    <string name="act_prev_song">Voriger Song</string>
+    <string name="act_next_song">Nächster Song</string>
+    <string name="music_empty">Noch keine Songs. Kopiere Sender-Packs (.radiopak) in deinen Pack-Ordner.</string>
+    <plurals name="songs_n">
+        <item quantity="one">%d Song</item>
+        <item quantity="other">%d Songs</item>
+    </plurals>
+    <plurals name="artists_n">
+        <item quantity="one">%d Interpret</item>
+        <item quantity="other">%d Interpreten</item>
+    </plurals>
 </resources>

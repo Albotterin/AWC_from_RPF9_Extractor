@@ -5,11 +5,21 @@ beginning of the song and over its end. The DJ's lines lie in speech containers 
 they announce ("dj_intro_<song>_01", "dj_outro_<song>_01"); some are general. collect() gives every song of a station the
 lines that fit into its windows; which one is said, and whether at all, is decided by the programme (awc_radio.Schedule
 and Schedule.java, from the UTC clock). mix() lays lines over a song for the PC (the app does it while playing).
+
+A song also marks where it is cued in ("intro", behind the silence at its beginning): cues() notes it, the programme
+lets the song's sound begin where the mixing rules want it. And stations have music beds, short pieces of music the game
+plays under its DJ's talk: beds() finds the DJ recordings that bring no sound of their own, lay_bed() mixes one for the
+PC.
 """
+import array
 import collections
+import math
+import operator
 import os
 import struct
 import subprocess
+import tempfile
+from concurrent.futures import ThreadPoolExecutor
 
 import awc_core as core
 import awc_gamedata as gamedata
@@ -22,10 +32,17 @@ SLACK = 0.6                  # a line may be this much longer than its window
 DUCK = 0.25                  # how loud the music stays while the DJ talks (Engine.java: the same)
 RAMP = 0.35                  # seconds the music takes to step back and forward again
 NO_WINDOW = 0x08000000 if os.name == "nt" else 0
+INTRO_EVENT = joaat("intro")
+CUE_MAX = 3.0                # a later cue-in point is not taken for the silence before a song
+# the categories the DJ talks in; there (and nowhere else) a station's music bed belongs
+BED_CATEGORIES = ("dj_banter", "dj_banter_night", "dj_banter_story", "dj_banter_from_ads", "dj_banter_from_news",
+                  "showintro", "showintro_night", "showintro_dj2", "showoutro", "showoutro_night", "showoutro_dj2")
+BED_FLOOR = -40.0            # dB: a recording whose quiet moments are louder than this brings a sound of its own
+BED_GAIN = DUCK              # how loud the bed is under the talk (Engine.java: the same)
 
 
-def windows(f, base):
-    """[(start, end)] where the DJ may talk over the song bank at `base` of the open archive: the intro, then the outro."""
+def events(f, base):
+    """[(event name hash, seconds)] of the marker chunk of the bank at `base` of the open archive."""
     f.seek(base)
     head = f.read(16)
     if len(head) < 16 or head[:4] != b"ADAT":
@@ -42,10 +59,100 @@ def windows(f, base):
             if v >> 56 == MARKERS and 16 <= size <= 0x100000:
                 f.seek(base + offset)
                 data = f.read(size)
-                times = sorted(struct.unpack_from("<I", data, k + 8)[0] / 48000.0 for k in range(0, len(data) - 15, 16)
-                               if struct.unpack_from("<I", data, k)[0] == DJ_EVENT)
-                return [(round(a, 2), round(b, 2)) for a, b in zip(times[0::2], times[1::2]) if b > a]
+                return [(struct.unpack_from("<I", data, k)[0], struct.unpack_from("<I", data, k + 8)[0] / 48000.0)
+                        for k in range(0, len(data) - 15, 16)]
     return []
+
+
+def windows(f, base):
+    """[(start, end)] where the DJ may talk over the song bank at `base` of the open archive: the intro, then the outro."""
+    times = sorted(at for name, at in events(f, base) if name == DJ_EVENT)
+    return [(round(a, 2), round(b, 2)) for a, b in zip(times[0::2], times[1::2]) if b > a]
+
+
+def cues(rpf, stations):
+    """Give the songs of the stations with programme rules their cue-in point (song["cue"], seconds)."""
+    with open(rpf, "rb") as f:
+        for st in stations.values():
+            if "rules" not in st:
+                continue
+            for song in songs_of(st):
+                at = min((at for name, at in events(f, song["base"]) if name == INTRO_EVENT), default=0.0)
+                if 0.05 <= at <= CUE_MAX:
+                    song["cue"] = round(at, 2)
+
+
+def quiet_floor(pcm, rate=8000):
+    """How loud (dB) the quiet moments of a recording are: the 5th percentile of its 50 ms pieces, the first and last
+    0.3 s left out. pcm: 16 bit mono samples as bytes."""
+    samples = array.array("h")
+    samples.frombytes(pcm[:len(pcm) // 2 * 2])
+    size = rate // 20
+    levels = []
+    for k in range(6 * size, len(samples) - 7 * size + 1, size):
+        piece = samples[k:k + size]
+        levels.append(10.0 * math.log10(sum(map(operator.mul, piece, piece)) / (size * 32768.0 ** 2) + 1e-10))
+    if not levels:
+        return -100.0
+    levels.sort()
+    return levels[int(0.05 * (len(levels) - 1))]
+
+
+def beds(rpf, stations, items, ffmpeg, progress=None):
+    """Mark the DJ recordings that want a music bed under them (track["bed"]). A station without such a recording, or
+    all of them without FFmpeg (needed to listen into them), loses its beds. items: {bank position: scan item}."""
+    wanted = {}                                              # (position, stream) -> [tracks]
+    for st in stations.values():
+        if not st.get("beds"):
+            continue
+        pools = st.get("rules", {}).get("pools", {})
+        keys = {k for c in BED_CATEGORIES for k in pools.get(c, ())}
+        for tr in st.get("jingles", []) + st.get("talk", []):
+            if "%s_%s" % (tr["base"], tr["idx"]) in keys:
+                wanted.setdefault((tr["base"], tr["idx"]), []).append(tr)
+    done = []
+    if ffmpeg and wanted:
+        with tempfile.TemporaryDirectory(prefix="awc_beds_") as work:
+            def listen(where):
+                base, index = where
+                path = os.path.join(work, "%d_%d.opus" % where)
+                try:
+                    core.AwcRef(dict(items[base], path=rpf)).extract({index: path})
+                    r = subprocess.run([ffmpeg, "-v", "error", "-i", path, "-ac", "1", "-ar", "8000", "-f", "s16le", "-"],
+                                       capture_output=True, stdin=subprocess.DEVNULL, creationflags=NO_WINDOW)
+                    if r.returncode == 0 and r.stdout and quiet_floor(r.stdout) <= BED_FLOOR:
+                        for tr in wanted[where]:
+                            tr["bed"] = True
+                except (OSError, core.AwcError):
+                    pass                                     # then it plays as it is
+                finally:
+                    try:
+                        os.remove(path)
+                    except OSError:
+                        pass
+
+            with ThreadPoolExecutor(max_workers=max(1, min(8, os.cpu_count() or 2))) as pool:
+                for _ in pool.map(listen, sorted(wanted)):
+                    done.append(None)
+                    if progress:
+                        progress(len(done) / len(wanted))
+    for st in stations.values():
+        if "beds" in st and not any(tr.get("bed") for tr in st.get("jingles", []) + st.get("talk", [])):
+            del st["beds"]
+
+
+def lay_bed(talk, bed, seconds, out, ffmpeg):
+    """Lay a music bed under a recording of the DJ: it begins and ends with it and starts again if it is too short.
+    Raises OSError."""
+    graph = ("[1:a]aresample=48000,aformat=channel_layouts=stereo,volume=%.3f,afade=t=in:st=0:d=%.3f,"
+             "afade=t=out:st=%.3f:d=%.3f[b];[0:a]aresample=48000,aformat=channel_layouts=stereo[t];"
+             "[t][b]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.89:level=disabled[o]"
+             % (BED_GAIN, RAMP, max(0.0, seconds - RAMP), RAMP))
+    r = subprocess.run([ffmpeg, "-v", "error", "-y", "-i", talk, "-stream_loop", "-1", "-i", bed, "-filter_complex", graph,
+                        "-map", "[o]", "-c:a", "libopus", "-b:a", "128k", "-f", "ogg", out],
+                       capture_output=True, stdin=subprocess.DEVNULL, creationflags=NO_WINDOW, timeout=300)
+    if r.returncode != 0 or not os.path.isfile(out):
+        raise OSError("ffmpeg: " + r.stderr.decode("utf-8", "replace")[-300:])
 
 
 def song_names(rpf):

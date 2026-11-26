@@ -35,14 +35,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The four tabs of the app (the stations, the podcasts, the score and the alarms), the small player at the bottom and the
- * large ones over the whole screen. All the playing is done by RadioService.
+ * The five tabs of the app (the stations, the songs on demand, the podcasts, the score and the alarms), the small player
+ * at the bottom and the large ones over the whole screen. All the playing is done by RadioService.
  */
 public class MainActivity extends Activity implements PackStore.Listener {
     static final String ACTION_SHOW_ALARMS = "org.awctool.radio.SHOW_ALARMS";
     private static final int REQ_PICK = 42;
     private static final int[] SLEEP_MINUTES = {0, 15, 30, 45, 60, 90};
-    private static final int TAB_RADIO = 0, TAB_ALARMS = 1, TAB_PODCASTS = 2, TAB_SCORE = 3;
+    private static final int TAB_RADIO = 0, TAB_ALARMS = 1, TAB_PODCASTS = 2, TAB_SCORE = 3, TAB_MUSIC = 4;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private List<Library.Station> stations, podcasts, scores;
@@ -62,6 +62,9 @@ public class MainActivity extends Activity implements PackStore.Listener {
     private String podcastShown;                           // podcasts tab: whose episodes are listed, or null
     private ScoreList scoreList;
     private String scoreShown, scoreSub;                   // score tab: the group and sub group that are listed, or null
+    private MusicList musicList;
+    private String musicShown, musicWords = "";             // on demand: what is listed (null: the start), what is searched
+    private Music music;
     private TextView headline, alarmHint;
     private LinearLayout alarmChip;
 
@@ -112,6 +115,8 @@ public class MainActivity extends Activity implements PackStore.Listener {
             podcastShown = state.getString("podcast");
             scoreShown = state.getString("scoreGroup");
             scoreSub = state.getString("scoreSub");
+            musicShown = state.getString("music");
+            musicWords = state.getString("musicWords", "");
         }
         if (ACTION_SHOW_ALARMS.equals(getIntent().getAction())) tab = TAB_ALARMS;
         buildScreen();
@@ -126,6 +131,8 @@ public class MainActivity extends Activity implements PackStore.Listener {
         out.putString("podcast", podcastShown);
         out.putString("scoreGroup", scoreShown);
         out.putString("scoreSub", scoreSub);
+        out.putString("music", musicShown);
+        out.putString("musicWords", musicWords);
     }
 
     private void askForNotifications() {
@@ -133,7 +140,7 @@ public class MainActivity extends Activity implements PackStore.Listener {
     }
 
     private boolean anyPack() {
-        return !stations.isEmpty() || !podcasts.isEmpty() || !scores.isEmpty();
+        return !stations.isEmpty() || !podcasts.isEmpty() || !scores.isEmpty() || !music.songs.isEmpty();
     }
 
     /** The whole screen for the current station list; called again when packs come or go. */
@@ -148,12 +155,14 @@ public class MainActivity extends Activity implements PackStore.Listener {
         overlay = null;
         podcastList = null;
         scoreList = null;
+        musicList = null;
         miniPodcast = false;
         alarmChip = null;
         scrolledTo = -1;
         stations = PackStore.get(this).stations;
         podcasts = PackStore.get(this).podcasts;
         scores = PackStore.get(this).scores;
+        music = PackStore.get(this).music();
 
         root = new FrameLayout(this);
         root.setBackgroundColor(Ui.NIGHT);
@@ -170,7 +179,8 @@ public class MainActivity extends Activity implements PackStore.Listener {
         titles.setOrientation(low ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL);
         titles.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
         headline = Ui.display(this, getString(tab == TAB_ALARMS ? R.string.tab_alarms : tab == TAB_PODCASTS ? R.string.tab_podcasts
-                : tab == TAB_SCORE ? R.string.tab_score : R.string.app_name), low ? 26 : 34, Ui.TEXT);
+                : tab == TAB_SCORE ? R.string.tab_score : tab == TAB_MUSIC ? R.string.tab_music : R.string.app_name), low ? 26 : 34,
+                Ui.TEXT);
         headline.setIncludeFontPadding(true);
         titles.addView(headline);
         if (tab == TAB_RADIO) {
@@ -202,6 +212,26 @@ public class MainActivity extends Activity implements PackStore.Listener {
         if (tab == TAB_ALARMS) {
             alarms = new AlarmList(this);
             main.addView(alarms, fill);
+        } else if (tab == TAB_MUSIC && anyPack()) {
+            musicList = new MusicList(this, music, musicShown, musicWords, new MusicList.Actions() {
+                @Override
+                public void show(String view) {
+                    musicShown = view;
+                    musicWords = "";
+                    buildScreen();
+                }
+
+                @Override
+                public void searched(String words) {
+                    musicWords = words;
+                }
+
+                @Override
+                public void play(String queue, int index) {
+                    playEpisode(queue, index);
+                }
+            });
+            main.addView(musicList, fill);
         } else if (tab == TAB_SCORE && anyPack()) {
             int at = Catalog.indexOf(scores, scoreShown);
             if (at < 0) scoreShown = scoreSub = null;
@@ -290,7 +320,7 @@ public class MainActivity extends Activity implements PackStore.Listener {
             player.setVisibility(View.GONE);
             root.addView(player);
         }
-        if (!podcasts.isEmpty() || !scores.isEmpty()) {
+        if (!podcasts.isEmpty() || !scores.isEmpty() || !music.songs.isEmpty()) {
             episodePlayer = new EpisodeScreen(this, low, new EpisodeScreen.Actions() {
                 @Override
                 public void close() {
@@ -325,9 +355,24 @@ public class MainActivity extends Activity implements PackStore.Listener {
                 }
 
                 @Override
+                public void shuffle() {
+                    command(RadioService.ACTION_SHUFFLE);
+                }
+
+                @Override
+                public void repeat() {
+                    command(RadioService.ACTION_REPEAT);
+                }
+
+                @Override
                 public void episodes(String name) {
                     openPlayer(false);
-                    if (Catalog.indexOf(scores, name) >= 0) {
+                    if (name.startsWith(Music.PREFIX)) {
+                        tab = TAB_MUSIC;
+                        String list = Music.listOf(name);
+                        musicShown = list.equals(Music.ALL) ? MusicList.SONGS : list.startsWith(Music.SEARCH) ? null : list;
+                        musicWords = list.startsWith(Music.SEARCH) ? list.substring(Music.SEARCH.length()) : "";
+                    } else if (Catalog.indexOf(scores, name) >= 0) {
                         tab = TAB_SCORE;
                         scoreShown = name;
                         scoreSub = service != null && name.equals(service.stationName) ? service.artist : null;
@@ -350,9 +395,10 @@ public class MainActivity extends Activity implements PackStore.Listener {
         getWindow().setNavigationBarColor(playerOpen ? Ui.NIGHT : Ui.SURFACE);
     }
 
-    /** The podcast or score group that is on (playing or paused), or null. */
+    /** The podcast, score group or queue of songs that is on (playing or paused), or null. */
     private Library.Station demandOn() {
         if (service == null || service.state == RadioService.STOPPED || !service.isPodcast()) return null;
+        if (service.isMusic()) return PackStore.get(this).onDemand(service.stationName);
         int i = Catalog.indexOf(podcasts, service.stationName);
         if (i >= 0) return podcasts.get(i);
         i = Catalog.indexOf(scores, service.stationName);
@@ -361,7 +407,8 @@ public class MainActivity extends Activity implements PackStore.Listener {
 
     /** The large player for what is on: the one of the podcasts, else the radio's; null if there is none. */
     private View wantedPlayer() {
-        return demandOn() != null && episodePlayer != null ? episodePlayer : podcastArea() || scoreArea() ? null : player;
+        return demandOn() != null && episodePlayer != null ? episodePlayer : podcastArea() || scoreArea() || musicArea() ? null
+                : player;
     }
 
     private int colorOf(View v) {
@@ -389,6 +436,7 @@ public class MainActivity extends Activity implements PackStore.Listener {
         LinearLayout bar = new LinearLayout(this);
         bar.setBackgroundColor(Ui.SURFACE);
         bar.addView(tabButton(TAB_RADIO, R.drawable.ic_radio, R.string.tab_radio, low), new LinearLayout.LayoutParams(0, dp(low ? 48 : 68), 1f));
+        bar.addView(tabButton(TAB_MUSIC, R.drawable.ic_music, R.string.tab_music, low), new LinearLayout.LayoutParams(0, dp(low ? 48 : 68), 1f));
         bar.addView(tabButton(TAB_PODCASTS, R.drawable.ic_podcast, R.string.tab_podcasts, low), new LinearLayout.LayoutParams(0, dp(low ? 48 : 68), 1f));
         bar.addView(tabButton(TAB_SCORE, R.drawable.ic_score, R.string.tab_score, low), new LinearLayout.LayoutParams(0, dp(low ? 48 : 68), 1f));
         bar.addView(tabButton(TAB_ALARMS, R.drawable.ic_alarm, R.string.tab_alarms, low), new LinearLayout.LayoutParams(0, dp(low ? 48 : 68), 1f));
@@ -403,10 +451,11 @@ public class MainActivity extends Activity implements PackStore.Listener {
         ImageView i = new ImageView(this);
         i.setImageResource(icon);
         i.setColorFilter(on ? Ui.SUN : Ui.MUTED);
-        i.setPadding(dp(18), dp(4), dp(18), dp(4));
+        i.setPadding(dp(16), dp(4), dp(16), dp(4));
         if (on) i.setBackground(Ui.rounded(this, Ui.RAISED, 16));
-        t.addView(i, new LinearLayout.LayoutParams(dp(60), dp(32)));
-        TextView n = Ui.strong(this, getString(label), 12, on ? Ui.TEXT : Ui.MUTED);
+        t.addView(i, new LinearLayout.LayoutParams(dp(56), dp(32)));
+        boolean narrow = getResources().getConfiguration().screenWidthDp < 380;      // five names side by side
+        TextView n = Ui.oneLine(Ui.strong(this, getString(label), narrow ? 11 : 12, on ? Ui.TEXT : Ui.MUTED));
         n.setPadding(low ? dp(6) : 0, low ? 0 : dp(3), 0, 0);
         t.addView(n, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         t.setBackground(Ui.ripple(null, new ColorDrawable(Color.WHITE)));
@@ -428,6 +477,11 @@ public class MainActivity extends Activity implements PackStore.Listener {
     /** Nothing is playing and the podcasts are open: the small player belongs to them, not to the radio. */
     private boolean podcastArea() {
         return tab == TAB_PODCASTS && (service == null || service.state == RadioService.STOPPED);
+    }
+
+    /** Nothing is playing and the songs on demand are open: there is nothing a small player could go on with. */
+    private boolean musicArea() {
+        return tab == TAB_MUSIC && (service == null || service.state == RadioService.STOPPED);
     }
 
     /** Nothing is playing and the score is open: there is nothing a small player could go on with. */
@@ -466,7 +520,7 @@ public class MainActivity extends Activity implements PackStore.Listener {
         miniNext = Ui.icon(this, R.drawable.ic_next, getString(R.string.act_next), 48, Color.WHITE);
         miniNext.setOnClickListener(v -> {
             Library.Station on = demandOn();
-            if (on != null && on.score == null) jump(RadioService.FORWARD_SECONDS);
+            if (on != null && on.score == null && !on.music) jump(RadioService.FORWARD_SECONDS);
             else skip(1);
         });
         line.addView(miniNext, new LinearLayout.LayoutParams(dp(48), dp(48)));
@@ -534,6 +588,13 @@ public class MainActivity extends Activity implements PackStore.Listener {
         if (playerOpen) openPlayer(false);
         else if (tab == TAB_PODCASTS && podcastShown != null) showPodcast(null);
         else if (tab == TAB_SCORE && scoreShown != null) showScore(scoreSub == null ? null : scoreShown, null);
+        else if (tab == TAB_MUSIC && (musicShown != null || !musicWords.isEmpty())) {
+            // from a search back to what it covered; from an artist to the artists; else to the start
+            musicShown = !musicWords.isEmpty() ? musicShown
+                    : musicShown.startsWith(Music.ARTIST) ? MusicList.ARTISTS : null;
+            musicWords = "";
+            buildScreen();
+        }
         else if (tab != TAB_RADIO) showTab(TAB_RADIO);
         else super.onBackPressed();
     }
@@ -696,8 +757,8 @@ public class MainActivity extends Activity implements PackStore.Listener {
     private void toggle() {
         if (service != null && service.state != RadioService.STOPPED) {
             command(RadioService.ACTION_TOGGLE);
-        } else if (tab == TAB_SCORE) {
-            return;                                                                    // a piece is chosen in the list
+        } else if (tab == TAB_SCORE || tab == TAB_MUSIC) {
+            return;                                                                    // a piece or song is chosen in the list
         } else if (tab == TAB_PODCASTS) {                                              // go on with the podcast
             Library.Station p = resumable();
             if (p != null) playEpisode(p.name, Math.max(0, new Heard(this).resumeAt(p)));
@@ -799,25 +860,27 @@ public class MainActivity extends Activity implements PackStore.Listener {
         }
         if (podcastList != null) podcastList.update(service);
         if (scoreList != null) scoreList.update(service);
+        if (musicList != null) musicList.update(service);
         if (stations == null || !anyPack()) return;
         RadioService s = service;
         int state = s == null ? RadioService.STOPPED : s.state;
         boolean active = s != null && state != RadioService.STOPPED;
         boolean playing = active && state == RadioService.PLAYING;
         Library.Station on = demandOn();
-        boolean demand = on != null, pod = demand && on.score == null;
+        boolean demand = on != null, pod = demand && on.score == null && !on.music;
         int cur = active && !demand ? Catalog.indexOf(stations, s.stationName) : -1;
         boolean area = podcastArea();
-        Library.Station st = demand ? on : area ? resumable() : scoreArea() ? null : shownStation();
+        Library.Station st = demand ? on : area ? resumable() : scoreArea() || musicArea() ? null : shownStation();
+        Library.Station look = demand ? on.coverOf(s.episodeIndex()) : st;           // a queue of songs changes its picture
         if (mini != null) {
             mini.setVisibility(st == null ? View.GONE : View.VISIBLE);
             miniNext.setVisibility(area ? View.GONE : View.VISIBLE);
         }
         if (mini != null && st != null) {
-            if (st != miniShown) {
-                miniShown = st;
-                miniLogo.setImageBitmap(Logos.get(st, 128));
-                GradientDrawable bg = Ui.rounded(this, Logos.color(st).tint, 20);
+            if (look != miniShown) {
+                miniShown = look;
+                miniLogo.setImageBitmap(Logos.get(look, 128));
+                GradientDrawable bg = Ui.rounded(this, Logos.color(look).tint, 20);
                 mini.setBackground(Ui.ripple(bg, Ui.rounded(this, Color.WHITE, 20)));
             }
             String name = Ui.nameOf(this, st);

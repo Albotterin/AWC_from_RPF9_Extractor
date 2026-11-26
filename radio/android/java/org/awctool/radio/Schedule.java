@@ -18,7 +18,9 @@ import java.util.zip.CRC32;
  * same times, same crossfades), so that the phone and the PC play the same item at the same second. A station that
  * brings the game's programme rules follows them (setRules): with adverts, news and talk if wanted, else songs and
  * jingles; what comes at which hour is asked of the phone's clock. A station without rules plays its songs shuffled with
- * jingles. Only two songs that follow each other are crossfaded; the seconds of that overlap are part of the timetable.
+ * jingles. How an item hands over to the next is part of the timetable: where the pack has the game's mixing rules
+ * they say by the two categories how early the next one starts and how both are faded; otherwise only two songs that
+ * follow each other are crossfaded. Under the DJ's talk a station with music beds plays one of them (bedOf).
  * voices() says what the DJ says over an item when the listener wants the DJ; that changes nothing in the timetable.
  * Times are UNIX seconds (double), like time.time() in Python.
  */
@@ -88,6 +90,26 @@ public final class Schedule {
         final Set<String> sequence = new HashSet<>();              // categories played in their order
         final Set<String> ads = new HashSet<>();                   // adverts that lie in other categories
         boolean talkRadio;
+        // the game's mixing: category of the item that ends -> category of the next ("": any) -> rows of {weight, move,
+        // fade-out, its shape, start, fade-in, its shape}, times in milliseconds (awc_gamedata.parse_rules); null: none
+        Map<String, Map<String, long[][]>> mix;
+    }
+
+    /** A fade of an item: from second `at` of it, `len` seconds long; shape 0 straight, 1 equal power. */
+    public static final class Fade {
+        public final double at, len;
+        public final int shape;
+
+        Fade(double at, double len, int shape) {
+            this.at = at;
+            this.len = len;
+            this.shape = shape;
+        }
+
+        /** The loudness at `x` of the way from silent (0) to full (1). */
+        double gain(double x) {
+            return shape == 1 ? Math.sin(Math.PI / 2 * x) : x;
+        }
     }
 
     /** One recording of a category and its kind. */
@@ -133,6 +155,8 @@ public final class Schedule {
         public final double[] partStart;
         public final String[] partTitle, partArtist;
         public Window intro, outro;       // the DJ's windows over a song, or null
+        public double cue;                // second of a song at which it is cued in (the silence before it)
+        public boolean bed;               // talk of the DJ that gets a music bed under it
 
         public Track(String key, String title, String artist, double sec) {
             this(key, title, artist, sec, null, null, null);
@@ -165,15 +189,16 @@ public final class Schedule {
         }
     }
 
-    /** One entry of the programme. [start, end) is when its audio is on air; it fades in for fadeIn seconds after
-     *  start and fades out for fadeOut seconds before end (the next item starts when the fade-out begins). */
+    /** One entry of the programme. [start, end) is when its audio is on air; fadeIn and fadeOut say how it comes in
+     *  and goes (null: at full volume). The next item may start before that end or a little after it. */
     public static final class Item {
-        public final double start, end, fadeIn, fadeOut;
+        public final double start, end;
+        public final Fade fadeIn, fadeOut;
         public final String kind;                       // SONG, JINGLE, AD, NEWS or TALK
         public final boolean jingle, ad;
         public final Track track;
 
-        Item(double start, double end, String kind, Track track, double fadeIn, double fadeOut) {
+        Item(double start, double end, String kind, Track track, Fade fadeIn, Fade fadeOut) {
             this.start = start;
             this.end = end;
             this.kind = kind;
@@ -189,14 +214,16 @@ public final class Schedule {
         final double[] starts;
         final String[] kinds;
         final Track[] tracks;
-        final double[] fadeIn, fadeOut;
+        final Fade[] fadeIn, fadeOut;
+        final double[] play;                              // seconds on air
 
         Day(int n) {
             starts = new double[n];
             kinds = new String[n];
             tracks = new Track[n];
-            fadeIn = new double[n];
-            fadeOut = new double[n];
+            fadeIn = new Fade[n];
+            fadeOut = new Fade[n];
+            play = new double[n];
         }
     }
 
@@ -205,28 +232,56 @@ public final class Schedule {
         final List<Double> starts = new ArrayList<>();
         final List<String> kinds = new ArrayList<>();
         final List<Track> tracks = new ArrayList<>();
-        final List<Double> fin = new ArrayList<>();
-        final List<Double> fout = new ArrayList<>();
+        final List<Fade> fin = new ArrayList<>();
+        final List<Fade> fout = new ArrayList<>();
+        final List<Double> plays = new ArrayList<>();
 
-        /** Put an item behind the last one; false when it would start after the day. */
-        boolean add(String kind, Track tr) {
+        /** Put an item behind the last one; false when it would start after the day (see _add in awc_radio.py). */
+        boolean add(String kind, Track tr, int d, String beforeCategory, String category) {
             double sec = Math.max(1.0, tr.sec);
-            double ov = 0.0, start = 0.0;
+            double start = 0.0;
+            Fade fadeIn = null;
             if (!starts.isEmpty()) {
                 int last = starts.size() - 1;
-                double before = Math.max(1.0, tracks.get(last).sec);
-                if (SONG.equals(kind) && SONG.equals(kinds.get(last)) && !talk) {   // crossfade only from song to song
-                    ov = Math.min(fade, Math.min(0.25 * before, 0.25 * sec));
+                double before = plays.get(last);
+                double began = starts.get(last);
+                start = began + before;
+                double play = before;
+                Fade fadeOut = null;
+                if (rules != null && rules.mix != null) {
+                    long[] v = mixing(d, starts.size(), beforeCategory, category);
+                    if (v != null) {
+                        long move = v[1], outMs = v[2], startMs = v[4], inMs = v[5];
+                        double end = began + Math.max(0.5 * before, before + move / 1000.0);
+                        double cue = tr.cue;
+                        // never more than half of either item over the other, and never before the one that ends began
+                        double lead = Math.max(startMs / 1000.0, -0.5 * sec);
+                        start = Math.max(end + lead - cue, began + Math.max(1.0, 0.5 * before));
+                        play = end - began;
+                        if (outMs > 0) {
+                            double length = Math.min(outMs / 1000.0, play);
+                            fadeOut = new Fade(play - length, length, (int) v[3]);
+                        }
+                        if (inMs > 0) fadeIn = new Fade(cue, Math.min(inMs / 1000.0, 0.5 * sec), (int) v[6]);
+                    }
+                } else if (SONG.equals(kind) && SONG.equals(kinds.get(last)) && !talk) {   // crossfade song to song
+                    double overlap = Math.min(fade, Math.min(0.25 * before, 0.25 * sec));
+                    if (overlap > 0) {
+                        start = began + before - overlap;
+                        fadeOut = new Fade(before - overlap, overlap, 1);
+                        fadeIn = new Fade(0.0, overlap, 1);
+                    }
                 }
-                start = starts.get(last) + before - ov;
                 if (start >= DAY) return false;
-                fout.set(last, ov);
+                fout.set(last, fadeOut);
+                plays.set(last, play);
             }
             starts.add(start);
             kinds.add(kind);
             tracks.add(tr);
-            fin.add(ov);
-            fout.add(0.0);
+            fin.add(fadeIn);
+            fout.add(null);
+            plays.add(sec);
             return true;
         }
 
@@ -238,6 +293,7 @@ public final class Schedule {
                 out.tracks[i] = tracks.get(i);
                 out.fadeIn[i] = fin.get(i);
                 out.fadeOut[i] = fout.get(i);
+                out.play[i] = plays.get(i);
             }
             return out;
         }
@@ -257,6 +313,34 @@ public final class Schedule {
     private final Set<String> passed = new HashSet<>();   // kinds that are stepped over
     private final Set<String> hosted = new HashSet<>();   // songs of a night show: it has a host of its own
     private String zone = "";                             // the time zone the days were calculated for
+    private List<Track> beds = Collections.emptyList();   // the music that lies under the DJ's talk
+
+    void setBeds(List<Track> music) {
+        beds = sorted(music);
+    }
+
+    /** The music bed under an item of itemsFrom(), or null. The same for everybody at the same second. */
+    public Track bedOf(Item item) {
+        if (beds.isEmpty() || !item.track.bed || !(TALK.equals(item.kind) || JINGLE.equals(item.kind))) return null;
+        return beds.get((int) (h(name, "bed", (long) item.start, item.track.key) % beds.size()));
+    }
+
+    /** The row of the mixing rules for the end of a `before` item and an `after` item, or null. */
+    private long[] mixing(int d, int step, String before, String after) {
+        Map<String, long[][]> by = rules.mix.get(before);
+        if (by == null) return null;
+        long[][] found = by.get(after);
+        if (found == null) found = by.get("");
+        if (found == null || found.length == 0) return null;
+        long total = 0;
+        for (long[] v : found) total += v[0];
+        long at = h(name, d, "mix", step) % total;
+        for (long[] v : found) {
+            at -= v[0];
+            if (at < 0) return v;
+        }
+        return found[found.length - 1];
+    }
 
     public Schedule(String name, List<Track> songs, List<Track> jingles) {
         this(name, songs, jingles, FADE, false);
@@ -344,7 +428,8 @@ public final class Schedule {
         Window window = tr.intro;
         if (window != null && h % 100 < DJ_INTRO) {
             Track line = window.lines.get((int) ((h >> 8) % window.lines.size()));
-            if (window.from >= item.fadeIn && window.from + line.sec <= length) out.add(new Voice(window.from, line));
+            double in = item.fadeIn == null ? 0.0 : item.fadeIn.at + item.fadeIn.len;
+            if (window.from >= in && window.from + line.sec <= length) out.add(new Voice(window.from, line));
         }
         window = tr.outro;
         if (window != null) {
@@ -443,7 +528,7 @@ public final class Schedule {
                 count++;
                 kind = SONG;
             }
-            if (!day.add(kind, tr)) return day.done();
+            if (!day.add(kind, tr, d, "", "")) return day.done();
         }
     }
 
@@ -510,6 +595,7 @@ public final class Schedule {
         Map<String, ArrayList<String>> recent = new HashMap<>();
         Map<String, Long> place = new HashMap<>();
         String current = "", previous = "";
+        String aired = "";                                        // the category of the last item that went on air
         int run = 0, step = 0, stepped = 0;
         double now = 0.0;
         while (!pools.isEmpty()) {
@@ -543,9 +629,10 @@ public final class Schedule {
                 stepped++;
             } else {
                 stepped = 0;
-                if (!day.add(chosen.kind, chosen.track)) break;
+                if (!day.add(chosen.kind, chosen.track, d, aired, category)) break;
                 now = day.starts.get(day.starts.size() - 1) + Math.max(1.0, chosen.track.sec);
                 previous = chosen.track.key;
+                aired = category;
                 if (now >= DAY) break;
             }
             run = category.equals(current) ? run + 1 : 1;
@@ -576,7 +663,7 @@ public final class Schedule {
                 day = day(d);
             }
             Track tr = day.tracks[i];
-            double end = Math.min(day.starts[i] + Math.max(1.0, tr.sec), DAY);
+            double end = Math.min(day.starts[i] + day.play[i], DAY);
             out.add(new Item(d * DAY + day.starts[i], d * DAY + end, day.kinds[i], tr, day.fadeIn[i], day.fadeOut[i]));
             i++;
         }

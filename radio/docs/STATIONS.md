@@ -78,6 +78,49 @@ in the game) are not used.
 The news bulletins lie in track lists of the category `news` that belong to no station (a list of lists with 46 and 84
 entries in the sample archive). A station plays them when its rules name the category.
 
+## Mixing
+
+How one item hands over to the next. Behind a station object's track lists stand a count and pairs of (category,
+reference): the **category of the item that ends**. The reference leads to
+
+| Object type | What it is |
+|---|---|
+| 22 | a mixing rule |
+| 23 | a rule per **category of the item that follows**: count at +8, pairs (category, reference) from +12 |
+| 3 | a weighted choice: count in byte +7 (0xFF: u32 at +12), then pairs (reference, f32 weight) |
+| 31 | rows (reference, number of conditions, conditions); a condition of type 197 holds at +8 what counts while the game has set nothing |
+
+A **mixing rule** (252 bytes), all times in milliseconds:
+
+| Offset | Meaning |
+|---|---|
+| +12 | i32, 0 or negative: the ending item's end is moved earlier |
+| +20 | i32, length of its fade-out |
+| +24 | shape of the fade-out (a name: `linear_fall`, `equal_power_fall`) |
+| +28 | i32, when the following item starts, relative to that end (negative: before it) |
+| +32 | i32, length of its fade-in |
+| +36 | shape of the fade-in (`linear_rise`, `equal_power_rise`) |
+| +40, +144 | two blocks of 104 bytes with filter settings (low-pass sweeps in a few rules); not used here |
+
+Song banks carry marker events: `dj` (the DJ's two windows), `intro` (about where the sound begins: the cue-in point) and
+`outro` (a few seconds before the end).
+
+This program counts the times from the **end of the recording**, lets the `intro` marker of a following song land on the
+start time, and never lays more than half of either item over the other. The talk stations name no mixing rules.
+
+## Music beds
+
+16 music stations have a track list of the category `music_bed`: short pieces of music, made to repeat. No programme rule
+asks for them. This program lays one under the DJ's talk (categories `dj_banter…`, `showintro…`, `showoutro…`) when the
+recording's quiet moments lie below -40 dB, that is, when it brings no sound of its own; 12 dB below the talk. Which bed
+is a hash of station and time, the same on PC and phone.
+
+## Recordings recognised by their sound
+
+A few recordings have neither a station nor a name in the game's files. `awc_album.py` notes by their stream numbers which
+songs they are (four of Overmono for the soundtrack album, Augustus Pablo's *Ras Menilik Congo (Harp)* on Radio On-U);
+this was found by comparing their sound with public 30 second previews.
+
 ## Places with music
 
 Station objects that are no radio station give lifts, lobbies, a minigolf course and other places their music. Their

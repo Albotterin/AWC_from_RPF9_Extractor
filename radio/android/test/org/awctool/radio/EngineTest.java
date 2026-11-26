@@ -41,8 +41,14 @@ public class EngineTest {
             return failAfterStart >= 0 && started && clock.t - startClock >= failAfterStart;
         }
 
+        boolean looping;
+
         public boolean isFinished() {
-            return started && startPos + (clock.t - startClock) >= track.sec - finishEarlyBy;
+            return !looping && started && startPos + (clock.t - startClock) >= track.sec - finishEarlyBy;
+        }
+
+        public void loop() {
+            looping = true;
         }
 
         public void startAt(double pos, float v) {
@@ -164,7 +170,8 @@ public class EngineTest {
             if (b.start % 86400 == 0) continue;                              // the new day
             boolean songs = !a.jingle && !a.ad && !b.jingle && !b.ad && !talk;
             double want = songs ? Math.min(fade, Math.min(a.track.sec, b.track.sec) / 4) : 0;
-            check(Math.abs(b.fadeIn - want) < 1e-6 && Math.abs(a.fadeOut - want) < 1e-6, "fade " + b.fadeIn + " instead of " + want);
+            double in = b.fadeIn == null ? 0 : b.fadeIn.len, out = a.fadeOut == null ? 0 : a.fadeOut.len;
+            check(Math.abs(in - want) < 1e-6 && Math.abs(out - want) < 1e-6, "fade " + in + " instead of " + want);
             check(Math.abs(b.start - (a.start + a.track.sec - want)) < 1e-6, "start of the next item");
             if (want > 0) faded++;
             else plain++;
@@ -210,7 +217,7 @@ public class EngineTest {
                 }
                 if (match == null) {
                     StringBuilder dbg = new StringBuilder();
-                    for (Schedule.Item it : sch.itemsFrom(now - 500, 60)) if (it.track.key.equals(f.track.key)) dbg.append(String.format(" [%.2f..%.2f fi=%.2f fo=%.2f]", it.start - now, it.end - now, it.fadeIn, it.fadeOut));
+                    for (Schedule.Item it : sch.itemsFrom(now - 500, 60)) if (it.track.key.equals(f.track.key)) dbg.append(String.format(" [%.2f..%.2f]", it.start - now, it.end - now));
                     dbg.append(" | player started at clock " + (f.startClock - now) + " pos " + f.startPos + " sec " + f.track.sec);
                     check(false, label + ": a player of " + f.track.key + " is still playing at +0 but items (relative to now) are:" + dbg);
                 }
@@ -229,9 +236,9 @@ public class EngineTest {
             if (strictAudible && now - start > 2.0) {
                 check(audible >= 1, label + ": silence at " + now);
                 // equal-power crossfade: the summed energy stays close to 1 (within the sampling of the 50 ms tick)
-                if (audible == 2 && older.fadeOut > 0) check(energy > 0.85 && energy < 1.15, label + ": crossfade energy " + energy + " at " + now);
+                if (audible == 2 && older.fadeOut != null) check(energy > 0.85 && energy < 1.15, label + ": crossfade energy " + energy + " at " + now);
                 // without a crossfade two items only touch: the next one starts a moment early
-                if (audible == 2 && older.fadeOut == 0) check(older.end - now <= Engine.START_COMPENSATION + 1e-6, label + ": overlap without a fade at " + now);
+                if (audible == 2 && older.fadeOut == null) check(older.end - now <= Engine.START_COMPENSATION + 1e-6, label + ": overlap without a fade at " + now);
             }
             check(eng.openPlayers() <= 4, label + ": too many players " + eng.openPlayers());
             clock.t += delay / 1000.0;
@@ -248,10 +255,112 @@ public class EngineTest {
         System.out.println(String.format("  %-34s ok  (%d players created, max %d at once, %.0f h simulated)", label, all.size(), maxPlayers, seconds / 3600));
     }
 
+    /** A station mixed as in the game: songs, idents and DJ talk that overlap as its rows say, music under the talk. */
+    static void mixed(double start, double seconds) {
+        Random r = new Random(3);
+        Schedule.Rules rules = new Schedule.Rules();
+        rules.table.put("", List.of(new Schedule.Row("music", new Schedule.Factor[0])));
+        rules.table.put("music", List.of(new Schedule.Row("ident", new Schedule.Factor[0]), new Schedule.Row("dj_banter", new Schedule.Factor[0])));
+        rules.table.put("ident", List.of(new Schedule.Row("music", new Schedule.Factor[0])));
+        rules.table.put("dj_banter", List.of(new Schedule.Row("music", new Schedule.Factor[0])));
+        rules.mix = new HashMap<>();
+        rules.mix.put("music", Map.of("ident", new long[][]{{1000, 0, 1000, 0, -1500, 1500, 0}},
+                "dj_banter", new long[][]{{1000, 0, 1500, 0, -1500, 1500, 1}, {500, 0, 0, 0, -1000, 0, 0}}));
+        rules.mix.put("ident", Map.of("music", new long[][]{{1000, 0, 0, 0, -3000, 1000, 0}}));
+        rules.mix.put("dj_banter", Map.of("", new long[][]{{1000, -500, 500, 1, -1000, 0, 0}, {1000, 0, 0, 0, 800, 0, 0}}));
+        Map<String, Schedule.Track> tracks = new HashMap<>();
+        List<Schedule.Track> songs = new ArrayList<>(), beds = new ArrayList<>();
+        List<String> music = new ArrayList<>(), idents = new ArrayList<>(), talk = new ArrayList<>();
+        for (int i = 0; i < 14; i++) {
+            Schedule.Track t = new Schedule.Track((1000 + i) + "_0", "s" + i, "a", 100 + r.nextInt(60) + r.nextDouble());
+            t.cue = i % 3 == 0 ? 0.0 : 0.75;
+            songs.add(t);
+            tracks.put(t.key, t);
+            music.add(t.key);
+        }
+        for (int i = 0; i < 5; i++) {
+            Schedule.Track t = new Schedule.Track((9000 + i) + "_0", "", "", 4 + r.nextInt(8) + r.nextDouble());
+            tracks.put(t.key, t);
+            idents.add(t.key);
+        }
+        for (int i = 0; i < 6; i++) {
+            Schedule.Track t = new Schedule.Track((4000 + i) + "_0", "", "", 28 + r.nextInt(20) + r.nextDouble());
+            t.bed = i < 4;
+            tracks.put(t.key, t);
+            talk.add(t.key);
+        }
+        for (int i = 0; i < 3; i++) beds.add(new Schedule.Track((8000 + i) + "_0", "", "", 11 + i + 0.5));
+        rules.pools.put("music", music);
+        rules.pools.put("ident", idents);
+        rules.pools.put("dj_banter", talk);
+        Schedule sch = new Schedule("Mixed FM", songs, new ArrayList<>(), 3, false);
+        sch.setRules(rules, tracks, new ArrayList<>(), true);
+        sch.setBeds(beds);
+
+        List<Schedule.Item> items = sch.itemsFrom(start, 200);
+        int overlaps = 0, gaps = 0, bedded = 0;
+        for (int i = 1; i < items.size(); i++) {
+            Schedule.Item a1 = items.get(i - 1), b1 = items.get(i);
+            if (b1.start % 86400 == 0) continue;
+            if (b1.start < a1.end - 0.05) overlaps++;
+            if (b1.start > a1.end + 0.05) gaps++;
+            check(b1.start >= a1.start + Math.max(1.0, 0.5 * (a1.end - a1.start)) - 1e-6, "mixed: an item starts too early");
+            if (sch.bedOf(b1) != null) bedded++;
+        }
+        check(overlaps > 60 && gaps > 0 && bedded > 10, "mixed: overlaps " + overlaps + ", gaps " + gaps + ", beds " + bedded);
+
+        FakeClock clock = new FakeClock();
+        clock.t = start;
+        List<Fake> all = new ArrayList<>();
+        Engine eng = new Engine(sch, clock, track -> {
+            Fake f = new Fake(track, clock, 0.15);
+            all.add(f);
+            return f;
+        });
+        int both = 0, under = 0;
+        while (clock.t < start + seconds) {
+            long delay = eng.tick();
+            double now = clock.t;
+            check(eng.openPlayers() <= 4 && eng.openBeds() <= 4, "mixed: players " + eng.openPlayers() + " + " + eng.openBeds());
+            int sounding = 0;
+            for (Schedule.Item it : sch.itemsFrom(now - 200, 40)) {
+                if (now < it.start + 0.3 || now > it.end - 0.15 || it.start < start + 1) continue;     // (a file starts a moment early)
+                Schedule.Track bed = sch.bedOf(it);
+                Fake main = null, music2 = null;
+                for (Fake f : all) {
+                    if (!f.started || f.released) continue;
+                    if (f.track == it.track) main = f;
+                    if (f.track == bed) music2 = f;
+                }
+                check(main != null, "mixed: " + it.track.key + " is silent at " + (now - it.start));
+                check(Math.abs(main.vol - Engine.volume(it, now, 1f)) < 1e-6, "mixed: volume " + main.vol);
+                check(Math.abs(main.position() - (now - it.start)) < 0.35, "mixed: drift " + (main.position() - (now - it.start)));
+                sounding++;
+                if (bed != null && now - it.start < it.track.sec - 0.5) {
+                    check(music2 != null && music2.looping, "mixed: no music under " + it.track.key + " at " + (now - it.start));
+                    check(Math.abs(music2.vol - Engine.bedVolume(it, now, 1f)) < 1e-6, "mixed: bed volume " + music2.vol);
+                    check(music2.vol <= Engine.DUCK + 1e-6, "mixed: the bed is too loud");
+                    double off = (music2.position() - (now - it.start)) % bed.sec;
+                    check(Math.min(Math.abs(off), bed.sec - Math.abs(off)) < 0.35, "mixed: bed out of step " + off);
+                    under++;
+                }
+            }
+            if (sounding == 2) both++;
+            clock.t += delay / 1000.0;
+        }
+        eng.stop();
+        for (Fake f : all) check(f.released, "mixed: player of " + f.track.key + " leaked");
+        check(both > 200 && under > 200, "mixed: two at once in " + both + " ticks, beds in " + under);
+        System.out.println(String.format("  %-34s ok  (%d players, %d ticks with two items, %d with a bed)", "mixed as in the game",
+                all.size(), both, under));
+    }
+
     public static void main(String[] a) {
         Schedule sch = station("Test FM", 14, 5, 11);
         Random rnd = new Random(5);
         System.out.println("Engine simulation tests");
+        mixed(1_700_000_000.0, 3 * 3600);
+        mixed(86400.0 * 19700 - 900, 1800);                 // across midnight UTC
 
         // 1) normal running from many start times, including right inside crossfades and across midnight UTC
         run("normal run, start 0", sch, 1_700_000_000.0, 3 * 3600, null, true);

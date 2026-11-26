@@ -698,6 +698,13 @@ def build_news(items, waves):
 T_ROOT, T_RULES = 30, 31
 F_BRANCH, F_CONST, F_COUNT, F_SINCE, F_CONST2, F_HOUR, F_CHOICE = 5, 33, 35, 36, 38, 39, 49
 CURVE_POINTS, CURVE_TABLE = 4, 6
+# The mixing rules: the station names for every category whose item ends how the following one comes in - one rule for
+# any follower, or one per category of the follower. Such a rule (TYPE_MIX) holds for the item that ends: seconds its
+# end is moved forward, the length of its fade-out and the shape of that fade; and for the item that follows: when it
+# starts (seconds before the end), the length of its fade-in and its shape. Instead of one rule there can be a weighted
+# list (TYPE_LIST_OF_LISTS' neighbour, type 3) or rows with conditions (T_RULES).
+TYPE_WEIGHTED, TYPE_MIX, TYPE_MIX_BY_NEXT, F_VARIABLE = 3, 22, 23, 197
+EQUAL_POWER = (joaat("equal_power_rise"), joaat("equal_power_fall"))     # every other shape counts as straight
 
 
 def _objects(data):
@@ -730,7 +737,10 @@ def _curve(d):
 
 def parse_rules(files):
     """-> {station hash: {"table": {category after which, or "": [[next category, [factor, ...]], ...]},
-    "history": {category: how many of its items do not come back}, "sequence": [categories played in their order]}}.
+    "history": {category: how many of its items do not come back}, "sequence": [categories played in their order],
+    "mix": {category of the item that ends: {category of the one that follows, or "": [[weight, move, fade, shape,
+    start, fade, shape], ...]}}}}. The numbers of a mix are milliseconds: move <= 0 ends the item early, start < 0 lets
+    the follower begin before that end; a shape is 0 (straight) or 1 (equal power).
 
     A factor is a number or ["s" since | "c" count | "h" hour, category ("" for the hour), curve]."""
     metas, game = _game_file(files)
@@ -788,6 +798,73 @@ def parse_rules(files):
             o += 8 + 4 * n
         return out
 
+    def variants(ref, depth=0):
+        """[(weight, mixing rule)] behind a reference."""
+        d = game.follow(ref) if ref != NONE else None
+        if not d or depth > 4:
+            return []
+        if d[0] == TYPE_MIX and len(d) >= 40:
+            return [(1.0, d)]
+        if d[0] == TYPE_WEIGHTED and len(d) >= 8:
+            count, base = (_u32(d, 12), 16) if d[7] == 0xFF else (d[7], 8)
+            found = []
+            for k in range(min(count, (len(d) - base) // 8)):
+                x, weight = struct.unpack_from("<If", d, base + 8 * k)
+                found += [(weight * w, rule) for w, rule in variants(x, depth + 1)]
+            return found
+        if d[0] == T_RULES:                                     # rows: (what, number of conditions, conditions)
+            found, o = [], 8
+            while o + 8 <= len(d):
+                x, n = _u32(d, o), _u32(d, o + 4)
+                if n > 16 or o + 8 + 4 * n > len(d):
+                    break
+                weight = 1.0
+                for k in range(n):
+                    c = game.follow(_u32(d, o + 8 + 4 * k))
+                    if c and c[0] == F_VARIABLE and len(c) >= 12:       # what counts while the game has set nothing
+                        weight *= struct.unpack_from("<f", c, 8)[0]
+                    else:
+                        value = factor(_u32(d, o + 8 + 4 * k))
+                        weight *= value if not isinstance(value, list) else 1.0
+                if weight > 0:
+                    found += [(weight * w, rule) for w, rule in variants(x, depth + 1)]
+                o += 8 + 4 * n
+            return found
+        return []
+
+    def mixes(ref):
+        """[[weight, move, fade, shape, start, fade, shape]] of a reference, equal rules put together."""
+        found = {}
+        for weight, d in variants(ref):
+            move, _x, fade_out, shape_out, start, fade_in, shape_in = struct.unpack_from("<iiiiiii", d, 12)
+            values = (min(0, max(-60000, move)), max(0, min(60000, fade_out)), int(game.hash_at(shape_out) in EQUAL_POWER),
+                      max(-60000, min(60000, start)), max(0, min(60000, fade_in)), int(game.hash_at(shape_in) in EQUAL_POWER))
+            found[values] = found.get(values, 0.0) + weight
+        return [[int(round(w * 1000))] + list(v) for v, w in found.items() if w >= 0.0005]
+
+    def mix_table(d):
+        """The mixing rules of a station object: they follow behind its track lists, one entry per category."""
+        out = {}
+        p = 64 + 12 * _u32(d, 60)
+        if p + 4 > len(d):
+            return out
+        for k in range(min(_u32(d, p), (len(d) - p - 4) // 8)):
+            name, ref = _u32(d, p + 4 + 8 * k), _u32(d, p + 8 + 8 * k)
+            target = game.follow(ref) if name != NONE and ref != NONE else None
+            if not target:
+                continue
+            if target[0] == TYPE_MIX_BY_NEXT and len(target) >= 12:
+                by = {}
+                for i in range(min(_u32(target, 8), (len(target) - 12) // 8)):
+                    found = mixes(_u32(target, 16 + 8 * i))
+                    if found:
+                        by[category(_u32(target, 12 + 8 * i))] = found
+            else:
+                by = {"": mixes(ref)} if mixes(ref) else {}
+            if by:
+                out[category(name)] = by
+        return out
+
     out = {}
     for h in game.index:
         d = game.get(h)
@@ -810,7 +887,7 @@ def parse_rules(files):
                     history[category(ref)] = n
                 elif mode == 1:
                     sequence.append(category(ref))
-        out[h] = {"table": table, "history": history, "sequence": sequence}
+        out[h] = {"table": table, "history": history, "sequence": sequence, "mix": mix_table(d)}
     return out
 
 
@@ -824,7 +901,7 @@ def read_rules(path):
 
 def tracks_of(st):
     """Every recording a station can put on air (not the DJ's lines, see awc_dj.station_lines)."""
-    return st.get("songs", []) + st.get("jingles", []) + st.get("talk", []) + st.get("ads", [])
+    return st.get("songs", []) + st.get("jingles", []) + st.get("talk", []) + st.get("ads", []) + st.get("beds", [])
 
 
 def has_programme(rules):
@@ -840,9 +917,15 @@ def _ruled_station(h, lists, banks, adverts, station, songs, found, cfg_names, s
     used = {follower for rows in rules["table"].values() for follower, _f in rows}
     st = {"songs": [], "jingles": [], "talk": [], "ads": []}
     pools, kept, flagged = {}, {}, []                      # kept: recording -> its key in the lists
+    beds = {}
     for lst in lists:
         for tr in lst:
             category = tr.kind
+            if category == "music_bed":
+                hit = banks.find(h, tr.wave)
+                if hit:
+                    beds.setdefault("%s_%s" % (hit[0]["base"], hit[1]["i"]), _track(*hit))
+                continue
             if category not in used or category == "news":        # what no rule ever asks for is never heard
                 continue
             hit = banks.find(h, tr.wave)
@@ -886,6 +969,8 @@ def _ruled_station(h, lists, banks, adverts, station, songs, found, cfg_names, s
         rules["talkradio"] = True
     st = {k: v for k, v in st.items() if v or k in ("songs", "jingles")}
     st["rules"] = rules
+    if beds and not talk_radio:
+        st["beds"] = list(beds.values())
     if "news" in used:
         st["news"] = True
     return st
