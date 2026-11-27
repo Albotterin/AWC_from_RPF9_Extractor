@@ -85,7 +85,7 @@ python radio/awc_radio.py        # das Radio
 
 ## 📱 Die AWC-Radio-App für Android
 
-Das Radio für die Hosentasche, fürs Auto und für den Nachttisch. **`AWC-Radio.apk`** (Version 1.21; Version 1.19 wurde auf einem echten Android-Handy getestet) spielt dasselbe
+Das Radio für die Hosentasche, fürs Auto und für den Nachttisch. **`AWC-Radio.apk`** (Version 1.21, auf einem echten Android-Handy getestet) spielt dasselbe
 Live-Programm wie der PC: gleiche Uhr, gleiche Reihenfolge, gleiche Übergänge – mit Sender-Packs derselben Version
 spielen Handy und PC zur selben Zeit dasselbe.
 
@@ -144,7 +144,7 @@ Stand **2026-11-27** (v2.15.0), gemessen an einer 28,5 GB großen `audio.rpf`.
 | Podcasts | alle 5, die die Credits nennen, mit 20 Folgen samt Titeln (3 Std. 36 Min.), in der App und am PC | ✅ |
 | Score | 2.543 Stücke (rund 33 Std.) und 113 Aufnahmen von Orten (4,8 Std.), im Extractor in einem eigenen Ordner; 1.078 ab 30 Sekunden (31 Std.) kommen in die App-Packs | ✅ |
 | Titel aus `data.rpf` | 839 der 865 Titel-Nummern, die die Aufnahmen tragen, haben in der Tabelle des Spiels Titel und Interpret | ✅ |
-| Android-App | Version 1.21: Radio, On-Demand, Podcasts, Score mit Suche, DJ, Inhalts-Schalter, Radiowecker, Widgets, Update-Prüfung, Android Auto; Version 1.19 lief auf einem echten Android-Handy, 1.21 ist dort noch nicht erprobt | ✅ |
+| Android-App | Version 1.21: Radio, On-Demand, Podcasts, Score mit Suche, DJ, Inhalts-Schalter, Radiowecker, Widgets, Update-Prüfung, Android Auto; läuft auf einem echten Android-Handy | ✅ |
 | The Vault Radio | läuft als ein langer Mix; 23 seiner 24 gelisteten Songs sind als Teile darin benannt | 🎚 |
 
 ![AWC Radio – Fortschritt der Sender](radio/docs/radio-progress.svg)
@@ -178,7 +178,7 @@ Details zu jedem Sender: [Fortschritt des Radios](radio/docs/RADIO-PROGRESS.de.m
 - [x] Die Android-App läuft auf einem echten Handy
 - [x] Score und DJ der App sind auf einem echten Handy getestet
 - [x] App 1.19 läuft auf einem echten Handy
-- [ ] App 1.21 (Score-Suche, Updates durch die App, Gesprochenes ohne Blende) ist noch nicht auf einem echten Handy getestet
+- [x] App 1.21 läuft auf einem echten Handy (Score-Suche, Updates durch die App, Gesprochenes ohne Blende)
 - [ ] Extractor: nur Opus; das RPF9-Inhaltsverzeichnis wird nicht gelesen, es gibt also keine Dateinamen
 
 ### Meilensteine

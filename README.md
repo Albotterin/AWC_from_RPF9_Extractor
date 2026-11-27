@@ -83,8 +83,8 @@ python radio/awc_radio.py        # the radio
 
 ## 📱 AWC Radio app for Android
 
-The radio for your pocket, your car and your bedside. **`AWC-Radio.apk`** (version 1.21; version 1.19 was tested on a
-real Android phone) plays the same live programme as
+The radio for your pocket, your car and your bedside. **`AWC-Radio.apk`** (version 1.21, tested on a real
+Android phone) plays the same live programme as
 the PC: same clock, same order, same transitions – with station packs from the same version, phone and PC play the same
 at the same time.
 
@@ -143,7 +143,7 @@ Status **2026-11-27** (v2.15.0), measured with a 28.5 GB `audio.rpf`.
 | Podcasts | all 5 the credits name, with 20 episodes and their titles (3 h 36 min), in the app and on the PC | ✅ |
 | Score | 2,543 pieces (about 33 h) and 113 recordings of places (4.8 h), a folder of their own in the extractor; 1,078 of at least 30 seconds (31 h) go into the app packs | ✅ |
 | Titles from `data.rpf` | 839 of the 865 track numbers the recordings carry have a title and artist in the game's own table | ✅ |
-| Android app | version 1.21: radio, On-Demand, podcasts, score with search, DJ, content switches, radio alarm, widgets, update check, Android Auto; version 1.19 ran on a real Android phone, 1.21 is not yet tried on one | ✅ |
+| Android app | version 1.21: radio, On-Demand, podcasts, score with search, DJ, content switches, radio alarm, widgets, update check, Android Auto; it runs on a real Android phone | ✅ |
 | The Vault Radio | plays as one long mix; 23 of its 24 listed songs are named as parts of it | 🎚 |
 
 ![AWC Radio – station progress](radio/docs/radio-progress.svg)
@@ -176,7 +176,7 @@ Details for every station: [radio progress](radio/docs/RADIO-PROGRESS.md).
 - [x] The Android app runs on a real phone
 - [x] Score and DJ in the app are tested on a real phone
 - [x] App 1.19 runs on a real phone
-- [ ] App 1.21 (score search, updates installed by the app, speech not faded) is not yet tested on a real phone
+- [x] App 1.21 runs on a real phone (score search, updates installed by the app, speech not faded)
 - [ ] Extractor: Opus only; the RPF9 table of contents is not read, so there are no file names
 
 ### Milestones
