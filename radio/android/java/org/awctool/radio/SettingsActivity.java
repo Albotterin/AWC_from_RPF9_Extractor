@@ -58,12 +58,14 @@ public class SettingsActivity extends Activity implements PackStore.Listener {
     protected void onStart() {
         super.onStart();
         PackStore.addListener(this);
+        Installer.attach(this);
         update();
     }
 
     @Override
     protected void onStop() {
         PackStore.removeListener(this);
+        Installer.detach(this);
         super.onStop();
     }
 

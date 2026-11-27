@@ -662,6 +662,11 @@ def _h(*parts):
     return zlib.crc32("|".join(str(p) for p in parts).encode("utf-8"))
 
 
+def is_speech(category, kind):
+    """Somebody talks: such an item is never faded. (The other items besides songs are jingles.)"""
+    return kind in ("talk", "ad", "news") or category.startswith(("dj_banter", "show"))
+
+
 def switches_of(category, kind, talk_radio):
     """The switches an item of this category and kind needs, all of them, to go on air; "song" and "show" are always on.
     The DJ coming back from the adverts or the news needs the break itself as well."""
@@ -690,6 +695,10 @@ class Schedule:
     (rules["mix"]): by the category of the item that ends and of the one that follows, the first may end a little early
     and fade out, the second starts before that end and may fade in; a song is placed so that its cue-in point
     (track["cue"]) lands there. Where the rules say nothing, items follow back to back.
+
+    Only music is faded, though: what is spoken (see is_speech) never is, and a jingle only where it meets something
+    spoken or another jingle, not where it meets a song. Instead a song steps back while something is said over it, see
+    talk_over().
 
     Without them two songs that follow each other overlap by `fade` seconds (a crossfade like on a real radio) and
     nothing else does; listeners then hear the same only with the same crossfade (standard: FADE).
@@ -795,6 +804,12 @@ class Schedule:
                         fade_out = (play - length, length, out_shape)
                     if in_ms > 0:
                         fade_in = (cue, min(in_ms / 1000.0, 0.5 * sec), in_shape)
+                    # what is said is heard whole: no fade-out or fade-in for it, nor for a jingle against a song
+                    said = is_speech(before_category, last[0]), is_speech(category, kind)
+                    if last[0] != "song" and (kind == "song" or said[0]):
+                        fade_out = None
+                    if kind != "song" and (last[0] == "song" or said[1]):
+                        fade_in = None
             elif kind == "song" and last[0] == "song" and not self.talk:        # crossfade only from song to song
                 overlap = min(self.fade, 0.25 * before, 0.25 * sec)
                 if overlap > 0:
@@ -957,6 +972,35 @@ class Schedule:
                     out.append((window[0], line))
         return out
 
+    def talk_over(self, item, dj):
+        """When something is said over a song by the items around it: [(from, to)] in seconds of the song - a jingle,
+        advert, news or talk that overlaps it, and with dj what the DJ says over another song and still says over this
+        one. The song steps back for it as it does for the DJ's lines over itself (voices())."""
+        start, end, kind = item[:3]
+        if kind != "song" or self.talk or (self.rules and self.rules.get("talkradio")):
+            return []
+        around, at = [], start
+        for _ in range(2):                                    # the two items before it may still sound
+            before = self.items_from(at - 0.001, 1)[0]
+            if before[0] >= at:
+                break
+            around.append(before)
+            at = before[0]
+        around += self.items_from(start + 0.001, 4)[1:]
+        out = []
+        for other in around:
+            if other[2] != "song":
+                spans = [(other[0], other[1])]
+            elif dj:
+                spans = [(other[0] + at, other[0] + at + line[2]) for at, line in self.voices(other)]
+            else:
+                spans = []
+            for a, b in spans:
+                a, b = max(a, start), min(b, end)
+                if b - a > 0.05:
+                    out.append((a - start, b - start))
+        return sorted(out)
+
     def bed_of(self, item):
         """The music bed under an item of items_from(), or None. The same for everybody at the same second."""
         start, _end, kind, tr_, _fin, _fout = item
@@ -1027,6 +1071,7 @@ class RadioApp(tk.Tk):
         self.fail_count = 0
         self.want = queue.Queue()       # tracks to extract
         self.ready = {}                 # key -> path
+        self.baked = set()                 # ... of them those that carry the DJ and the music's shape
         self.pending_html = None
         self._style()
         self._build()
@@ -1503,14 +1548,21 @@ class RadioApp(tk.Tk):
     def _bed(self, item):
         return self.sched.bed_of(item) if self.sched is not None and self.ffmpeg else None
 
+    def _ducks(self, item):
+        return self.sched.talk_over(item, bool(self.var_dj.get())) if self.sched is not None else []
+
     def _key(self, item):
         """The name of the file that plays an item: the track, or the track with what is mixed to it (what the DJ says
-        over a song, the music bed under the DJ's talk)."""
+        over a song, the music bed under the DJ's talk). With the DJ in it, its fades and the places where it steps back
+        are part of the file and of the name."""
         voices, bed = self._voices(item), self._bed(item)
         key = _tkey(item[3])
         if bed:
             return key + "bed" + _tkey(bed)
-        return key if not voices else key + "dj" + "-".join("%d_%d@%d" % (v[1][0], v[1][1], int(v[0] * 10)) for v in voices)
+        if not voices:
+            return key
+        music = repr((item[4], item[5], [(round(a, 1), round(b, 1)) for a, b in self._ducks(item)]))
+        return key + "dj" + "-".join("%d_%d@%d" % (v[1][0], v[1][1], int(v[0] * 10)) for v in voices) + "m%08x" % _h(music)
 
     def _fade_chosen(self, _e=None):
         self.cfg["crossfade"] = self.box_fade.current()
@@ -1567,7 +1619,21 @@ class RadioApp(tk.Tk):
         for item in [self.cur_item] + self.upcoming:             # extract in playing order
             key = self._key(item)
             if key not in self.ready:
-                self.want.put((key, item[3], self._voices(item), self._bed(item)))
+                self.want.put((key, item[3], self._voices(item), self._bed(item), self._music(item)))
+
+    def _music(self, item):
+        """The FFmpeg filters that shape the sound of an item as the programme has it: its fades, and the places where it
+        steps back for what is said over it (the DJ's own lines are seen to where they are mixed in)."""
+        fin, fout = item[4], item[5]
+        out = []
+        ducks = self._ducks(item)
+        if ducks:
+            out.append("volume=eval=frame:volume='%s'" % awc_dj.duck_filter(ducks))
+        if fin:
+            out.append("afade=t=in:st=%.3f:d=%.3f:curve=%s" % (fin[0], fin[1], SHAPES[fin[2]]))
+        if fout:
+            out.append("afade=t=out:st=%.3f:d=%.3f:curve=%s" % (fout[0], fout[1], SHAPES[fout[2]]))
+        return out
 
     def _sync(self, skip_current=False):
         """Jump to whatever the station has on air right now (the same for everybody with the same clock).
@@ -1588,8 +1654,9 @@ class RadioApp(tk.Tk):
 
     def _spawn(self, item):
         """Start ffplay for `item` at the position the station has reached by now, with its crossfade in/out."""
-        start, _end, _kind, _tr, fin, fout = item
-        path = self.ready.get(self._key(item))
+        start, _end, _kind, _tr, fin, _fout = item
+        key = self._key(item)
+        path = self.ready.get(key)
         if not path or not os.path.isfile(path):
             return None
         pos = max(0.0, time.time() + LEAD - start)               # where the station is by the time ffplay is up
@@ -1597,13 +1664,11 @@ class RadioApp(tk.Tk):
         cmd = [self.ffplay, "-nodisp", "-autoexit", "-loglevel", "quiet", "-volume", str(int(self.vol.get()))]
         if pos:
             cmd += ["-ss", "%.2f" % pos]
-        fades = []
-        if fin and pos < fin[0] + fin[1]:
-            fades.append("afade=t=in:st=%.3f:d=%.3f:curve=%s" % (fin[0], fin[1], SHAPES[fin[2]]))
-        if fout:
-            fades.append("afade=t=out:st=%.3f:d=%.3f:curve=%s" % (fout[0], fout[1], SHAPES[fout[2]]))
-        if fades:                                                # asetpts: the filters see the position within the track
-            cmd += ["-af", ",".join(["asetpts=N/SR/TB+%.3f/TB" % pos] + fades)]
+        shape = [] if key in self.baked else self._music(item)   # (in a file with the DJ it is done already)
+        if fin and pos >= fin[0] + fin[1]:
+            shape = [x for x in shape if not x.startswith("afade=t=in")]
+        if shape:                                                # asetpts: the filters see the position within the track
+            cmd += ["-af", ",".join(["asetpts=N/SR/TB+%.3f/TB" % pos] + shape)]
         cmd.append(path)
         try:
             return subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
@@ -1685,7 +1750,7 @@ class RadioApp(tk.Tk):
         """Background thread: cut the tracks out of the archive into small Opus files that ffplay can play, and mix the
         DJ into those he talks over."""
         while True:
-            key, tr_, voices, bed = self.want.get()
+            key, tr_, voices, bed, music = self.want.get()
             if key in self.ready:
                 continue
             try:
@@ -1704,10 +1769,12 @@ class RadioApp(tk.Tk):
                     if not (os.path.isfile(mixed) and os.path.getsize(mixed) > 0):
                         try:
                             lines = [(at, self._cut(awc_dj.line_track(x)), x[2]) for at, x in voices]
-                            awc_dj.mix(path, lines, mixed + ".part", self.ffmpeg)
+                            awc_dj.mix(path, lines, mixed + ".part", self.ffmpeg, music)
                             os.replace(mixed + ".part", mixed)
                         except Exception:  # noqa: BLE001   (without the DJ rather than silence)
                             mixed = path
+                    if mixed != path:
+                        self.baked.add(key)
                     path = mixed
                 self.ready[key] = path
             except Exception:  # noqa: BLE001

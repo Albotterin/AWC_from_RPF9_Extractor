@@ -49,6 +49,7 @@ public class UpdateTest {
         Harness.choosePacks();
         Harness.workingPlayers();
         Harness.radio();
+        allow(false);
     }
 
     private static JSONObject release(String tag, String title, String notes, String apk) throws Exception {
@@ -103,6 +104,11 @@ public class UpdateTest {
         return c;
     }
 
+    private static void forgetStarted(android.app.Activity a) {
+        while (Shadows.shadowOf(a).getNextStartedActivity() != null) {
+        }
+    }
+
     private static void press(Dialog d, int button) {
         ((AlertDialog) d).getButton(button).performClick();
         Harness.pass(300);
@@ -152,10 +158,13 @@ public class UpdateTest {
         Assert.assertTrue(said, said.contains("Installiert: Version " + installed()));
         Assert.assertTrue("the changelog of both", said.contains("Etwas Neues auf Deutsch.") && said.contains("Version 99.0")
                 && said.contains("A new thing with a link and italics."));
-        Assert.assertTrue(said, said.contains("Herunterladen") && said.contains("Später") && said.contains("Version überspringen"));
+        Assert.assertTrue(said, said.contains("Installieren") && said.contains("Später") && said.contains("Version überspringen"));
         ScreenshotTest.shot(c.get(), "95_update_popup", d);
-        Shadows.shadowOf(Harness.application()).clearStartedServices();
+        forgetStarted(c.get());
         press(d, DialogInterface.BUTTON_POSITIVE);
+        Assert.assertTrue("first it must be allowed", words(popup()).contains("Update erlauben"));
+        Assert.assertNull("no browser", Shadows.shadowOf(c.get()).getNextStartedActivity());
+        press(popup(), DialogInterface.BUTTON_NEUTRAL);                     // the old way stays open
         Intent browser = Shadows.shadowOf(c.get()).getNextStartedActivity();
         Assert.assertEquals(Intent.ACTION_VIEW, browser.getAction());
         Assert.assertEquals(BASE + "v2/AWC-Radio.apk", browser.getDataString());
@@ -254,7 +263,9 @@ public class UpdateTest {
         Assert.assertTrue(said, said.contains("Update verfügbar: Version 99.0") && said.contains("Schließen"));
         Assert.assertFalse(said, said.contains("Version überspringen"));
         press(d, DialogInterface.BUTTON_POSITIVE);
-        Assert.assertEquals(BASE + "v1/AWC-Radio.apk", Shadows.shadowOf(a).getNextStartedActivity().getDataString());
+        Assert.assertTrue(words(popup()).contains("Update erlauben"));
+        press(popup(), DialogInterface.BUTTON_NEGATIVE);
+        Assert.assertNull(Shadows.shadowOf(a).getNextStartedActivity());
         for (View v : ScreenshotTest.all(a.getWindow().getDecorView())) {
             if (v instanceof android.widget.ScrollView) v.scrollTo(0, 100_000);
         }
@@ -267,6 +278,215 @@ public class UpdateTest {
         }
         Harness.pass(300);
         ScreenshotTest.shot(a, "96_update_settings", null);
+    }
+
+    // ------------------------------------------------------------------------------------------ installing
+    private static final byte[] APP = new byte[100_000];
+    private int loaded;
+
+    private static String sha256(byte[] data) throws Exception {
+        StringBuilder hex = new StringBuilder();
+        for (byte b : java.security.MessageDigest.getInstance("SHA-256").digest(data)) hex.append(String.format("%02x", b & 255));
+        return hex.toString();
+    }
+
+    /** A release whose APK GitHub lists with this length and checksum, and a download that brings APP. */
+    private void offered(long size, String sha) throws Exception {
+        JSONObject r = release("v1", "app 99.0", NOTES + GERMAN, BASE + "v1/AWC-Radio.apk");
+        r.getJSONArray("assets").getJSONObject(0).put("size", size).put("digest", "sha256:" + sha);
+        online(r);
+        Installer.source = url -> {
+            Assert.assertEquals(BASE + "v1/AWC-Radio.apk", url);
+            loaded++;
+            return new java.io.ByteArrayInputStream(APP);
+        };
+    }
+
+    /** What Android reads from the downloaded file. */
+    private static void fileIs(String name, int code) {
+        android.content.pm.PackageInfo info = new android.content.pm.PackageInfo();
+        info.packageName = name;
+        info.versionName = "99.0";
+        info.versionCode = code;
+        Shadows.shadowOf(Harness.app().getPackageManager())
+                .setPackageArchiveInfo(new java.io.File(Harness.app().getCacheDir(), "update.apk").getAbsolutePath(), info);
+    }
+
+    private static void allow(boolean on) {
+        Shadows.shadowOf(Harness.app().getPackageManager()).setCanRequestPackageInstalls(on);
+    }
+
+    private static int code() throws Exception {
+        return Harness.app().getPackageManager().getPackageInfo(Harness.app().getPackageName(), 0).versionCode;
+    }
+
+    private static List<android.content.pm.PackageInstaller.SessionInfo> sessions() {
+        return Harness.app().getPackageManager().getPackageInstaller().getMySessions();
+    }
+
+    private static boolean said(String words) {
+        Dialog d = popup();
+        return d != null && words(d).contains(words);
+    }
+
+    @Test
+    public void theAppInstallsItsUpdate() throws Exception {
+        allow(true);
+        offered(APP.length, sha256(APP));
+        fileIs(Harness.app().getPackageName(), code() + 1);
+        ActivityController<MainActivity> c = start();
+        forgetStarted(c.get());
+        press(popup(), DialogInterface.BUTTON_POSITIVE);
+        Harness.settle();
+        Assert.assertEquals(1, loaded);
+        Assert.assertEquals("handed to Android", 1, sessions().size());
+        Assert.assertEquals(Harness.app().getPackageName(), sessions().get(0).getAppPackageName());
+        Assert.assertFalse(Installer.busy());
+        Assert.assertNull("nothing left to say: " + (popup() == null ? "" : words(popup())), popup());
+        Assert.assertFalse("the file is gone", new java.io.File(Harness.app().getCacheDir(), "update.apk").exists());
+        Assert.assertNull("no browser", Shadows.shadowOf(c.get()).getNextStartedActivity());
+
+        // Android wants the listener's word: its question is shown
+        Intent question = new Intent("android.content.pm.action.CONFIRM_INSTALL");
+        Intent answer = new Intent(Harness.app(), InstallReceiver.class)
+                .putExtra(android.content.pm.PackageInstaller.EXTRA_STATUS, android.content.pm.PackageInstaller.STATUS_PENDING_USER_ACTION)
+                .putExtra(Intent.EXTRA_INTENT, question);
+        new InstallReceiver().onReceive(Harness.app(), answer);
+        Assert.assertEquals(question.getAction(), Shadows.shadowOf(c.get()).getNextStartedActivity().getAction());
+
+        // and if it refuses, the app says so and offers the browser
+        answer = new Intent(Harness.app(), InstallReceiver.class).putExtra(InstallReceiver.EXTRA_PAGE, BASE + "v1/AWC-Radio.apk")
+                .putExtra(android.content.pm.PackageInstaller.EXTRA_STATUS, android.content.pm.PackageInstaller.STATUS_FAILURE_CONFLICT)
+                .putExtra(android.content.pm.PackageInstaller.EXTRA_STATUS_MESSAGE, "INSTALL_FAILED_UPDATE_INCOMPATIBLE");
+        new InstallReceiver().onReceive(Harness.app(), answer);
+        Harness.pass(300);
+        Assert.assertTrue(said("INSTALL_FAILED_UPDATE_INCOMPATIBLE"));
+        ScreenshotTest.shot(c.get(), "97_update_refused", popup());
+        press(popup(), DialogInterface.BUTTON_POSITIVE);
+        Assert.assertEquals(BASE + "v1/AWC-Radio.apk", Shadows.shadowOf(c.get()).getNextStartedActivity().getDataString());
+        c.pause().stop().destroy();
+    }
+
+    @Test
+    public void allowingFirst() throws Exception {
+        allow(false);
+        offered(APP.length, sha256(APP));
+        fileIs(Harness.app().getPackageName(), code());                     // the same build number is no step back
+        ActivityController<MainActivity> c = start();
+        press(popup(), DialogInterface.BUTTON_POSITIVE);
+        ScreenshotTest.shot(c.get(), "98_update_allow", popup());
+        press(popup(), DialogInterface.BUTTON_POSITIVE);
+        Intent setting = Shadows.shadowOf(c.get()).getNextStartedActivity();
+        Assert.assertEquals(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, setting.getAction());
+        Assert.assertEquals("package:" + Harness.app().getPackageName(), setting.getDataString());
+        Assert.assertEquals(0, loaded);
+        c.pause().stop();
+        allow(true);
+        c.start().resume();
+        Harness.settle();
+        Assert.assertEquals("goes on after coming back", 1, loaded);
+        Assert.assertEquals(1, sessions().size());
+        c.pause().stop().destroy();
+    }
+
+    @Test
+    public void comingBackWithoutAllowingLoadsNothing() throws Exception {
+        allow(false);
+        offered(APP.length, sha256(APP));
+        ActivityController<MainActivity> c = start();
+        press(popup(), DialogInterface.BUTTON_POSITIVE);
+        press(popup(), DialogInterface.BUTTON_POSITIVE);
+        c.pause().stop().start().resume();
+        Harness.settle();
+        allow(true);
+        c.pause().stop().start().resume();
+        Harness.settle();
+        Assert.assertEquals("only straight after the setting", 0, loaded);
+        c.pause().stop().destroy();
+    }
+
+    @Test
+    public void aRestartWhileAllowingGoesOn() throws Exception {
+        allow(true);
+        offered(APP.length, sha256(APP));
+        fileIs(Harness.app().getPackageName(), code() + 1);
+        prefs().edit().putLong("updates_waiting", System.currentTimeMillis() - 60_000)
+                .putLong("updates_asked", System.currentTimeMillis()).commit();
+        ActivityController<MainActivity> c = start();
+        Harness.settle();
+        Assert.assertEquals(1, loaded);
+        Assert.assertEquals(1, sessions().size());
+        c.pause().stop().destroy();
+    }
+
+    @Test
+    public void onlyTheRightFileIsInstalled() throws Exception {
+        allow(true);
+        String[] cases = {"checksum", "shorter", "longer", "foreign", "older", "unreadable", "offline"};
+        for (String wrong : cases) {
+            Harness.reset();
+            offered(wrong.equals("shorter") ? APP.length + 1 : wrong.equals("longer") ? APP.length - 1 : APP.length,
+                    wrong.equals("checksum") ? sha256(new byte[1]) : sha256(APP));
+            fileIs(wrong.equals("foreign") ? "org.somebody.else" : Harness.app().getPackageName(),
+                    wrong.equals("older") ? code() - 1 : code() + 1);
+            if (wrong.equals("unreadable")) {
+                Shadows.shadowOf(Harness.app().getPackageManager())
+                        .setPackageArchiveInfo(new java.io.File(Harness.app().getCacheDir(), "update.apk").getAbsolutePath(), null);
+            }
+            if (wrong.equals("offline")) {
+                Installer.source = url -> {
+                    throw new IOException("no route");
+                };
+            }
+            SettingsActivity a = settings();
+            press(checkIn(a), DialogInterface.BUTTON_POSITIVE);
+            Harness.settle();
+            Assert.assertTrue(wrong, said("Update nicht geklappt"));
+            Assert.assertTrue(wrong, said(wrong.equals("shorter") || wrong.equals("offline") ? "ließ sich nicht herunterladen"
+                    : "Nichts wurde installiert"));
+            Assert.assertTrue(wrong, sessions().isEmpty());
+            Assert.assertFalse(wrong, Installer.busy());
+            Assert.assertFalse(wrong, new java.io.File(Harness.app().getCacheDir(), "update.apk").exists());
+            popup().dismiss();
+        }
+    }
+
+    @Test
+    public void cancellingAndLeavingTheScreen() throws Exception {
+        allow(true);
+        offered(APP.length, sha256(APP));
+        fileIs(Harness.app().getPackageName(), code() + 1);
+        final java.util.concurrent.Semaphore go = new java.util.concurrent.Semaphore(0);
+        Installer.Source slow = url -> {
+            go.acquireUninterruptibly();
+            return new java.io.ByteArrayInputStream(APP);
+        };
+        Installer.source = slow;
+        ActivityController<MainActivity> c = start();
+        press(popup(), DialogInterface.BUTTON_POSITIVE);
+        Assert.assertTrue(said("Version 99.0 wird geladen"));
+        ScreenshotTest.shot(c.get(), "99_update_loading", popup());
+        press(popup(), DialogInterface.BUTTON_NEGATIVE);                    // cancel
+        go.release();
+        Harness.settle();
+        Assert.assertFalse(Installer.busy());
+        Assert.assertTrue(sessions().isEmpty());
+        Assert.assertNull(popup());
+
+        // loaded while the app is not on the screen: Android is asked when it is back
+        Updates.check(c.get());
+        Harness.settle();
+        press(popup(), DialogInterface.BUTTON_POSITIVE);
+        c.pause().stop();
+        go.release();
+        Harness.settle();
+        Assert.assertTrue("waits for a screen", Installer.busy());
+        Assert.assertTrue(sessions().isEmpty());
+        c.start().resume();
+        Harness.settle();
+        Assert.assertFalse(Installer.busy());
+        Assert.assertEquals(1, sessions().size());
+        c.pause().stop().destroy();
     }
 
     @Test

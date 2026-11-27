@@ -29,8 +29,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Looks on GitHub for a newer app, proposes it together with its changelog and hands the download to the browser;
- * Android then installs it over this one. The only thing the app ever asks the internet for is that list of releases.
+ * Looks on GitHub for a newer app and proposes it together with its changelog; Installer then loads and installs it. The
+ * app asks the internet for nothing but that list of releases and, when the listener wants it, the new app.
  *
  * At the start of the app it asks at most once a day (unless switched off in the settings) and says nothing unless there
  * is something newer that the listener did not skip; the button in the settings always answers.
@@ -61,13 +61,21 @@ final class Updates {
         prefs(c).edit().putBoolean(PREF_AUTO, on).apply();
     }
 
-    private static SharedPreferences prefs(Context c) {
+    static SharedPreferences prefs(Context c) {
         return c.getSharedPreferences(RadioService.PREFS, Context.MODE_PRIVATE);
     }
 
     /** The app was opened. */
     static void onStart(Activity a) {
-        if (!automatic(a) || busy || Math.abs(System.currentTimeMillis() - prefs(a).getLong(PREF_ASKED, 0)) < DAY) return;
+        if (Installer.resumeAfterRestart(a) && !busy) {      // restarted while the listener allowed installing: go on
+            ask(a, (all, error) -> {
+                List<Releases.Release> newer = all == null ? null : Releases.newer(all, installed(a));
+                if (newer != null && !newer.isEmpty()) Installer.start(a, newer.get(0));
+            });
+            return;
+        }
+        if (!automatic(a) || busy || Installer.busy()
+                || Math.abs(System.currentTimeMillis() - prefs(a).getLong(PREF_ASKED, 0)) < DAY) return;
         ask(a, (all, error) -> {
             if (all == null) return;                          // no connection: ask again next time, without a word
             prefs(a).edit().putLong(PREF_ASKED, System.currentTimeMillis()).apply();
@@ -118,7 +126,7 @@ final class Updates {
         AlertDialog.Builder b = new AlertDialog.Builder(a, R.style.AppDialog)
                 .setTitle(a.getString(R.string.update_available, latest.app))
                 .setView(scroll(a, text))
-                .setPositiveButton(R.string.update_download, (d, w) -> open(a, latest.download()))
+                .setPositiveButton(R.string.update_install, (d, w) -> Installer.start(a, latest))
                 .setNegativeButton(unasked ? R.string.update_later : R.string.info_close, null);
         if (unasked) {
             b.setNeutralButton(R.string.update_skip, (d, w) -> prefs(a).edit().putString(PREF_SKIP, latest.app).apply());
@@ -157,7 +165,8 @@ final class Updates {
         return s;
     }
 
-    private static void open(Activity a, String url) {
+    /** Hands an address to the browser. */
+    static void open(Activity a, String url) {
         try {
             a.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)).addCategory(Intent.CATEGORY_BROWSABLE));
             Toast.makeText(a, R.string.update_install_hint, Toast.LENGTH_LONG).show();

@@ -61,10 +61,12 @@ cheats, do not touch a running game and do not connect to game or platform servi
 The only network access of the PC programs is the download of the **publisher's public credits web page**, used to name
 songs.
 
-The Android app uses the internet for one thing only: it asks github.com for the list of this project's releases, to tell
+The Android app uses the internet for updates only: it asks github.com for the list of this project's releases, to tell
 you about a newer version - at the start at most once a day (this can be switched off in its settings) and when you press
-the button there. It sends nothing about you or your files; as with any web request, GitHub sees the phone's IP address.
-A download you choose opens in your browser.
+the button there. When you choose **Install**, it downloads the new app from this project's release on GitHub, checks it
+and hands it to Android's installer. For this Android asks you once to allow the app to install apps, and it asks again
+before every installation; nothing is installed without your consent. The app sends nothing about you or your files; as
+with any web request, GitHub sees the phone's IP address.
 
 ## 5. Your own files
 

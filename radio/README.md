@@ -101,6 +101,11 @@ How the times are read is an interpretation: they count from the end of a record
 point a few seconds earlier), which recordings get a bed and how loud it is are choices of this program, and the low-pass
 sweeps some rules describe are left out.
 
+**One departure from the rules: speech is not faded.** The rules' fades cut into jingles and DJ links that lie across a
+change of songs. So DJ talk, other talk, news and adverts are never faded, and a jingle is not faded where it meets a song
+(only against speech or another jingle). Instead the song steps back, as under the DJ's own lines, for as long as
+something is said over it. When everything starts and ends stays as the rules have it.
+
 **Crossfade.** For the clubs and mixes, which have no such rules: one song into the next (standard: 3 seconds), off or
 1-12 seconds - on the PC with **Crossfade** at the top of the window, in the app on the settings page. The overlap is part
 of the timetable, so PC and phone stay in step only with the same setting.
@@ -154,7 +159,7 @@ The current list of all stations with their content and length: [all stations](d
 The phone app plays the same live programme as the PC: same clock, same order, same transitions (in the same time
 zone). It consists of the app and the packs:
 
-* **`AWC-Radio.apk`** - the app (version 1.20), the same file for everybody, no game data inside. Android 7.0 or newer,
+* **`AWC-Radio.apk`** - the app (version 1.21), the same file for everybody, no game data inside. Android 7.0 or newer,
   English and German. Station grid, mini player and a large player in the colour of the station's logo; background playback
   with a media notification, lock-screen and headset buttons; sleep timer; switches for what runs between the songs; **Android Auto** (switch on *Unknown sources* in
   its developer settings first, because the app does not come from the Play Store).
@@ -174,9 +179,12 @@ zone). It consists of the app and the packs:
   station's colour with previous, pause and next; resizable, from logo and pause to two rows. While the radio is off it
   shows the station heard last, and play tunes in. **Station tile**: choose a station; a tap plays it, another pauses.
 * **Updates** - at the start, at most once a day, the app asks github.com for the list of releases. A newer version is
-  proposed with its changelog (download, later, or skip this version); the download opens in the browser, and a tap on the
-  file installs it over the app. **Check for updates** in the settings asks at any time and always shows a changelog; the
-  automatic check can be switched off there. Nothing else uses the internet.
+  proposed with its changelog (install, later, or skip this version). **Install** downloads the APK from the release,
+  checks its length, its SHA-256 and that it is this app and no older build, and hands it to Android's installer; Android
+  only takes an app signed with the same key. Once you have to allow the app to install apps, and Android asks before
+  every installation; the app closes during it. If something fails, the browser can still load the file. **Check for
+  updates** in the settings asks at any time and always shows a changelog; the automatic check can be switched off there.
+  Nothing else uses the internet.
 * **Packs** - one file per station (`.radiopak`), per podcast (`.podpak`), one with the news (`news.newspak`), one for the soundtrack album (`.playlistpak`) and one per
   score group (`.scorepak`), made on the PC: in AWC Radio click **Android packs…**, choose a
   folder and write them. Each holds the station's songs in the game's own quality (about 128 kbit/s, not re-encoded), its logo

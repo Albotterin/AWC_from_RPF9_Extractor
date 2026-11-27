@@ -67,8 +67,8 @@ python radio/awc_radio.py        # the radio
 * A live programme by the clock: every station keeps running, everybody with the same time and time zone hears the same.
 * **The game's own programme rules**, read from your audio config: how often adverts, news, DJ links and idents come, what
   changes at night, how the talk stations string their shows together.
-* **Transitions as in the game**: jingles, adverts, songs and talk overlap and fade as the game's mixing rules say, and
-  the DJ's talk gets the station's own music underneath.
+* **Transitions as in the game**: jingles, adverts, songs and talk overlap as the game's mixing rules say, and the DJ's
+  talk gets the station's own music underneath. What is spoken is not faded: the song steps back under it.
 * Long DJ mixes show the title of the current part.
 * **The DJ**, if you switch him on: intros and outros spoken over the songs, in the windows the song files mark for them
   (default: off).
@@ -83,7 +83,7 @@ python radio/awc_radio.py        # the radio
 
 ## 📱 AWC Radio app for Android
 
-The radio for your pocket, your car and your bedside. **`AWC-Radio.apk`** (version 1.20; version 1.19 was tested on a
+The radio for your pocket, your car and your bedside. **`AWC-Radio.apk`** (version 1.21; version 1.19 was tested on a
 real Android phone) plays the same live programme as
 the PC: same clock, same order, same transitions – with station packs from the same version, phone and PC play the same
 at the same time.
@@ -99,11 +99,11 @@ at the same time.
 | 🚗 **Android Auto** | The stations as a grid with their logos, song and station on the player screen, voice commands such as *"play Radio On-U on AWC Radio"* |
 | 😴 **Sleep timer** | Stops the radio after the time you choose |
 | 🧩 **Widgets** | A player for the home screen (logo, title, previous, pause, next; resizable) and a tile per station that plays it with one tap |
-| 🔄 **Updates** | A newer version is proposed with its changelog, at the start (at most once a day) or with a button in the settings; the download opens in the browser |
+| 🔄 **Updates** | A newer version is proposed with its changelog, at the start (at most once a day) or with a button in the settings; the app downloads and installs it itself after Android's confirmation (the browser stays as a fallback) |
 | 📢 **Between the songs** | A switch each for adverts, news, DJ talk, talk and shows, and jingles, in the player and on the settings page; a station offers what it has |
 | ⚙️ **Settings** | A settings page: crossfade on/off and 1-12 s (clubs and mixes only; the other stations are mixed as in the game), what runs between the songs, DJ over songs, pack folder, updates, battery settings, info and log |
 | 📦 **Packs** | One file per station (`.radiopak`), per podcast (`.podpak`), one with the news (`.newspak`), one for the soundtrack album (`.playlistpak`) and one per score group (`.scorepak`), all in one folder on the phone: add or update single ones without copying everything again |
-| 🔒 **Offline** | Everything it plays comes from the packs on the phone. The internet is used for one thing only: asking github.com for the list of releases (can be switched off) |
+| 🔒 **Offline** | Everything it plays comes from the packs on the phone. The internet is used for updates only: asking github.com for the list of releases (can be switched off) and loading the new app when you choose to |
 | 🌍 **Languages** | English and German |
 | 📋 **Needs** | Android 7.0 or newer |
 
@@ -119,11 +119,11 @@ at the same time.
 * The APK contains **no game data** and is the same file for everybody. Station and podcast packs contain audio and pictures from your own game: for your own use only, do not share them.
 * The single `.dat` pack of earlier versions is no longer read.
 * Test an alarm on your phone before you rely on it: some manufacturers' battery savers stop apps in the background.
-* A newer APK installs over the old one; from version 1.19 on the app proposes it by itself.
+* A newer APK installs over the old one; from version 1.19 on the app proposes it by itself, from 1.21 on it also installs it.
 
 ## Progress
 
-Status **2026-11-27** (v2.14.0), measured with a 28.5 GB `audio.rpf`.
+Status **2026-11-27** (v2.15.0), measured with a 28.5 GB `audio.rpf`.
 
 | Area | State | |
 |---|---|---|
@@ -143,7 +143,7 @@ Status **2026-11-27** (v2.14.0), measured with a 28.5 GB `audio.rpf`.
 | Podcasts | all 5 the credits name, with 20 episodes and their titles (3 h 36 min), in the app and on the PC | ✅ |
 | Score | 2,543 pieces (about 33 h) and 113 recordings of places (4.8 h), a folder of their own in the extractor; 1,078 of at least 30 seconds (31 h) go into the app packs | ✅ |
 | Titles from `data.rpf` | 839 of the 865 track numbers the recordings carry have a title and artist in the game's own table | ✅ |
-| Android app | version 1.20: radio, On-Demand, podcasts, score with search, DJ, content switches, radio alarm, widgets, update check, Android Auto; version 1.19 ran on a real Android phone, 1.20 is not yet tried on one | ✅ |
+| Android app | version 1.21: radio, On-Demand, podcasts, score with search, DJ, content switches, radio alarm, widgets, update check, Android Auto; version 1.19 ran on a real Android phone, 1.21 is not yet tried on one | ✅ |
 | The Vault Radio | plays as one long mix; 23 of its 24 listed songs are named as parts of it | 🎚 |
 
 ![AWC Radio – station progress](radio/docs/radio-progress.svg)
@@ -176,7 +176,7 @@ Details for every station: [radio progress](radio/docs/RADIO-PROGRESS.md).
 - [x] The Android app runs on a real phone
 - [x] Score and DJ in the app are tested on a real phone
 - [x] App 1.19 runs on a real phone
-- [ ] App 1.20 (search in the score tab) is not yet tested on a real phone
+- [ ] App 1.21 (score search, updates installed by the app, speech not faded) is not yet tested on a real phone
 - [ ] Extractor: Opus only; the RPF9 table of contents is not read, so there are no file names
 
 ### Milestones
@@ -204,6 +204,7 @@ Details for every station: [radio progress](radio/docs/RADIO-PROGRESS.md).
 | [v2.12.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.12.0) | 2026-11-26 | 📻 A switch of its own for adverts, news, DJ talk, talk and jingles (PC and app) · app 1.17 |
 | [v2.13.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.13.0) | 2026-11-26 | 📱 Home screen widgets and an update check with changelog · app 1.19 |
 | [v2.14.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.14.0) | 2026-11-27 | 🔎 Search in the app's score tab · app 1.20 |
+| [v2.15.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.15.0) | 2026-11-27 | 📻 Speech is not faded, songs step back under it · 📱 the app installs its updates · app 1.21 |
 
 ## Repository layout
 

@@ -292,6 +292,10 @@ public final class Schedule {
                             fadeOut = new Fade(play - length, length, (int) v[3]);
                         }
                         if (inMs > 0) fadeIn = new Fade(cue, Math.min(inMs / 1000.0, 0.5 * sec), (int) v[6]);
+                        // what is said is heard whole: no fade-out or fade-in for it, nor for a jingle against a song
+                        boolean saidBefore = isSpeech(beforeCategory, kinds.get(last)), said = isSpeech(category, kind);
+                        if (!SONG.equals(kinds.get(last)) && (SONG.equals(kind) || saidBefore)) fadeOut = null;
+                        if (!SONG.equals(kind) && (SONG.equals(kinds.get(last)) || said)) fadeIn = null;
                     }
                 } else if (SONG.equals(kind) && SONG.equals(kinds.get(last)) && !talk) {   // crossfade song to song
                     double overlap = Math.min(fade, Math.min(0.25 * before, 0.25 * sec));
@@ -345,6 +349,46 @@ public final class Schedule {
 
     void setBeds(List<Track> music) {
         beds = sorted(music);
+    }
+
+    /** Somebody talks: such an item is never faded. (The other items besides songs are jingles.) */
+    static boolean isSpeech(String category, String kind) {
+        return TALK.equals(kind) || AD.equals(kind) || NEWS.equals(kind) || category.startsWith("dj_banter")
+                || category.startsWith("show");
+    }
+
+    /**
+     * When something is said over a song by the items around it, {from, to} in seconds of the song (talk_over() in
+     * awc_radio.py): a jingle, advert, news or talk that overlaps it, and with `dj` what the DJ says over another song
+     * and still says over this one. The song steps back for it as it does for the DJ's lines over itself (voices()).
+     */
+    public List<double[]> talkOver(Item item, boolean dj) {
+        List<double[]> out = new ArrayList<>();
+        if (!SONG.equals(item.kind) || talk || rules != null && rules.talkRadio) return out;
+        List<Item> around = new ArrayList<>();
+        double at = item.start;
+        for (int i = 0; i < 2; i++) {                        // the two items before it may still sound
+            Item before = itemsFrom(at - 0.001, 1).get(0);
+            if (before.start >= at) break;
+            around.add(before);
+            at = before.start;
+        }
+        List<Item> after = itemsFrom(item.start + 0.001, 4);
+        around.addAll(after.subList(1, after.size()));
+        for (Item other : around) {
+            List<double[]> spans = new ArrayList<>();
+            if (!SONG.equals(other.kind)) {
+                spans.add(new double[]{other.start, other.end});
+            } else if (dj) {
+                for (Voice v : voices(other)) spans.add(new double[]{other.start + v.at, other.start + v.at + v.line.sec});
+            }
+            for (double[] span : spans) {
+                double a = Math.max(span[0], item.start), b = Math.min(span[1], item.end);
+                if (b - a > 0.05) out.add(new double[]{a - item.start, b - item.start});
+            }
+        }
+        Collections.sort(out, (x, y) -> x[0] != y[0] ? Double.compare(x[0], y[0]) : Double.compare(x[1], y[1]));
+        return out;
     }
 
     /** The music bed under an item of itemsFrom(), or null. The same for everybody at the same second. */

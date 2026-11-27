@@ -245,7 +245,7 @@
     <string name="update_available">Update available: version %1$s</string>
     <string name="update_installed">Installed: version %1$s</string>
     <string name="update_version">Version %1$s · %2$s</string>
-    <string name="update_download">Download</string>
+    <string name="update_install">Install</string>
     <string name="update_later">Later</string>
     <string name="update_skip">Skip this version</string>
     <string name="update_current">Up to date: version %1$s</string>
@@ -255,5 +255,17 @@
     <string name="update_failed">github.com could not be reached. Is the phone online?</string>
     <string name="update_busy">github.com takes no more requests right now. Try again later.</string>
     <string name="update_install_hint">When the download is done, tap the file to install it.</string>
+    <string name="update_loading">Loading version %1$s …</string>
+    <string name="update_closes">Android then asks whether to install. AWC Radio closes while it is installed; open it again afterwards.</string>
+    <string name="update_allow_title">Allow the update</string>
+    <string name="update_allow">So that AWC Radio can install its update itself, Android has to allow it once: switch it on in the next view, then come back.</string>
+    <string name="update_allow_open">Open the setting</string>
+    <string name="update_not_allowed">Not allowed – the update was not installed</string>
+    <string name="update_not_done">The update did not work</string>
+    <string name="update_load_failed">The new app could not be downloaded. Is the phone online?</string>
+    <string name="update_broken">The downloaded file is incomplete or not the expected app. Nothing was installed.</string>
+    <string name="update_refused">Android did not install the update (%1$s).</string>
+    <string name="update_aborted">Installation cancelled</string>
+    <string name="update_browser">Open in browser</string>
     <string name="update_open_failed">Nothing can open %1$s</string>
 </resources>

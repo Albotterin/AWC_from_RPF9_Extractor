@@ -277,13 +277,14 @@ def duck_filter(spans):
     return "1-%.3f*min(1,%s)" % (1.0 - DUCK, "+".join(parts))
 
 
-def mix(song, voices, out, ffmpeg):
-    """Lay the DJ's lines over a song: voices = [(second in the song, file of the line, its length)]. Raises OSError."""
+def mix(song, voices, out, ffmpeg, music=()):
+    """Lay the DJ's lines over a song: voices = [(second in the song, file of the line, its length)]. `music`: further
+    filters for the song alone (its fades, where it steps back for others), which leave the DJ as he is. Raises OSError."""
     cmd = [ffmpeg, "-v", "error", "-y", "-i", song]
     for _at, path, _sec in voices:
         cmd += ["-i", path]
-    graph = ["[0:a]aresample=48000,aformat=channel_layouts=stereo,volume=eval=frame:volume='%s'[m]"
-             % duck_filter([(at, at + sec) for at, _p, sec in voices])]
+    graph = ["[0:a]%s[m]" % ",".join(["aresample=48000", "aformat=channel_layouts=stereo", "volume=eval=frame:volume='%s'"
+                                      % duck_filter([(at, at + sec) for at, _p, sec in voices])] + list(music))]
     for n, (at, _path, _sec) in enumerate(voices, 1):
         graph.append("[%d:a]aresample=48000,aformat=channel_layouts=stereo,adelay=%d:all=1[v%d]" % (n, int(at * 1000), n))
     graph.append("[m]%samix=inputs=%d:duration=first:normalize=0,alimiter=limit=0.89:level=disabled[o]"

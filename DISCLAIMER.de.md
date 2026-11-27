@@ -64,10 +64,12 @@ Spiels oder der Plattform.
 Der einzige Netzwerkzugriff der PC-Programme ist der Download der **öffentlichen Credits-Webseite des Publishers**, um
 Songs zu benennen.
 
-Die Android-App nutzt das Internet nur für eines: Sie fragt bei github.com nach der Liste der Releases dieses Projekts, um
-auf eine neuere Version hinzuweisen – beim Start höchstens einmal am Tag (in den Einstellungen abschaltbar) und auf
-Knopfdruck dort. Dabei wird nichts über dich oder deine Dateien übertragen; wie bei jedem Seitenaufruf sieht GitHub die
-IP-Adresse des Handys. Ein gewählter Download öffnet sich in deinem Browser.
+Die Android-App nutzt das Internet nur für Updates: Sie fragt bei github.com nach der Liste der Releases dieses Projekts,
+um auf eine neuere Version hinzuweisen – beim Start höchstens einmal am Tag (in den Einstellungen abschaltbar) und auf
+Knopfdruck dort. Wählst du **Installieren**, lädt sie die neue App aus dem Release dieses Projekts bei GitHub, prüft sie
+und übergibt sie dem Installationsprogramm von Android. Dafür fragt Android einmal, ob die App Apps installieren darf,
+und vor jeder Installation noch einmal; ohne deine Zustimmung wird nichts installiert. Dabei wird nichts über dich oder
+deine Dateien übertragen; wie bei jedem Seitenaufruf sieht GitHub die IP-Adresse des Handys.
 
 ## 5. Deine eigenen Dateien
 

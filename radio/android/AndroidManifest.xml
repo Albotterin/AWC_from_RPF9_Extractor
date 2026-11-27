@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="org.awctool.radio"
-    android:versionCode="21"
-    android:versionName="1.20">
+    android:versionCode="22"
+    android:versionName="1.21">
 
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="34" />
 
@@ -16,8 +16,10 @@
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.VIBRATE" />
-    <!-- only to ask GitHub for the list of releases: is there a newer app? -->
+    <!-- only for updates: to ask GitHub for the list of releases and to load a newer app from there -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- to hand that app to Android's installer; the phone's owner has to allow it and confirms every installation -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:name=".App"
@@ -47,6 +49,9 @@
         <activity android:name=".AlarmEditActivity" android:exported="false" />
 
         <activity android:name=".SettingsActivity" android:exported="false" />
+
+        <!-- what Android's installer says about an update -->
+        <receiver android:name=".InstallReceiver" android:exported="false" />
 
         <!-- the ringing alarm; directBootAware: it also works after a restart before the first unlock -->
         <activity

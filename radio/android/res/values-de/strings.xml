@@ -245,7 +245,7 @@
     <string name="update_available">Update verfügbar: Version %1$s</string>
     <string name="update_installed">Installiert: Version %1$s</string>
     <string name="update_version">Version %1$s · %2$s</string>
-    <string name="update_download">Herunterladen</string>
+    <string name="update_install">Installieren</string>
     <string name="update_later">Später</string>
     <string name="update_skip">Version überspringen</string>
     <string name="update_current">Aktuell: Version %1$s</string>
@@ -255,5 +255,17 @@
     <string name="update_failed">github.com ist nicht erreichbar. Ist das Handy online?</string>
     <string name="update_busy">github.com nimmt gerade keine weiteren Anfragen an. Versuch es später noch einmal.</string>
     <string name="update_install_hint">Nach dem Herunterladen die Datei antippen, um sie zu installieren.</string>
+    <string name="update_loading">Version %1$s wird geladen …</string>
+    <string name="update_closes">Danach fragt Android, ob installiert werden soll. Beim Installieren schließt sich AWC Radio; öffne es danach wieder.</string>
+    <string name="update_allow_title">Update erlauben</string>
+    <string name="update_allow">Damit AWC Radio sein Update selbst installieren kann, muss Android das einmal erlauben: in der nächsten Ansicht einschalten und dann zurückkehren.</string>
+    <string name="update_allow_open">Einstellung öffnen</string>
+    <string name="update_not_allowed">Nicht erlaubt – das Update wurde nicht installiert</string>
+    <string name="update_not_done">Update nicht geklappt</string>
+    <string name="update_load_failed">Die neue App ließ sich nicht herunterladen. Ist das Handy online?</string>
+    <string name="update_broken">Die geladene Datei ist unvollständig oder nicht die erwartete App. Nichts wurde installiert.</string>
+    <string name="update_refused">Android hat das Update nicht installiert (%1$s).</string>
+    <string name="update_aborted">Installation abgebrochen</string>
+    <string name="update_browser">Im Browser öffnen</string>
     <string name="update_open_failed">%1$s lässt sich nicht öffnen</string>
 </resources>

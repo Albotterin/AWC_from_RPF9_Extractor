@@ -33,8 +33,12 @@ final class Releases {
     static final class Release {
         final String app, tag, published, notes;
         final String apk;                                    // where its APK is loaded from, "" if it has none
+        final long size;                                     // ... its length as GitHub lists it, 0 if unknown
+        final String sha256;                                 // ... and its checksum in hex, "" if unknown
 
-        Release(String app, String tag, String published, String notes, String apk) {
+        Release(String app, String tag, String published, String notes, String apk, long size, String sha256) {
+            this.size = size;
+            this.sha256 = sha256;
             this.app = app;
             this.tag = tag;
             this.published = published;
@@ -47,7 +51,7 @@ final class Releases {
             return published.length() >= 10 ? published.substring(0, 10) : published;
         }
 
-        /** What a tap on "download" opens: the APK, else the release's page. */
+        /** What the browser would open instead of the app loading it itself: the APK, else the release's page. */
         String download() {
             return apk.isEmpty() ? PAGE + tag : apk;
         }
@@ -80,16 +84,22 @@ final class Releases {
                 found = TITLE.matcher(title);
                 if (!found.find()) continue;
             }
-            String apk = "";
+            String apk = "", sha256 = "";
+            long size = 0;
             JSONArray assets = o.optJSONArray("assets");
             for (int k = 0; assets != null && k < assets.length(); k++) {
                 JSONObject a = assets.getJSONObject(k);
                 String url = a.optString("browser_download_url");
-                if (APK.equals(a.optString("name")) && url.startsWith(DOWNLOADS)) apk = url;       // only from there
+                if (APK.equals(a.optString("name")) && url.startsWith(DOWNLOADS)) {                // only from there
+                    apk = url;
+                    size = Math.max(0, a.optLong("size"));
+                    String digest = a.isNull("digest") ? "" : a.optString("digest");
+                    sha256 = digest.startsWith("sha256:") ? digest.substring(7) : "";
+                }
             }
             String tag = o.optString("tag_name");
             if (!tag.matches("[A-Za-z0-9._-]+")) continue;
-            out.add(new Release(found.group(1), tag, o.optString("published_at"), notes, apk));
+            out.add(new Release(found.group(1), tag, o.optString("published_at"), notes, apk, size, sha256));
         }
         Collections.sort(out, (a, b) -> {
             int by = compare(b.app, a.app);

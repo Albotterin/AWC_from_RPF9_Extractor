@@ -67,8 +67,9 @@ python radio/awc_radio.py        # das Radio
 * Ein Live-Programm nach der Uhr: Jeder Sender läuft weiter, alle mit derselben Uhrzeit und Zeitzone hören dasselbe.
 * **Die Programmregeln des Spiels**, aus deiner Audio-Konfiguration gelesen: wie oft Werbung, Nachrichten, DJ-Beiträge und
   Senderkennungen kommen, was sich nachts ändert, wie die Talk-Sender ihre Sendungen aneinanderreihen.
-* **Übergänge wie im Spiel**: Jingles, Werbung, Songs und Talk überlappen und blenden so, wie es die Misch-Regeln des
-  Spiels sagen, und unter dem DJ läuft die Hintergrundmusik des Senders.
+* **Übergänge wie im Spiel**: Jingles, Werbung, Songs und Talk überlappen so, wie es die Misch-Regeln des Spiels sagen,
+  und unter dem DJ läuft die Hintergrundmusik des Senders. Gesprochenes wird nicht geblendet: Der Song tritt darunter
+  zurück.
 * Lange DJ-Mixe zeigen den Titel des aktuellen Abschnitts.
 * **Der DJ**, wenn man ihn einschaltet: Ansagen über den Anfang und das Ende der Songs, in den Fenstern, die die Songdateien
   dafür markieren (von Haus aus aus).
@@ -84,7 +85,7 @@ python radio/awc_radio.py        # das Radio
 
 ## 📱 Die AWC-Radio-App für Android
 
-Das Radio für die Hosentasche, fürs Auto und für den Nachttisch. **`AWC-Radio.apk`** (Version 1.20; Version 1.19 wurde auf einem echten Android-Handy getestet) spielt dasselbe
+Das Radio für die Hosentasche, fürs Auto und für den Nachttisch. **`AWC-Radio.apk`** (Version 1.21; Version 1.19 wurde auf einem echten Android-Handy getestet) spielt dasselbe
 Live-Programm wie der PC: gleiche Uhr, gleiche Reihenfolge, gleiche Übergänge – mit Sender-Packs derselben Version
 spielen Handy und PC zur selben Zeit dasselbe.
 
@@ -99,11 +100,11 @@ spielen Handy und PC zur selben Zeit dasselbe.
 | 🚗 **Android Auto** | Die Sender als Raster mit ihren Logos, Song und Sender auf dem Player-Bildschirm, Sprachbefehle wie *„Spiele Radio On-U auf AWC Radio“* |
 | 😴 **Einschlaftimer** | Stoppt das Radio nach der gewählten Zeit |
 | 🧩 **Widgets** | Ein Player für den Startbildschirm (Logo, Titel, Zurück, Pause, Weiter; in der Größe anpassbar) und je Sender eine Kachel, die ihn mit einem Tipp spielt |
-| 🔄 **Updates** | Eine neuere Version wird mit ihrem Changelog vorgeschlagen, beim Start (höchstens einmal am Tag) oder per Knopf in den Einstellungen; der Download öffnet sich im Browser |
+| 🔄 **Updates** | Eine neuere Version wird mit ihrem Changelog vorgeschlagen, beim Start (höchstens einmal am Tag) oder per Knopf in den Einstellungen; die App lädt und installiert sie selbst, nach der Rückfrage von Android (der Browser bleibt als Ausweg) |
 | 📢 **Zwischen den Songs** | Je ein Schalter für Werbung, Nachrichten, DJ-Beiträge, Talk und Sendungen sowie Jingles, im Player und auf der Einstellungsseite; ein Sender bietet an, was er hat |
 | ⚙️ **Einstellungen** | Eine Einstellungsseite: Überblenden ein/aus und 1–12 s (nur für Clubs und Mixe; die anderen Sender werden wie im Spiel gemischt), Inhalte zwischen den Songs, DJ über Songs, Pack-Ordner, Updates, Akku-Einstellungen, Info und Protokoll |
 | 📦 **Packs** | Eine Datei je Sender (`.radiopak`), je Podcast (`.podpak`), eine mit den Nachrichten (`.newspak`), eine für das Soundtrack-Album (`.playlistpak`) und je Score-Gruppe (`.scorepak`), alle in einem Ordner auf dem Handy: einzeln hinzufügen oder aktualisieren, ohne alles neu zu kopieren |
-| 🔒 **Offline** | Alles, was sie spielt, kommt aus den Packs auf dem Handy. Das Internet braucht sie nur für eines: bei github.com nach der Liste der Releases fragen (abschaltbar) |
+| 🔒 **Offline** | Alles, was sie spielt, kommt aus den Packs auf dem Handy. Das Internet braucht sie nur für Updates: bei github.com nach der Liste der Releases fragen (abschaltbar) und auf deinen Wunsch die neue App laden |
 | 🌍 **Sprachen** | Deutsch und Englisch |
 | 📋 **Voraussetzung** | Android 7.0 oder neuer |
 
@@ -119,11 +120,11 @@ spielen Handy und PC zur selben Zeit dasselbe.
 * Die APK enthält **keine Spieldaten** und ist für alle dieselbe Datei. Sender- und Podcast-Packs enthalten Audio und Bilder aus deinem eigenen Spiel: nur für den eigenen Gebrauch, bitte nicht weitergeben.
 * Das einzelne `.dat`-Pack früherer Versionen wird nicht mehr gelesen.
 * Teste einen Wecker auf deinem Handy, bevor du dich darauf verlässt: Die Akkusparfunktionen mancher Hersteller beenden Apps im Hintergrund.
-* Eine neuere APK lässt sich über die alte installieren; ab Version 1.19 schlägt die App sie selbst vor.
+* Eine neuere APK lässt sich über die alte installieren; ab Version 1.19 schlägt die App sie selbst vor, ab 1.21 installiert sie sie auch.
 
 ## Fortschritt
 
-Stand **2026-11-27** (v2.14.0), gemessen an einer 28,5 GB großen `audio.rpf`.
+Stand **2026-11-27** (v2.15.0), gemessen an einer 28,5 GB großen `audio.rpf`.
 
 | Bereich | Stand | |
 |---|---|---|
@@ -143,7 +144,7 @@ Stand **2026-11-27** (v2.14.0), gemessen an einer 28,5 GB großen `audio.rpf`.
 | Podcasts | alle 5, die die Credits nennen, mit 20 Folgen samt Titeln (3 Std. 36 Min.), in der App und am PC | ✅ |
 | Score | 2.543 Stücke (rund 33 Std.) und 113 Aufnahmen von Orten (4,8 Std.), im Extractor in einem eigenen Ordner; 1.078 ab 30 Sekunden (31 Std.) kommen in die App-Packs | ✅ |
 | Titel aus `data.rpf` | 839 der 865 Titel-Nummern, die die Aufnahmen tragen, haben in der Tabelle des Spiels Titel und Interpret | ✅ |
-| Android-App | Version 1.20: Radio, On-Demand, Podcasts, Score mit Suche, DJ, Inhalts-Schalter, Radiowecker, Widgets, Update-Prüfung, Android Auto; Version 1.19 lief auf einem echten Android-Handy, 1.20 ist dort noch nicht erprobt | ✅ |
+| Android-App | Version 1.21: Radio, On-Demand, Podcasts, Score mit Suche, DJ, Inhalts-Schalter, Radiowecker, Widgets, Update-Prüfung, Android Auto; Version 1.19 lief auf einem echten Android-Handy, 1.21 ist dort noch nicht erprobt | ✅ |
 | The Vault Radio | läuft als ein langer Mix; 23 seiner 24 gelisteten Songs sind als Teile darin benannt | 🎚 |
 
 ![AWC Radio – Fortschritt der Sender](radio/docs/radio-progress.svg)
@@ -177,7 +178,7 @@ Details zu jedem Sender: [Fortschritt des Radios](radio/docs/RADIO-PROGRESS.de.m
 - [x] Die Android-App läuft auf einem echten Handy
 - [x] Score und DJ der App sind auf einem echten Handy getestet
 - [x] App 1.19 läuft auf einem echten Handy
-- [ ] App 1.20 (Suche im Score-Reiter) ist noch nicht auf einem echten Handy getestet
+- [ ] App 1.21 (Score-Suche, Updates durch die App, Gesprochenes ohne Blende) ist noch nicht auf einem echten Handy getestet
 - [ ] Extractor: nur Opus; das RPF9-Inhaltsverzeichnis wird nicht gelesen, es gibt also keine Dateinamen
 
 ### Meilensteine
@@ -205,6 +206,7 @@ Details zu jedem Sender: [Fortschritt des Radios](radio/docs/RADIO-PROGRESS.de.m
 | [v2.12.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.12.0) | 2026-11-26 | 📻 Eigene Schalter für Werbung, Nachrichten, DJ-Beiträge, Talk und Jingles (PC und App) · App 1.17 |
 | [v2.13.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.13.0) | 2026-11-26 | 📱 Widgets für den Startbildschirm und eine Update-Prüfung mit Changelog · App 1.19 |
 | [v2.14.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.14.0) | 2026-11-27 | 🔎 Suche im Score-Reiter der App · App 1.20 |
+| [v2.15.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.15.0) | 2026-11-27 | 📻 Gesprochenes ohne Blende, Songs treten darunter zurück · 📱 die App installiert ihre Updates · App 1.21 |
 
 ## Aufbau des Repositorys
 

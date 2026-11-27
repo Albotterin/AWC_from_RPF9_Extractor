@@ -209,6 +209,13 @@ def compare_programmes(cp, folder):
                         sys.exit(1)
                     want.append("%s|%d|%s|%s|%s|%.6f|%.6f|%s|%s" % (st["name"], i, tag, kind, radio._tkey(tr), start, end,
                                                                      fade_text(fin), fade_text(fout)))
+                    for a, b in schedule.talk_over((start, end, kind, tr, fin, fout), True):
+                        want.append("%s|%d|%s|over|%s|%.6f|%.6f|%.6f" % (st["name"], i, tag, radio._tkey(tr), start, a, b))
+                    if kind != "song" and schedule.mix is not None:          # nothing spoken is faded against a song
+                        for other in schedule.items_from(start - 0.001, 1) + schedule.items_from(start + 0.001, 2)[1:]:
+                            if other[2] == "song" and (fin if other[0] < start else fout):
+                                print("faded against a song: %s %s %s %s" % (st["name"], tag, kind, radio._tkey(tr)))
+                                sys.exit(1)
                     bed = schedule.bed_of((start, end, kind, tr, fin, fout))
                     if bed:
                         want.append("%s|%d|%s|bed|%s|%.6f" % (st["name"], i, tag, radio._tkey(bed), start))
@@ -222,6 +229,7 @@ def compare_programmes(cp, folder):
     kinds = {k: sum(1 for x in want if "|%s|" % k in x) for k in ("news", "talk")}
     said = sum(1 for x in want if "|voice|" in x)
     under = sum(1 for x in want if "|bed|" in x)
+    over = sum(1 for x in want if "|over|" in x)
     bad = [(a, b) for a, b in zip(got, want) if a != b]
     if len(got) != len(want) or bad:
         print("programme differs: %d lines from the app, %d from the PC; first: %s" % (len(got), len(want), bad[:3]))
@@ -229,8 +237,9 @@ def compare_programmes(cp, folder):
     if not ads:
         print("no advert in any programme")
         sys.exit(1)
-    print("Programme: app and PC identical (%d lines compared: %d adverts, %d news, %d talk, %d DJ lines, %d music beds; "
-          "nothing switched off on air)" % (len(want), ads, kinds["news"], kinds["talk"], said, under))
+    print("Programme: app and PC identical (%d lines compared: %d adverts, %d news, %d talk, %d DJ lines, %d music beds, "
+          "%d times a song steps back; nothing switched off on air)" % (len(want), ads, kinds["news"], kinds["talk"], said,
+                                                                         under, over))
 
 
 if __name__ == "__main__":

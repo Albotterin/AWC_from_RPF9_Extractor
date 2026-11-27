@@ -105,6 +105,12 @@ Wie die Zeiten gelesen werden, ist eine Auslegung: Sie zählen vom Ende einer Au
 „Outro“-Punkt ein paar Sekunden davor), welche Aufnahmen eine Hintergrundmusik bekommen und wie laut sie ist, entscheidet
 dieses Programm, und die Tiefpass-Verläufe mancher Regeln fehlen.
 
+**Eine Abweichung von den Regeln: Gesprochenes wird nicht geblendet.** Die Blenden der Regeln schnitten Jingles und
+DJ-Beiträge an, die über einem Songwechsel liegen. Deshalb werden DJ, Talk, Nachrichten und Werbung nie geblendet, und ein
+Jingle nicht dort, wo er auf einen Song trifft (nur gegen Gesprochenes oder einen anderen Jingle). Stattdessen tritt der
+Song zurück, wie unter den DJ-Ansagen, solange etwas darüber läuft. Wann alles beginnt und endet, bleibt wie in den
+Regeln.
+
 **Überblenden.** Für die Clubs und Mixe, die keine solchen Regeln haben: ein Song in den nächsten (Standard: 3
 Sekunden), aus oder 1–12 Sekunden – am PC mit **Überblenden** oben im Fenster, in der App auf der Einstellungsseite. Die
 Überblendung ist Teil des Zeitplans: PC und Handy laufen nur mit derselben Einstellung gleich.
@@ -157,7 +163,7 @@ Die Handy-App spielt dasselbe Live-Programm wie der PC: gleiche Uhr und Zeitzone
 Übergänge.
 Dazu hat sie einen eigenen Bereich für die [Podcasts](#podcasts). Zur App gehören die Packs:
 
-* **`AWC-Radio.apk`** - die App (Version 1.20), für alle dieselbe Datei, ohne Spieldaten. Android 7.0 oder neuer, Deutsch und
+* **`AWC-Radio.apk`** - die App (Version 1.21), für alle dieselbe Datei, ohne Spieldaten. Android 7.0 oder neuer, Deutsch und
   Englisch. Senderraster, kleiner Player und großer Player in der Farbe des Senderlogos; Wiedergabe im Hintergrund mit
   Medien-Benachrichtigung, Sperrbildschirm- und Kopfhörertasten; Einschlaftimer; Schalter für das, was zwischen den Songs läuft; **Android Auto** (vorher in dessen
   Entwicklereinstellungen „Unbekannte Quellen“ aktivieren, weil die App nicht aus dem Play Store kommt).
@@ -179,9 +185,12 @@ Dazu hat sie einen eigenen Bereich für die [Podcasts](#podcasts). Zur App gehö
   Zeilen. Ist das Radio aus, zeigt er den zuletzt gehörten Sender, und Play schaltet ihn ein. **Sender-Kachel**: einen
   Sender wählen; ein Tipp spielt ihn, ein weiterer pausiert.
 * **Updates** – beim Start, höchstens einmal am Tag, fragt die App bei github.com nach der Liste der Releases. Eine neuere
-  Version wird mit ihrem Changelog vorgeschlagen (herunterladen, später oder überspringen); der Download öffnet sich im
-  Browser, ein Tipp auf die Datei installiert sie über die App. **Auf Updates prüfen** in den Einstellungen fragt jederzeit
-  und zeigt immer einen Changelog; die automatische Prüfung ist dort abschaltbar. Sonst nutzt die App das Internet nicht.
+  Version wird mit ihrem Changelog vorgeschlagen (installieren, später oder überspringen). **Installieren** lädt die APK
+  aus dem Release, prüft Länge, SHA-256 und dass es diese App und kein älterer Stand ist, und übergibt sie dem
+  Installationsprogramm von Android; Android nimmt nur eine App mit demselben Signaturschlüssel an. Einmal muss man der
+  App erlauben, Apps zu installieren, und Android fragt vor jeder Installation; die App schließt sich dabei. Klappt etwas
+  nicht, kann weiterhin der Browser die Datei laden. **Auf Updates prüfen** in den Einstellungen fragt jederzeit und zeigt
+  immer einen Changelog; die automatische Prüfung ist dort abschaltbar. Sonst nutzt die App das Internet nicht.
 * **Packs** - eine Datei je Sender (`.radiopak`), je Podcast (`.podpak`), eine mit den Nachrichten (`news.newspak`), eine für
   das Soundtrack-Album (`.playlistpak`) und eine je Score-Gruppe (`.scorepak`), am PC erzeugt: in AWC Radio auf **Android-Packs…** klicken, einen
   Ordner wählen und schreiben. Ein Sender-Pack enthält die Songs des Senders in der Originalqualität des Spiels (ca. 128 kbit/s, nicht

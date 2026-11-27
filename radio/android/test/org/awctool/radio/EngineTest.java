@@ -317,7 +317,7 @@ public class EngineTest {
             all.add(f);
             return f;
         });
-        int both = 0, under = 0;
+        int both = 0, under = 0, steppedBack = 0;
         while (clock.t < start + seconds) {
             long delay = eng.tick();
             double now = clock.t;
@@ -333,7 +333,23 @@ public class EngineTest {
                     if (f.track == bed) music2 = f;
                 }
                 check(main != null, "mixed: " + it.track.key + " is silent at " + (now - it.start));
-                check(Math.abs(main.vol - Engine.volume(it, now, 1f)) < 1e-6, "mixed: volume " + main.vol);
+                double want = Engine.volume(it, now, 1f);
+                if (it.kind.equals(Schedule.SONG)) {           // it steps back while an ident or the DJ is heard over it
+                    double most = 0;
+                    for (Schedule.Item x : sch.itemsFrom(now - 200, 40)) {
+                        if (x.kind.equals(Schedule.SONG) || Math.min(x.end, it.end) - Math.max(x.start, it.start) <= 0.05) continue;
+                        double from = Math.max(x.start, it.start), to = Math.min(x.end, it.end);
+                        double in = Math.min(1, Math.max(0, (now - (from - Engine.RAMP)) / Engine.RAMP));
+                        double out = Math.min(1, Math.max(0, (to + Engine.RAMP - now) / Engine.RAMP));
+                        most = Math.max(most, in * out);
+                    }
+                    want *= 1 - (1 - Engine.DUCK) * most;
+                    if (most > 0.999) steppedBack++;
+                } else {                                      // spoken, or an ident between songs: never faded
+                    check(it.fadeIn == null && it.fadeOut == null, "mixed: a spoken item is faded");
+                    check(main.vol > 0.999f, "mixed: a spoken item is quiet: " + main.vol);
+                }
+                check(Math.abs(main.vol - want) < 1e-5, "mixed: volume " + main.vol + " instead of " + want);
                 check(Math.abs(main.position() - (now - it.start)) < 0.35, "mixed: drift " + (main.position() - (now - it.start)));
                 sounding++;
                 if (bed != null && now - it.start < it.track.sec - 0.5) {
@@ -350,9 +366,10 @@ public class EngineTest {
         }
         eng.stop();
         for (Fake f : all) check(f.released, "mixed: player of " + f.track.key + " leaked");
-        check(both > 200 && under > 200, "mixed: two at once in " + both + " ticks, beds in " + under);
-        System.out.println(String.format("  %-34s ok  (%d players, %d ticks with two items, %d with a bed)", "mixed as in the game",
-                all.size(), both, under));
+        check(both > 200 && under > 200 && steppedBack > 100, "mixed: two at once in " + both + " ticks, beds in " + under
+                + ", stepped back in " + steppedBack);
+        System.out.println(String.format("  %-34s ok  (%d players, %d ticks with two items, %d with a bed, %d with a song stepped back)",
+                "mixed as in the game", all.size(), both, under, steppedBack));
     }
 
     public static void main(String[] a) {

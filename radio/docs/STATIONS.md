@@ -70,8 +70,8 @@ n x `(f32 x, f32 y)` from `+20`), type 6 a table (`u32` n at `+16`, then n x `f3
 Behind a station's track lists come pairs `(category, mixing rule)` and then `(category, n, mode)`: with mode 2 the last n
 items of that category do not come back, with mode 1 the category is played in its order.
 
-AWC Radio uses the rules of 20 stations (18 music stations and the two talk stations). The mixing rules (how items overlap
-in the game) are not used.
+AWC Radio uses the rules of 20 stations (18 music stations and the two talk stations). How items overlap is described under
+[Mixing](#mixing).
 
 ## News
 
@@ -107,6 +107,10 @@ Song banks carry marker events: `dj` (the DJ's two windows), `intro` (about wher
 
 This program counts the times from the **end of the recording**, lets the `intro` marker of a following song land on the
 start time, and never lays more than half of either item over the other. The talk stations name no mixing rules.
+
+The fades are not applied to everything: spoken items (`talk`, `advert`, `news`, `dj_banter…`, `show…`) are never faded,
+and other jingles only against a spoken item or another jingle, not against a song. A song steps back to a quarter of its
+level while something is said over it. Start and end times are those of the rules.
 
 ## Music beds
 

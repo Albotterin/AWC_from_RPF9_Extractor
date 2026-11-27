@@ -84,6 +84,12 @@ final class Harness {
             throw new java.io.IOException("offline in the tests");
         };
         ReflectionHelpers.setStaticField(Updates.class, "busy", false);
+        Installer.source = url -> {
+            throw new java.io.IOException("offline in the tests");
+        };
+        for (String field : new String[]{"screen", "job", "asked", "progress", "bar"}) {
+            ReflectionHelpers.setStaticField(Installer.class, field, null);
+        }
         ReflectionHelpers.setStaticField(PackStore.class, "catalog", null);
         ReflectionHelpers.setStaticField(PackStore.class, "ready", false);
         ReflectionHelpers.setStaticField(Widgets.class, "now", null);

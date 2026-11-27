@@ -41,6 +41,10 @@ public final class ProgramDump {
                                     out.printf(java.util.Locale.ROOT, "%s|%d|%s%d|%s|%s|%.6f|%.6f|%s|%s%n", s.name, a - 2,
                                             "c" + content + "f", fade, it.kind, it.track.key,
                                             it.start, it.end, fade(it.fadeIn), fade(it.fadeOut));
+                                    for (double[] span : s.programme(content, fade).talkOver(it, true)) {
+                                        out.printf(java.util.Locale.ROOT, "%s|%d|%s%d|over|%s|%.6f|%.6f|%.6f%n", s.name, a - 2,
+                                                "c" + content + "f", fade, it.track.key, it.start, span[0], span[1]);
+                                    }
                                     Schedule.Track bed = s.programme(content, fade).bedOf(it);
                                     if (bed != null) {
                                         out.printf(java.util.Locale.ROOT, "%s|%d|%s%d|bed|%s|%.6f%n", s.name, a - 2,

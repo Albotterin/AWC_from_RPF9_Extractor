@@ -14,6 +14,7 @@ import java.util.List;
  * audio focus is handled with resync().
  *
  * With the DJ switched on (setDj) a second player says his lines over a song (Schedule.voices) while the song steps back.
+ * It steps back in the same way for what other items say over it (Schedule.talkOver).
  * Under talk of the DJ that has a music bed (Schedule.bedOf) another player repeats that music quietly.
  */
 final class Engine {
@@ -69,6 +70,7 @@ final class Engine {
         int tries = 1;
         double retryAt;
         List<Line> lines;                         // what the DJ says over it; null: not looked up
+        List<double[]> others;                    // when other items speak over it; null: not looked up
         final Schedule.Track bed;                 // the music under it, or null
         Player under;
         boolean underStarted, underOver;
@@ -102,7 +104,10 @@ final class Engine {
     /** The DJ's intros and outros on or off, at any time. */
     void setDj(boolean on) {
         dj = on;
-        if (!on) for (Slot s : slots) silence(s);
+        for (Slot s : slots) {
+            s.others = null;                          // what the DJ says over the song before counts only while he is on
+            if (!on) silence(s);
+        }
     }
 
     /** The programme this engine plays. */
@@ -241,18 +246,37 @@ final class Engine {
         return busy;
     }
 
-    /** How loud the music of an item is at `now` because of the DJ: 1, or less while he talks over it. */
-    private static float behindDj(Slot s, double now) {
-        if (s.lines == null) return 1f;
+    /** How far the music has stepped back at `now` for something said from `from` to `to`: 0 not at all, 1 all the way. */
+    private static double back(double now, double from, double to) {
+        double in = Math.min(1, Math.max(0, (now - (from - RAMP)) / RAMP));
+        double out = Math.min(1, Math.max(0, (to + RAMP - now) / RAMP));
+        return in * out;
+    }
+
+    /** How loud the music of an item is at `now` because of what is said: 1, or less while somebody talks over it. */
+    private static float behindTalk(Slot s, double now) {
         double most = 0;
-        for (Line l : s.lines) {
-            if (!l.started && (l.over || l.player == null || !l.player.isPrepared())) continue;    // nothing to hear
-            double from = s.item.start + l.voice.at, to = from + l.voice.line.sec;
-            double in = Math.min(1, Math.max(0, (now - (from - RAMP)) / RAMP));
-            double out = Math.min(1, Math.max(0, (to + RAMP - now) / RAMP));
-            most = Math.max(most, in * out);
+        if (s.lines != null) {
+            for (Line l : s.lines) {
+                if (!l.started && (l.over || l.player == null || !l.player.isPrepared())) continue;    // nothing to hear
+                double from = s.item.start + l.voice.at;
+                most = Math.max(most, back(now, from, from + l.voice.line.sec));
+            }
+        }
+        if (s.others != null) {
+            for (double[] span : s.others) most = Math.max(most, back(now, s.item.start + span[0], s.item.start + span[1]));
         }
         return (float) (1 - (1 - DUCK) * most);
+    }
+
+    /** Looks up when other items speak over an item; true while the music steps back or forward for one of them. */
+    private boolean others(Slot s, double now) {
+        if (s.others == null) s.others = schedule.talkOver(s.item, dj);
+        for (double[] span : s.others) {
+            double from = s.item.start + span[0], to = s.item.start + span[1];
+            if (now > from - RAMP - 0.3 && now < to + RAMP + 0.3) return true;
+        }
+        return false;
     }
 
     private static void releaseBed(Slot s) {
@@ -400,15 +424,16 @@ final class Engine {
                 continue;
             }
             if (talk(s, now)) busy = true;
+            if (others(s, now)) busy = true;
             if (!s.started) {
                 if (now + 2.0 >= it.start) busy = true;
                 // start() needs a moment: a little early, so that one item follows the other without a gap
                 if (p.isPrepared() && now + START_COMPENSATION >= it.start) {
-                    p.startAt(Math.max(0.0, now + START_COMPENSATION - it.start), volume(it, now, duck) * behindDj(s, now));
+                    p.startAt(Math.max(0.0, now + START_COMPENSATION - it.start), volume(it, now, duck) * behindTalk(s, now));
                     s.started = true;
                 }
             } else {
-                p.setVolume(volume(it, now, duck) * behindDj(s, now));
+                p.setVolume(volume(it, now, duck) * behindTalk(s, now));
                 double in = it.fadeIn == null ? 0.0 : it.fadeIn.at + it.fadeIn.len;
                 double goes = it.fadeOut == null ? it.end : it.start + it.fadeOut.at;
                 if (now - it.start < in + 0.2 || now > goes - 0.2) busy = true;

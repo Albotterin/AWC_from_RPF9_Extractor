@@ -707,6 +707,7 @@ public class MainActivity extends Activity implements PackStore.Listener {
         super.onStart();
         bound = bindService(new Intent(this, RadioService.class), conn, Context.BIND_AUTO_CREATE);
         PackStore.addListener(this);
+        Installer.attach(this);
         Updates.onStart(this);
         Catalog now = PackStore.get(this);
         if (stations != now.stations || podcasts != now.podcasts || scores != now.scores) buildScreen();   // changed while away
@@ -722,6 +723,7 @@ public class MainActivity extends Activity implements PackStore.Listener {
     protected void onStop() {
         handler.removeCallbacks(refresh);
         PackStore.removeListener(this);
+        Installer.detach(this);
         if (bound) {
             try {
                 unbindService(conn);
