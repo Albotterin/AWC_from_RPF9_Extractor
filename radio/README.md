@@ -154,7 +154,7 @@ The current list of all stations with their content and length: [all stations](d
 The phone app plays the same live programme as the PC: same clock, same order, same transitions (in the same time
 zone). It consists of the app and the packs:
 
-* **`AWC-Radio.apk`** - the app (version 1.19), the same file for everybody, no game data inside. Android 7.0 or newer,
+* **`AWC-Radio.apk`** - the app (version 1.20), the same file for everybody, no game data inside. Android 7.0 or newer,
   English and German. Station grid, mini player and a large player in the colour of the station's logo; background playback
   with a media notification, lock-screen and headset buttons; sleep timer; switches for what runs between the songs; **Android Auto** (switch on *Unknown sources* in
   its developer settings first, because the app does not come from the Play Store).
@@ -165,7 +165,8 @@ zone). It consists of the app and the packs:
   finished recordings of lifts, lobbies, a minigolf course and other places), their sub
   groups (a mission, an area) and pieces; a piece plays from its start and the group goes on. The names are the working
   names from the game files and may give away the story. See the [extractor](../extractor/README.md#the-score) for how the
-  pieces are made.
+  pieces are made. A search field on top looks through the whole
+  score: missions and places by their name, pieces by title and mission; back clears it.
 * **Radio alarm** - several alarms with weekdays, station, volume, gentle start, snooze and vibration. It rings on the phone's
   alarm volume with a screen over the lock screen. If nothing can be heard from the radio within 10 seconds (pack missing,
   player error, phone not yet unlocked after a restart), the phone's own alarm tone rings. It stops by itself after 30 minutes.

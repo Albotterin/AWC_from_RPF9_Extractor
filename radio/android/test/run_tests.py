@@ -97,7 +97,8 @@ def main():
     srcs = sources("Schedule.java", "Engine.java", "Episodes.java") + [tests("EngineTest.java"), tests("EpisodesTest.java")]
     catalog = os.path.isfile(json_jar)
     if catalog:
-        srcs += sources("Library.java", "Pack.java", "Catalog.java", "Music.java", "Alarm.java", "StationColor.java")
+        srcs += sources("Library.java", "Pack.java", "Catalog.java", "Music.java", "ScoreSearch.java", "Alarm.java",
+                        "StationColor.java")
         srcs += [tests("ProgramDump.java")]
         srcs += [tests("CatalogTest.java"), tests("AlarmTest.java"), tests("MusicTest.java")]
     cp = OUT + (os.pathsep + json_jar if catalog else "")

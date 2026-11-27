@@ -162,6 +162,9 @@
     <string name="score_play_all">Play all</string>
     <string name="score_all_pieces">All pieces</string>
     <string name="score_names">The names are the working names from the game files and may give away the story.</string>
+    <string name="score_search_hint">Piece, mission or place</string>
+    <string name="score_found_subs">Missions and places</string>
+    <string name="score_found_pieces">Pieces</string>
     <string name="piece_error">This piece cannot be played</string>
     <string name="info_score">Score pieces: %1$d</string>
     <string name="score_empty_title">No score yet</string>

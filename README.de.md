@@ -84,7 +84,7 @@ python radio/awc_radio.py        # das Radio
 
 ## 📱 Die AWC-Radio-App für Android
 
-Das Radio für die Hosentasche, fürs Auto und für den Nachttisch. **`AWC-Radio.apk`** (Version 1.19, auf einem echten Android-Handy getestet) spielt dasselbe
+Das Radio für die Hosentasche, fürs Auto und für den Nachttisch. **`AWC-Radio.apk`** (Version 1.20; Version 1.19 wurde auf einem echten Android-Handy getestet) spielt dasselbe
 Live-Programm wie der PC: gleiche Uhr, gleiche Reihenfolge, gleiche Übergänge – mit Sender-Packs derselben Version
 spielen Handy und PC zur selben Zeit dasselbe.
 
@@ -94,7 +94,7 @@ spielen Handy und PC zur selben Zeit dasselbe.
 | 🔎 **On-Demand** | Ein Reiter wie eine Musik-App: Songs und Interpreten suchen, alle Songs, die Interpreten, eine Playlist für jeden Sender und eine für das Soundtrack-Album mit seinem Cover; Zufall und Wiederholen |
 | 🎙 **Podcasts** | Ein eigener Bereich neben dem Radio: Cover, Folgenliste, Player mit Positionsleiste, 15 Sekunden zurück und 30 vor; die Stelle in jeder Folge wird gemerkt, die nächste folgt von selbst |
 | 🗣 **DJ über Songs** | Ansagen über den Songs, in den Einstellungen einzuschalten; die Musik tritt zurück, solange der DJ spricht |
-| 🎼 **Score** | Ein eigener Reiter: offene Welt, Missionen, Stützpunkte, Aktivitäten und Musik an Orten (Fahrstühle, Hotellobbys, Minigolf), jeweils mit Untergruppen und Stücken |
+| 🎼 **Score** | Ein eigener Reiter: offene Welt, Missionen, Stützpunkte, Aktivitäten und Musik an Orten (Fahrstühle, Hotellobbys, Minigolf), jeweils mit Untergruppen und Stücken; eine Suche über den ganzen Score nach Stücken, Missionen und Orten |
 | ⏰ **Radiowecker** | Mehrere Wecker mit Wochentagen, Sender, Lautstärke, sanftem Start und Schlummern; ein Sonnenaufgang-Bildschirm über dem Sperrbildschirm. Ist das Radio nicht zu hören, klingelt der Weckton des Handys; Wecker bleiben nach einem Neustart erhalten |
 | 🚗 **Android Auto** | Die Sender als Raster mit ihren Logos, Song und Sender auf dem Player-Bildschirm, Sprachbefehle wie *„Spiele Radio On-U auf AWC Radio“* |
 | 😴 **Einschlaftimer** | Stoppt das Radio nach der gewählten Zeit |
@@ -123,7 +123,7 @@ spielen Handy und PC zur selben Zeit dasselbe.
 
 ## Fortschritt
 
-Stand **2026-11-26** (v2.13.0), gemessen an einer 28,5 GB großen `audio.rpf`.
+Stand **2026-11-27** (v2.14.0), gemessen an einer 28,5 GB großen `audio.rpf`.
 
 | Bereich | Stand | |
 |---|---|---|
@@ -143,7 +143,7 @@ Stand **2026-11-26** (v2.13.0), gemessen an einer 28,5 GB großen `audio.rpf`.
 | Podcasts | alle 5, die die Credits nennen, mit 20 Folgen samt Titeln (3 Std. 36 Min.), in der App und am PC | ✅ |
 | Score | 2.543 Stücke (rund 33 Std.) und 113 Aufnahmen von Orten (4,8 Std.), im Extractor in einem eigenen Ordner; 1.078 ab 30 Sekunden (31 Std.) kommen in die App-Packs | ✅ |
 | Titel aus `data.rpf` | 839 der 865 Titel-Nummern, die die Aufnahmen tragen, haben in der Tabelle des Spiels Titel und Interpret | ✅ |
-| Android-App | Version 1.19: Radio, On-Demand, Podcasts, Score, DJ, Inhalts-Schalter, Radiowecker, Widgets, Update-Prüfung, Android Auto; läuft auf einem echten Android-Handy | ✅ |
+| Android-App | Version 1.20: Radio, On-Demand, Podcasts, Score mit Suche, DJ, Inhalts-Schalter, Radiowecker, Widgets, Update-Prüfung, Android Auto; Version 1.19 lief auf einem echten Android-Handy, 1.20 ist dort noch nicht erprobt | ✅ |
 | The Vault Radio | läuft als ein langer Mix; 23 seiner 24 gelisteten Songs sind als Teile darin benannt | 🎚 |
 
 ![AWC Radio – Fortschritt der Sender](radio/docs/radio-progress.svg)
@@ -177,6 +177,7 @@ Details zu jedem Sender: [Fortschritt des Radios](radio/docs/RADIO-PROGRESS.de.m
 - [x] Die Android-App läuft auf einem echten Handy
 - [x] Score und DJ der App sind auf einem echten Handy getestet
 - [x] App 1.19 läuft auf einem echten Handy
+- [ ] App 1.20 (Suche im Score-Reiter) ist noch nicht auf einem echten Handy getestet
 - [ ] Extractor: nur Opus; das RPF9-Inhaltsverzeichnis wird nicht gelesen, es gibt also keine Dateinamen
 
 ### Meilensteine
@@ -203,6 +204,7 @@ Details zu jedem Sender: [Fortschritt des Radios](radio/docs/RADIO-PROGRESS.de.m
 | [v2.11.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.11.0) | 2026-11-26 | 📻 Übergänge wie im Spiel mit Musik unter dem DJ · 🔎 On-Demand mit Suche, Playlisten und Soundtrack-Album · App 1.16 |
 | [v2.12.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.12.0) | 2026-11-26 | 📻 Eigene Schalter für Werbung, Nachrichten, DJ-Beiträge, Talk und Jingles (PC und App) · App 1.17 |
 | [v2.13.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.13.0) | 2026-11-26 | 📱 Widgets für den Startbildschirm und eine Update-Prüfung mit Changelog · App 1.19 |
+| [v2.14.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.14.0) | 2026-11-27 | 🔎 Suche im Score-Reiter der App · App 1.20 |
 
 ## Aufbau des Repositorys
 

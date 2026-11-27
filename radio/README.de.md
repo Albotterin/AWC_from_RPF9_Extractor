@@ -157,7 +157,7 @@ Die Handy-App spielt dasselbe Live-Programm wie der PC: gleiche Uhr und Zeitzone
 Übergänge.
 Dazu hat sie einen eigenen Bereich für die [Podcasts](#podcasts). Zur App gehören die Packs:
 
-* **`AWC-Radio.apk`** - die App (Version 1.19), für alle dieselbe Datei, ohne Spieldaten. Android 7.0 oder neuer, Deutsch und
+* **`AWC-Radio.apk`** - die App (Version 1.20), für alle dieselbe Datei, ohne Spieldaten. Android 7.0 oder neuer, Deutsch und
   Englisch. Senderraster, kleiner Player und großer Player in der Farbe des Senderlogos; Wiedergabe im Hintergrund mit
   Medien-Benachrichtigung, Sperrbildschirm- und Kopfhörertasten; Einschlaftimer; Schalter für das, was zwischen den Songs läuft; **Android Auto** (vorher in dessen
   Entwicklereinstellungen „Unbekannte Quellen“ aktivieren, weil die App nicht aus dem Play Store kommt).
@@ -168,7 +168,8 @@ Dazu hat sie einen eigenen Bereich für die [Podcasts](#podcasts). Zur App gehö
   enthält die fertigen Aufnahmen von Fahrstühlen, Hotellobbys, einer Minigolfanlage und anderen Orten),
   darin Untergruppen (eine Mission, ein Gebiet) und Stücke; ein Stück läuft von vorn, danach geht die Gruppe weiter. Die
   Namen sind Arbeitsnamen aus den Spieldateien und können die Handlung verraten. Wie die Stücke entstehen, steht beim
-  [Extractor](../extractor/README.de.md#der-score).
+  [Extractor](../extractor/README.de.md#der-score). Ein Suchfeld oben durchsucht den ganzen Score: Missionen und Orte nach
+  ihrem Namen, Stücke nach Titel und Mission; Zurück leert es.
 * **Radiowecker** - mehrere Wecker mit Wochentagen, Sender, Lautstärke, sanftem Start, Schlummern und Vibration. Er klingelt
   mit der Weckerlautstärke des Handys und zeigt einen Bildschirm über dem Sperrbildschirm. Ist vom Radio nach 10 Sekunden
   nichts zu hören (Pack fehlt, Player-Fehler, Handy nach einem Neustart noch nicht entsperrt), klingelt der Weckton des

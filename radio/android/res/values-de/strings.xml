@@ -162,6 +162,9 @@
     <string name="score_play_all">Alle abspielen</string>
     <string name="score_all_pieces">Alle Stücke</string>
     <string name="score_names">Die Namen sind die Arbeitsnamen aus den Spieldateien und können die Handlung verraten.</string>
+    <string name="score_search_hint">Stück, Mission oder Ort</string>
+    <string name="score_found_subs">Missionen und Orte</string>
+    <string name="score_found_pieces">Stücke</string>
     <string name="piece_error">Dieses Stück lässt sich nicht abspielen</string>
     <string name="info_score">Score-Stücke: %1$d</string>
     <string name="score_empty_title">Noch kein Score</string>

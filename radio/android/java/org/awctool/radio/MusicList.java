@@ -1,23 +1,15 @@
 package org.awctool.radio;
 
 import android.app.Activity;
-import android.content.Context;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
-import android.text.Editable;
-import android.text.InputType;
 import android.text.TextUtils;
-import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.inputmethod.EditorInfo;
-import android.view.inputmethod.InputMethodManager;
 import android.widget.AbsListView;
 import android.widget.BaseAdapter;
-import android.widget.EditText;
 import android.widget.FrameLayout;
-import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
@@ -63,8 +55,7 @@ final class MusicList extends LinearLayout {
     private final Music music;
     private final Actions actions;
     private final String view;                            // null: the start
-    private final EditText field;
-    private final ImageButton clear;
+    private final SearchField search;
     private final ListView list;
     private final Rows adapter = new Rows();
     private final List<Row> rows = new ArrayList<>();
@@ -83,36 +74,8 @@ final class MusicList extends LinearLayout {
         setOrientation(VERTICAL);
         columns = Math.max(3, Math.min(8, a.getResources().getConfiguration().screenWidthDp / 118));
 
-        LinearLayout search = new LinearLayout(a);
-        search.setGravity(Gravity.CENTER_VERTICAL);
-        search.setBackground(Ui.rounded(a, Ui.SURFACE, 26));
-        search.setPadding(dp(16), 0, dp(4), 0);
-        ImageView glass = new ImageView(a);
-        glass.setImageResource(R.drawable.ic_search);
-        glass.setColorFilter(Ui.MUTED);
-        search.addView(glass, new LayoutParams(dp(20), dp(20)));
-        field = new EditText(a);
-        field.setHint(R.string.search_hint);
-        field.setHintTextColor(Ui.MUTED);
-        field.setTextColor(Ui.TEXT);
-        field.setTextSize(15);
-        field.setSingleLine(true);
-        field.setBackground(null);
-        field.setPadding(dp(12), 0, dp(8), 0);
-        field.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-        field.setImeOptions(EditorInfo.IME_ACTION_SEARCH | EditorInfo.IME_FLAG_NO_EXTRACT_UI);
-        field.setText(this.words);
-        field.setOnEditorActionListener((v, id, e) -> {
-            keyboardAway();
-            return true;
-        });
-        search.addView(field, new LayoutParams(0, dp(52), 1f));
-        clear = Ui.icon(a, R.drawable.ic_close, a.getString(R.string.search_clear), 44, Ui.MUTED);
-        clear.setOnClickListener(v -> field.setText(""));
-        search.addView(clear, new LayoutParams(dp(44), dp(44)));
-        LayoutParams slp = new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        slp.setMargins(dp(14), 0, dp(14), dp(6));
-        addView(search, slp);
+        search = new SearchField(a, R.string.search_hint, this.words, this::typed);
+        search.addTo(this);
 
         list = new ListView(a);
         list.setDivider(null);
@@ -125,7 +88,7 @@ final class MusicList extends LinearLayout {
         list.setOnScrollListener(new AbsListView.OnScrollListener() {
             @Override
             public void onScrollStateChanged(AbsListView v, int state) {
-                if (state == SCROLL_STATE_TOUCH_SCROLL) keyboardAway();
+                if (state == SCROLL_STATE_TOUCH_SCROLL) search.keyboardAway();
             }
 
             @Override
@@ -135,35 +98,18 @@ final class MusicList extends LinearLayout {
         fill();
         list.setAdapter(adapter);
         addView(list, new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+    }
 
-        field.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-            }
-
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {
-            }
-
-            @Override
-            public void afterTextChanged(Editable s) {
-                MusicList.this.words = s.toString();
-                actions.searched(MusicList.this.words);
-                fill();
-                adapter.notifyDataSetChanged();
-                list.setSelection(0);
-            }
-        });
+    private void typed(String now) {
+        words = now;
+        actions.searched(words);
+        fill();
+        adapter.notifyDataSetChanged();
+        list.setSelection(0);
     }
 
     private int dp(float v) {
         return Ui.dp(activity, v);
-    }
-
-    private void keyboardAway() {
-        InputMethodManager keys = (InputMethodManager) activity.getSystemService(Context.INPUT_METHOD_SERVICE);
-        if (keys != null) keys.hideSoftInputFromWindow(field.getWindowToken(), 0);
-        field.clearFocus();
     }
 
     // ------------------------------------------------------------------------------------------ what is listed
@@ -210,7 +156,6 @@ final class MusicList extends LinearLayout {
 
     private void fill() {
         rows.clear();
-        clear.setVisibility(words.isEmpty() ? INVISIBLE : VISIBLE);
         if (music.songs.isEmpty()) {
             hint(activity.getString(R.string.music_empty));
         } else if (!words.trim().isEmpty()) {
@@ -398,7 +343,7 @@ final class MusicList extends LinearLayout {
         card.addView(time);
         card.setContentDescription(s.track.title + ", " + s.track.artist);
         card.setOnClickListener(v -> {
-            keyboardAway();
+            search.keyboardAway();
             actions.play(r.queue, r.index);
         });
         return frame;
@@ -424,7 +369,7 @@ final class MusicList extends LinearLayout {
         words(card, r.text, r.below, Ui.TEXT);
         card.setContentDescription(r.text);
         card.setOnClickListener(v -> {
-            keyboardAway();
+            search.keyboardAway();
             if (!words.isEmpty()) actions.searched("");
             actions.show(r.view);
         });

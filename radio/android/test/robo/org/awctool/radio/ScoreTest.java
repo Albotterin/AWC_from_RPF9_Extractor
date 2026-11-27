@@ -6,6 +6,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.media.browse.MediaBrowser;
 import android.view.View;
+import android.widget.EditText;
 import android.widget.TextView;
 
 import org.junit.Assert;
@@ -188,6 +189,83 @@ public class ScoreTest {
         Assert.assertEquals("Flash FM", radio.label());
     }
 
+    private EditText field() {
+        for (View v : ScreenshotTest.all(a.getWindow().getDecorView())) {
+            if (v instanceof EditText && v.isShown()) return (EditText) v;
+        }
+        return null;
+    }
+
+    /** A line (not the search field) that reads exactly this. */
+    private boolean listed(String text) {
+        for (View v : ScreenshotTest.all(a.getWindow().getDecorView())) {
+            if (v instanceof TextView && !(v instanceof EditText) && v.isShown() && text.contentEquals(((TextView) v).getText())) return true;
+        }
+        return false;
+    }
+
+    private void type(String text) {
+        field().setText(text);
+        Harness.pass(400);
+    }
+
+    @Test
+    public void search() throws Exception {
+        open();
+        tap("Score");
+        Library.Station m = missions();
+        Schedule.Track piece = m.songs.get(m.songs.size() / 2);
+        type(piece.title + " " + piece.artist);
+        Assert.assertTrue(visible("Stücke"));
+        Assert.assertTrue(listed(piece.title));
+        Assert.assertFalse("the groups make room", visible("Offene Welt"));
+        ScreenshotTest.shot(a, "69a_score_search", null);
+        Assert.assertTrue(tap(piece.title));
+        Assert.assertTrue(radio.isScore());
+        Assert.assertEquals(piece.title, radio.title);
+        Assert.assertEquals(piece.artist, radio.artist);
+        seconds(2);
+        Assert.assertEquals("the search stays", piece.title + " " + piece.artist, field().getText().toString());
+        ScreenshotTest.shot(a, "69b_score_search_playing", null);
+
+        type("qqqzzz");
+        Assert.assertTrue(visible("Nichts gefunden"));
+        a.onBackPressed();
+        Harness.pass(400);
+        Assert.assertTrue("back clears the search", visible("Offene Welt"));
+        Assert.assertEquals("", field().getText().toString());
+
+        // a mission that is found opens; back leads to its group
+        type(piece.artist.toLowerCase(java.util.Locale.ROOT) + " ");
+        Assert.assertTrue(visible("Missionen und Orte"));
+        ScreenshotTest.shot(a, "69c_score_search_mission", null);
+        Assert.assertTrue(tap(piece.artist));
+        Assert.assertEquals("", field().getText().toString());
+        Assert.assertTrue(visible(piece.title));
+        a.onBackPressed();
+        Harness.pass(400);
+        Assert.assertTrue(visible("Alle abspielen"));
+
+        // searched inside a group: the whole score is searched, back returns to the group
+        type(piece.title);
+        Assert.assertFalse(visible("Alle abspielen"));
+        a.onBackPressed();
+        Harness.pass(400);
+        Assert.assertTrue(visible("Alle abspielen"));
+
+        // very many hits: the list stays a list
+        for (String letters : new String[]{"a", "an", "a"}) type(letters);
+        Assert.assertTrue(visible("Stücke"));
+        int lines = 0;
+        for (View v : ScreenshotTest.all(a.getWindow().getDecorView())) {
+            if (v instanceof TextView && v.isShown()) lines++;
+        }
+        Assert.assertTrue("only what is on the screen is built: " + lines, lines < 120);
+        type("");
+        Assert.assertTrue(visible("Alle abspielen"));
+        command(RadioService.ACTION_STOP);
+    }
+
     @Test
     public void inTheCar() {
         Harness.settle();
@@ -220,6 +298,9 @@ public class ScoreTest {
         open();
         tap("Score");
         ScreenshotTest.shot(a, "65_small_score", null);
+        type("loop");
+        ScreenshotTest.shot(a, "65b_small_score_search", null);
+        type("");
         tap("Offene Welt");
         tap("Alle abspielen");
         seconds(3);

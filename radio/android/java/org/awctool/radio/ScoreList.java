@@ -6,9 +6,12 @@ import android.graphics.drawable.ColorDrawable;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AbsListView;
+import android.widget.BaseAdapter;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ListView;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
@@ -19,12 +22,17 @@ import java.util.Map;
 
 /**
  * The score tab: the groups of the score, then the sub groups of one (a mission, an area), then the pieces of one sub
- * group. A piece that is tapped plays, and the group goes on from there.
+ * group. A search field over them looks through the whole score; what it finds takes their place while it holds words.
+ * A piece that is tapped plays, and the group goes on from there.
  */
-final class ScoreList extends ScrollView {
+final class ScoreList extends LinearLayout {
+    private static final int SUB_HITS = 8;
+
     interface Actions {
         /** Show a group and one of its sub groups; null for the level above. */
         void show(String group, String sub);
+
+        void searched(String words);
 
         void play(String group, int piece);
     }
@@ -32,33 +40,61 @@ final class ScoreList extends ScrollView {
     /** The views of one line that change while the score is heard. */
     private static final class Row {
         int from, to;                       // the pieces of the group that the line stands for
+        View view;
         TextView title;
         ImageView mark;
         Ui.EqView eq;
     }
 
+    /** A line of what a search found: a heading, a hint, a sub group or a piece. */
+    private static final class Hit {
+        String heading, hint;
+        ScoreSearch.Sub sub;
+        ScoreSearch.Piece piece;
+    }
+
     private final Activity activity;
+    private final Actions actions;
     private final LinearLayout box;
+    private final ScrollView browse;
+    private SearchField search;                         // null while there is no score
+    private ListView results;
+    private final Hits adapter = new Hits();
+    private final List<Hit> hits = new ArrayList<>();
+    private ScoreSearch index;                          // made at the first search
+    private String words;
+    private String onGroup = "";                        // what is on: the group, the piece, and whether it is heard
+    private int onPiece = -1;
+    private boolean onPlaying;
     private final List<Library.Station> scores;
     private final Library.Station open;                 // the group that is shown, or null
     private final String sub;                           // the sub group that is shown, or null
     private final List<Row> rows = new ArrayList<>();
     private final List<TextView> states = new ArrayList<>();
 
-    ScoreList(Activity a, List<Library.Station> scores, Library.Station open, String sub, Actions actions) {
+    ScoreList(Activity a, List<Library.Station> scores, Library.Station open, String sub, String words, Actions actions) {
         super(a);
         activity = a;
+        this.actions = actions;
         this.scores = scores;
         this.open = open;
         this.sub = open == null ? null : sub;
-        setVerticalScrollBarEnabled(false);
-        setVerticalFadingEdgeEnabled(true);
-        setFadingEdgeLength(dp(18));
-        setFillViewport(true);
+        this.words = words == null ? "" : words;
+        setOrientation(VERTICAL);
+        browse = new ScrollView(a);
+        browse.setVerticalScrollBarEnabled(false);
+        browse.setVerticalFadingEdgeEnabled(true);
+        browse.setFadingEdgeLength(dp(18));
+        browse.setFillViewport(true);
         box = new LinearLayout(a);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(dp(14), dp(2), dp(14), dp(20));
-        addView(box);
+        browse.addView(box);
+        if (!scores.isEmpty()) {
+            search = new SearchField(a, R.string.score_search_hint, this.words, this::typed);
+            search.addTo(this);
+        }
+        addView(browse, new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
         if (scores.isEmpty()) {
             empty();
         } else if (open == null) {
@@ -71,7 +107,38 @@ final class ScoreList extends ScrollView {
         } else {
             pieces(open, this.sub, actions);
         }
+        if (search != null) {
+            results = new ListView(a);
+            results.setDivider(null);
+            results.setSelector(new ColorDrawable(Color.TRANSPARENT));
+            results.setVerticalScrollBarEnabled(false);
+            results.setVerticalFadingEdgeEnabled(true);
+            results.setFadingEdgeLength(dp(18));
+            results.setClipToPadding(false);
+            results.setPadding(0, 0, 0, dp(16));
+            results.setOnScrollListener(new AbsListView.OnScrollListener() {
+                @Override
+                public void onScrollStateChanged(AbsListView v, int state) {
+                    if (state == SCROLL_STATE_TOUCH_SCROLL) search.keyboardAway();
+                }
+
+                @Override
+                public void onScroll(AbsListView v, int first, int visible, int total) {
+                }
+            });
+            find();
+            results.setAdapter(adapter);
+            addView(results, new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        }
         update(null);
+    }
+
+    private void typed(String now) {
+        words = now;
+        actions.searched(now);
+        find();
+        adapter.notifyDataSetChanged();
+        results.setSelection(0);
     }
 
     private int dp(float v) {
@@ -221,8 +288,15 @@ final class ScoreList extends ScrollView {
         }
     }
 
-    /** One line of a list: a round mark (dancing bars while it plays), a title and a line below it. */
+    /** A line of the groups: marked while one of its pieces is on. */
     private View entry(Library.Station g, String title, String below, int from, int to, int icon) {
+        Row r = made(g, title, below, from, to, icon);
+        rows.add(r);
+        return r.view;
+    }
+
+    /** One line of a list: a round mark (dancing bars while it plays), a title and a line below it. */
+    private Row made(Library.Station g, String title, String below, int from, int to, int icon) {
         Row r = new Row();
         r.from = from;
         r.to = to;
@@ -248,13 +322,138 @@ final class ScoreList extends ScrollView {
         info.setPadding(0, dp(1), 0, 0);
         col.addView(info);
         card.addView(col, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        rows.add(r);
-        return card;
+        r.view = card;
+        return r;
+    }
+
+    /** Shows whether a line holds the piece that is on, and whether that one is heard. */
+    private void mark(Row r, Library.Station g, boolean current, boolean playing) {
+        r.title.setTextColor(current ? Logos.color(g).light : Ui.TEXT);
+        r.eq.setVisibility(playing ? VISIBLE : GONE);
+        r.eq.setDancing(playing);
+        r.mark.setVisibility(playing ? GONE : VISIBLE);
+    }
+
+    // ------------------------------------------------------------------------------------------ what a search finds
+    private Hit hit() {
+        Hit h = new Hit();
+        hits.add(h);
+        return h;
+    }
+
+    /** Fills the results for the words and shows them in place of the groups; without words the groups come back. */
+    private void find() {
+        hits.clear();
+        boolean searching = !words.trim().isEmpty();
+        browse.setVisibility(searching ? GONE : VISIBLE);
+        results.setVisibility(searching ? VISIBLE : GONE);
+        if (!searching) return;
+        if (index == null) index = new ScoreSearch(scores);
+        ScoreSearch.Found found = index.find(words);
+        if (found.subs.isEmpty() && found.pieces.isEmpty()) {
+            hit().hint = activity.getString(R.string.search_nothing, words.trim());
+            return;
+        }
+        if (!found.subs.isEmpty()) {
+            hit().heading = activity.getString(R.string.score_found_subs);
+            for (ScoreSearch.Sub s : found.subs.subList(0, Math.min(SUB_HITS, found.subs.size()))) hit().sub = s;
+        }
+        if (!found.pieces.isEmpty()) {
+            hit().heading = activity.getString(R.string.score_found_pieces);
+            for (ScoreSearch.Piece p : found.pieces) hit().piece = p;
+        }
+    }
+
+    private View hitView(Hit h) {
+        if (h.heading != null) {
+            TextView t = Ui.strong(activity, h.heading, 14, Ui.SUN);
+            t.setPadding(dp(20), dp(12), dp(20), dp(4));
+            return t;
+        }
+        if (h.hint != null) {
+            TextView t = Ui.text(activity, h.hint, 15, Ui.MUTED);
+            t.setGravity(Gravity.CENTER);
+            t.setPadding(dp(32), dp(40), dp(32), dp(16));
+            return t;
+        }
+        final Library.Station g = h.sub != null ? h.sub.group : h.piece.group;
+        final Row r;
+        if (h.sub != null) {
+            final ScoreSearch.Sub s = h.sub;
+            r = made(g, s.name, Ui.nameOf(activity, g) + " • " + summary(g, s.from, s.to), s.from, s.to, R.drawable.ic_score);
+            r.view.setOnClickListener(v -> {
+                search.keyboardAway();
+                actions.show(g.name, s.name);
+            });
+        } else {
+            final int piece = h.piece.index;
+            Schedule.Track t = h.piece.track();
+            r = made(g, t.title, Ui.fmt(t.sec) + " • " + t.artist + " • " + Ui.nameOf(activity, g), piece, piece + 1,
+                    R.drawable.ic_play);
+            r.view.setOnClickListener(v -> {
+                search.keyboardAway();
+                actions.play(g.name, piece);
+            });
+        }
+        boolean current = g.name.equals(onGroup) && onPiece >= r.from && onPiece < r.to;
+        mark(r, g, current, current && onPlaying);
+        FrameLayout frame = new FrameLayout(activity);
+        frame.setPadding(dp(14), dp(3), dp(14), dp(3));
+        frame.addView(r.view);
+        return frame;
+    }
+
+    private final class Hits extends BaseAdapter {
+        @Override
+        public int getCount() {
+            return hits.size();
+        }
+
+        @Override
+        public Object getItem(int i) {
+            return hits.get(i);
+        }
+
+        @Override
+        public long getItemId(int i) {
+            return i;
+        }
+
+        @Override
+        public boolean isEnabled(int i) {
+            return false;                                 // the lines handle their taps themselves
+        }
+
+        @Override
+        public boolean areAllItemsEnabled() {
+            return false;
+        }
+
+        @Override
+        public int getItemViewType(int i) {
+            return IGNORE_ITEM_VIEW_TYPE;                 // every line is made anew
+        }
+
+        @Override
+        public View getView(int i, View old, ViewGroup parent) {
+            View v = hitView(hits.get(i));
+            v.setLayoutParams(new AbsListView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            return v;
+        }
     }
 
     /** Marks what is playing; `radio` may be null. */
     void update(RadioService radio) {
         boolean on = radio != null && radio.state != RadioService.STOPPED && radio.isScore();
+        String group = on ? radio.stationName : "";
+        int piece = on ? radio.episodeIndex() : -1;
+        boolean sounding = on && radio.state == RadioService.PLAYING;
+        if (!group.equals(onGroup) || piece != onPiece || sounding != onPlaying) {
+            onGroup = group;
+            onPiece = piece;
+            onPlaying = sounding;
+            if (!hits.isEmpty()) adapter.notifyDataSetChanged();
+        }
         if (open == null) {
             for (int i = 0; i < states.size() && i < scores.size(); i++) {
                 boolean this_ = on && radio.stationName.equals(scores.get(i).name);
@@ -268,10 +467,7 @@ final class ScoreList extends ScrollView {
             int at = on && radio.stationName.equals(open.name) ? radio.episodeIndex() : -1;
             boolean current = at >= r.from && at < r.to;
             boolean playing = current && radio.state == RadioService.PLAYING;
-            r.title.setTextColor(current ? Logos.color(open).light : Ui.TEXT);
-            r.eq.setVisibility(playing ? VISIBLE : GONE);
-            r.eq.setDancing(playing);
-            r.mark.setVisibility(playing ? GONE : VISIBLE);
+            mark(r, open, current, playing);
         }
     }
 }

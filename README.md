@@ -83,8 +83,8 @@ python radio/awc_radio.py        # the radio
 
 ## 📱 AWC Radio app for Android
 
-The radio for your pocket, your car and your bedside. **`AWC-Radio.apk`** (version 1.19, tested on a real
-Android phone) plays the same live programme as
+The radio for your pocket, your car and your bedside. **`AWC-Radio.apk`** (version 1.20; version 1.19 was tested on a
+real Android phone) plays the same live programme as
 the PC: same clock, same order, same transitions – with station packs from the same version, phone and PC play the same
 at the same time.
 
@@ -94,7 +94,7 @@ at the same time.
 | 🔎 **On-Demand** | A tab like a music app: search for songs and artists, all songs, the artists, a playlist for every station and one for the soundtrack album with its cover; shuffle and repeat |
 | 🎙 **Podcasts** | An area of their own next to the radio: covers, episode list, a player with seek bar, 15 seconds back and 30 forward; the place in every episode is remembered and the next one follows by itself |
 | 🗣 **DJ over songs** | Intros and outros over the songs, switched on in the settings; the music steps back while the DJ talks |
-| 🎼 **Score** | A tab of its own: open world, missions, compounds, activities and the music in places (lifts, lobbies, minigolf), each with sub groups and pieces |
+| 🎼 **Score** | A tab of its own: open world, missions, compounds, activities and the music in places (lifts, lobbies, minigolf), each with sub groups and pieces; a search over the whole score for pieces, missions and places |
 | ⏰ **Radio alarm** | Several alarms with weekdays, station, volume, gentle start and snooze; a sunrise screen over the lock screen. If the radio cannot be heard, the phone's own alarm tone rings; alarms survive a restart |
 | 🚗 **Android Auto** | The stations as a grid with their logos, song and station on the player screen, voice commands such as *"play Radio On-U on AWC Radio"* |
 | 😴 **Sleep timer** | Stops the radio after the time you choose |
@@ -123,7 +123,7 @@ at the same time.
 
 ## Progress
 
-Status **2026-11-26** (v2.13.0), measured with a 28.5 GB `audio.rpf`.
+Status **2026-11-27** (v2.14.0), measured with a 28.5 GB `audio.rpf`.
 
 | Area | State | |
 |---|---|---|
@@ -143,7 +143,7 @@ Status **2026-11-26** (v2.13.0), measured with a 28.5 GB `audio.rpf`.
 | Podcasts | all 5 the credits name, with 20 episodes and their titles (3 h 36 min), in the app and on the PC | ✅ |
 | Score | 2,543 pieces (about 33 h) and 113 recordings of places (4.8 h), a folder of their own in the extractor; 1,078 of at least 30 seconds (31 h) go into the app packs | ✅ |
 | Titles from `data.rpf` | 839 of the 865 track numbers the recordings carry have a title and artist in the game's own table | ✅ |
-| Android app | version 1.19: radio, On-Demand, podcasts, score, DJ, content switches, radio alarm, widgets, update check, Android Auto; it runs on a real Android phone | ✅ |
+| Android app | version 1.20: radio, On-Demand, podcasts, score with search, DJ, content switches, radio alarm, widgets, update check, Android Auto; version 1.19 ran on a real Android phone, 1.20 is not yet tried on one | ✅ |
 | The Vault Radio | plays as one long mix; 23 of its 24 listed songs are named as parts of it | 🎚 |
 
 ![AWC Radio – station progress](radio/docs/radio-progress.svg)
@@ -176,6 +176,7 @@ Details for every station: [radio progress](radio/docs/RADIO-PROGRESS.md).
 - [x] The Android app runs on a real phone
 - [x] Score and DJ in the app are tested on a real phone
 - [x] App 1.19 runs on a real phone
+- [ ] App 1.20 (search in the score tab) is not yet tested on a real phone
 - [ ] Extractor: Opus only; the RPF9 table of contents is not read, so there are no file names
 
 ### Milestones
@@ -202,6 +203,7 @@ Details for every station: [radio progress](radio/docs/RADIO-PROGRESS.md).
 | [v2.11.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.11.0) | 2026-11-26 | 📻 Transitions as in the game with music under the DJ · 🔎 On-Demand with search, playlists and the soundtrack album · app 1.16 |
 | [v2.12.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.12.0) | 2026-11-26 | 📻 A switch of its own for adverts, news, DJ talk, talk and jingles (PC and app) · app 1.17 |
 | [v2.13.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.13.0) | 2026-11-26 | 📱 Home screen widgets and an update check with changelog · app 1.19 |
+| [v2.14.0](https://github.com/Albotterin/AWC_from_RPF9_Extractor/releases/tag/v2.14.0) | 2026-11-27 | 🔎 Search in the app's score tab · app 1.20 |
 
 ## Repository layout
 

@@ -85,7 +85,7 @@ public class SettingsTest {
         View root = a.getWindow().getDecorView();
         for (String text : new String[]{"Wiedergabe", "Überblenden", "Dauer", "3 s", "Zwischen den Songs", "Werbung", "Nachrichten",
                 "DJ-Beiträge", "Talk und Sendungen", "Jingles", "DJ über Songs", "Pack-Ordner", "AWC-Radio", "Sender neu laden", "Auf Updates prüfen", "Beim Start prüfen",
-                "Akku-Einstellungen", "AWC Radio 1.19"}) {
+                "Akku-Einstellungen", "AWC Radio 1.20"}) {
             Assert.assertTrue(text, shows(root, text));
         }
         ScreenshotTest.shot(a, "50_settings", null);

@@ -133,7 +133,23 @@ public final class CatalogTest {
         check(m.songs.size() == 2 && m.songs.get(0).title.equals("new piece") && m.songs.get(0).artist.equals("ROB Bank"), "pieces");
         for (Schedule.Track t : m.songs) check(m.pack.read("t/" + t.key).length > 0, "file " + t.key);
         check(Catalog.isPack("Score_Missions.ScorePak") && !Catalog.isPack("a.scorepak.part"), "score file names");
+        search(new ScoreSearch(c.scores));
         c.closeUnused(null);
+    }
+
+    /** The search of the score: missions "ROB Bank" ("new piece") and "ROB Boat" ("b"), open world "Events" ("a"). */
+    private static void search(ScoreSearch s) {
+        ScoreSearch.Found f = s.find("rob");
+        check(f.subs.size() == 2 && f.subs.get(0).name.equals("ROB Bank") && f.pieces.size() == 2, "both missions");
+        f = s.find("  BANK, new ");
+        check(f.subs.isEmpty() && f.pieces.size() == 1 && f.pieces.get(0).group.name.equals("score:mission")
+                && f.pieces.get(0).index == 0 && f.pieces.get(0).track().title.equals("new piece"), "words of title and mission");
+        f = s.find("boat");
+        check(f.subs.size() == 1 && f.subs.get(0).from == 1 && f.subs.get(0).to == 2 && f.pieces.get(0).index == 1, "span of a mission");
+        f = s.find("b");                          // a title that begins with it comes before one whose mission holds it
+        check(f.pieces.size() == 2 && f.pieces.get(0).track().title.equals("b"), "titles that begin with it first");
+        check(s.find("events").subs.get(0).group.name.equals("score:openworld"), "every group");
+        check(s.find("").pieces.isEmpty() && s.find(" ").subs.isEmpty() && s.find("zzz").pieces.isEmpty(), "nothing");
     }
 
     private static void real(File folder) throws Exception {

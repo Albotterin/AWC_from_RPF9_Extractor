@@ -62,6 +62,7 @@ public class MainActivity extends Activity implements PackStore.Listener {
     private String podcastShown;                           // podcasts tab: whose episodes are listed, or null
     private ScoreList scoreList;
     private String scoreShown, scoreSub;                   // score tab: the group and sub group that are listed, or null
+    private String scoreWords = "";                        // ... and what is searched in the score
     private MusicList musicList;
     private String musicShown, musicWords = "";             // on demand: what is listed (null: the start), what is searched
     private Music music;
@@ -115,6 +116,7 @@ public class MainActivity extends Activity implements PackStore.Listener {
             podcastShown = state.getString("podcast");
             scoreShown = state.getString("scoreGroup");
             scoreSub = state.getString("scoreSub");
+            scoreWords = state.getString("scoreWords", "");
             musicShown = state.getString("music");
             musicWords = state.getString("musicWords", "");
         }
@@ -131,6 +133,7 @@ public class MainActivity extends Activity implements PackStore.Listener {
         out.putString("podcast", podcastShown);
         out.putString("scoreGroup", scoreShown);
         out.putString("scoreSub", scoreSub);
+        out.putString("scoreWords", scoreWords);
         out.putString("music", musicShown);
         out.putString("musicWords", musicWords);
     }
@@ -235,10 +238,15 @@ public class MainActivity extends Activity implements PackStore.Listener {
         } else if (tab == TAB_SCORE && anyPack()) {
             int at = Catalog.indexOf(scores, scoreShown);
             if (at < 0) scoreShown = scoreSub = null;
-            scoreList = new ScoreList(this, scores, at < 0 ? null : scores.get(at), scoreSub, new ScoreList.Actions() {
+            scoreList = new ScoreList(this, scores, at < 0 ? null : scores.get(at), scoreSub, scoreWords, new ScoreList.Actions() {
                 @Override
                 public void show(String group, String sub) {
                     showScore(group, sub);
+                }
+
+                @Override
+                public void searched(String words) {
+                    scoreWords = words;
                 }
 
                 @Override
@@ -376,6 +384,7 @@ public class MainActivity extends Activity implements PackStore.Listener {
                         tab = TAB_SCORE;
                         scoreShown = name;
                         scoreSub = service != null && name.equals(service.stationName) ? service.artist : null;
+                        scoreWords = "";
                     } else {
                         tab = TAB_PODCASTS;
                         podcastShown = name;
@@ -423,6 +432,7 @@ public class MainActivity extends Activity implements PackStore.Listener {
     private void showScore(String group, String sub) {
         scoreShown = group;
         scoreSub = group == null ? null : sub;
+        scoreWords = "";
         buildScreen();
     }
 
@@ -587,6 +597,7 @@ public class MainActivity extends Activity implements PackStore.Listener {
     public void onBackPressed() {
         if (playerOpen) openPlayer(false);
         else if (tab == TAB_PODCASTS && podcastShown != null) showPodcast(null);
+        else if (tab == TAB_SCORE && !scoreWords.isEmpty()) showScore(scoreShown, scoreSub);   // back to what it covered
         else if (tab == TAB_SCORE && scoreShown != null) showScore(scoreSub == null ? null : scoreShown, null);
         else if (tab == TAB_MUSIC && (musicShown != null || !musicWords.isEmpty())) {
             // from a search back to what it covered; from an artist to the artists; else to the start
